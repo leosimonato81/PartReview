@@ -57,11 +57,11 @@ adicione / In **Edit → Preferences → Addon Manager → Custom repositories**
 - Branch: `main`
 
 Depois abra **Ferramentas → Addon Manager**, instale o PartReview e reinicie.
-Atualizações aparecem como "atualização disponível". Por enquanto a lista
-mostra "versão desconhecida": a versão instalada aparece na dica do workbench.
+Atualizações aparecem como "atualização disponível", com o número da versão.
+A versão instalada também aparece na dica do workbench.
 / Then open **Tools → Addon Manager**, install PartReview and restart. Updates
-show up as "update available". For now the list shows "unknown version": the
-installed version is shown in the workbench tooltip.
+show up as "update available", with the version number. The installed
+version is also shown in the workbench tooltip.
 
 ### 2b. Sem git (ZIP) / Without git (ZIP)
 
