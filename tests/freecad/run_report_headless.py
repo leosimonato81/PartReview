@@ -15,6 +15,7 @@
 #   PARTREVIEW_TITLE optional report title
 #   PARTREVIEW_LEVEL quick, standard or full (default)
 #   PARTREVIEW_COMPANY / PARTREVIEW_LOGO / PARTREVIEW_AUTHOR optional cover data
+#   PARTREVIEW_ACCENT optional accent color "#rrggbb" (empty = default)
 #   PARTREVIEW_EXPORTS "csv,html" to also write those files
 #   PARTREVIEW_RESULT  internal name of the result to use (default: the first)
 #   PARTREVIEW_EXIT  "1" to quit FreeCAD at the end
@@ -60,6 +61,7 @@ def main():
         level=ReportLevel(os.environ.get("PARTREVIEW_LEVEL", "full")),
         company=os.environ.get("PARTREVIEW_COMPANY", ""),
         logo_path=os.environ.get("PARTREVIEW_LOGO", ""),
+        accent_color=os.environ.get("PARTREVIEW_ACCENT", ""),
         author=os.environ.get("PARTREVIEW_AUTHOR", ""),
         export_csv="csv" in os.environ.get("PARTREVIEW_EXPORTS", ""),
         export_html="html" in os.environ.get("PARTREVIEW_EXPORTS", ""),
