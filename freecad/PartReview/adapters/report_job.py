@@ -33,6 +33,7 @@ from ..domain.quality import (
     EquilibriumStatus,
     ErrorEstimate,
     check_equilibrium,
+    load_on_fixed_nodes,
     mesh_quality,
     parse_ccx_totals,
 )
@@ -129,7 +130,15 @@ def _equilibrium(analysis, result):
     reactions = Vec3(0.0, 0.0, 0.0)
     for vector in totals.values():
         reactions = g.add(reactions, vector)
-    return check_equilibrium(applied, reactions)
+    check = check_equilibrium(applied, reactions)
+    if check.status is EquilibriumStatus.IMBALANCE:
+        # Loads on nodes that are also fixed are missing from CalculiX reaction totals
+        # (spike 8.0, decision 007). Computed only when needed: it is not free.
+        data = fem_reader.nodal_loads_and_fixed_nodes(analysis)
+        if data is not None:
+            check = check_equilibrium(applied, reactions,
+                                      load_on_supports=load_on_fixed_nodes(*data))
+    return check
 
 
 def _error_estimate(analysis, result_obj, result, tets):

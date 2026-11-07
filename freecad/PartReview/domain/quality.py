@@ -35,6 +35,9 @@ class EquilibriumCheck:
     reactions: Vec3 | None = None  # N
     residual: float | None = None  # |applied + reactions| / |applied|
     reason_key: str = ""  # i18n key explaining NOT_VERIFIABLE / NOT_AVAILABLE
+    # Part of the applied load that sits on fixed nodes (N). CalculiX leaves it out of
+    # the reaction totals (it goes straight into the support), so it is added back.
+    load_on_supports: Vec3 | None = None
 
 
 _TOTAL = re.compile(r"total force \(fx,fy,fz\) for set (\S+) and time\s+(\S+)")
@@ -62,14 +65,34 @@ def parse_ccx_totals(text: str) -> dict:
 
 
 def check_equilibrium(applied: Vec3, reactions: Vec3,
-                      tolerance: float = EQUILIBRIUM_TOLERANCE) -> EquilibriumCheck:
+                      tolerance: float = EQUILIBRIUM_TOLERANCE,
+                      load_on_supports: Vec3 | None = None) -> EquilibriumCheck:
+    """Applied forces + support reactions = 0.
+
+    ``reactions`` are CalculiX totals (*NODE PRINT ... TOTALS). Loads applied on
+    nodes that are themselves fixed never show up there: the support takes them
+    directly. ``load_on_supports`` (their sum) is subtracted from the reported
+    reactions, so the support reaction is complete (spike 8.0, decision 007).
+    """
     magnitude = g.length(applied)
     if magnitude == 0:
         return EquilibriumCheck(EquilibriumStatus.NOT_VERIFIABLE, applied, reactions,
                                 reason_key="eq.reason.no_load")
+    if load_on_supports is not None:
+        reactions = g.sub(reactions, load_on_supports)
     residual = g.length(g.add(applied, reactions)) / magnitude
     status = EquilibriumStatus.VERIFIED if residual <= tolerance else EquilibriumStatus.IMBALANCE
-    return EquilibriumCheck(status, applied, reactions, residual)
+    return EquilibriumCheck(status, applied, reactions, residual,
+                            load_on_supports=load_on_supports)
+
+
+def load_on_fixed_nodes(node_loads, fixed_nodes) -> Vec3:
+    """Sum of nodal loads {node: Vec3 in N} on nodes listed in ``fixed_nodes``."""
+    total = Vec3(0.0, 0.0, 0.0)
+    for node, load in node_loads.items():
+        if node in fixed_nodes:
+            total = g.add(total, load)
+    return total
 
 
 # --- mesh shape ----------------------------------------------------------------

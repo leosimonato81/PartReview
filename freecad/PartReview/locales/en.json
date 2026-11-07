@@ -148,6 +148,7 @@
   "eq.status.not_verifiable": "Not verifiable",
   "eq.status.not_available": "Not available",
   "eq.detail": "loads ΣF = {applied}; reactions ΣR = {reactions}; residual |ΣF + ΣR| / |ΣF| = {residual}",
+  "eq.detail_supports": "Reactions include {load} ({share} of the load) applied on nodes that are also fixed: that part goes straight into the support and CalculiX leaves it out of the reaction totals, so the tool adds it back.",
   "eq.reason.no_load": "there are no applied forces to compare",
   "eq.reason.load_types": "there are loads the tool does not sum yet (pressure, self-weight, imposed displacement or others)",
   "eq.reason.no_dat": "the document has no CalculiX reaction text (ccx_dat_file)",

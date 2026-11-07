@@ -75,3 +75,19 @@ def test_unavailable_items_say_why():
     text = "\n".join(v for b in quality_blocks(doc) if isinstance(b, Table) for _, v in b.rows)
     assert "Não disponível: o documento não tem o texto de reações" in text
     assert "não disponível: a estimativa exige um único material" in text
+
+
+def test_load_on_supports_is_explained_in_the_report():
+    eq = check_equilibrium(Vec3(0, 0, -18.0), Vec3(0, 0, 17.196),
+                           load_on_supports=Vec3(0, 0, -0.804))
+    assert eq.status is EquilibriumStatus.VERIFIED
+    inputs = with_quality(ReportLevel.STANDARD, equilibrium=eq, error=False)
+    doc = build_report(inputs, Translator("pt_BR", strict=True))
+    text = "\n".join(v for b in quality_blocks(doc) if isinstance(b, Table) for _, v in b.rows)
+    assert "Verificado" in text and "nós que também estão no apoio fixo" in text
+    assert "4,47 %" in text
+    plain = check_equilibrium(Vec3(0, 0, -9e6), Vec3(0, 0, 9e6))
+    doc = build_report(with_quality(ReportLevel.STANDARD, equilibrium=plain, error=False),
+                       Translator("en", strict=True))
+    text = "\n".join(v for b in quality_blocks(doc) if isinstance(b, Table) for _, v in b.rows)
+    assert "also fixed" not in text

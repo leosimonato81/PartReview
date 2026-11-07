@@ -11,6 +11,7 @@ import datetime
 from dataclasses import dataclass
 
 from . import colormap
+from . import geometry as g
 from .blocks import (  # noqa: F401  (re-exported for callers and tests)
     DEFAULT_ACCENT,
     BarChart,
@@ -462,6 +463,11 @@ def _equilibrium_rows(eq: EquilibriumCheck, tr: Translator):
         detail = tr.t("eq.detail", applied=_vector(tr, eq.applied, "N"),
                       reactions=_vector(tr, eq.reactions, "N"),
                       residual=tr.number(100 * eq.residual, 2) + " %")
+        on_supports = eq.load_on_supports
+        if on_supports is not None and g.length(on_supports) > 1e-9 * g.length(eq.applied):
+            detail += "\n" + tr.t("eq.detail_supports", load=_vector(tr, on_supports, "N"),
+                                   share=tr.number(100 * g.length(on_supports)
+                                                   / g.length(eq.applied), 3) + " %")
         return [(tr.t("quality.equilibrium"), "%s\n%s" % (status, detail))]
     return [(tr.t("quality.equilibrium"), "%s: %s" % (status, tr.t(eq.reason_key)))]
 

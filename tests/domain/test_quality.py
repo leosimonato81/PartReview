@@ -9,6 +9,7 @@ from freecad.PartReview.domain.models import Vec3
 from freecad.PartReview.domain.quality import (
     EquilibriumStatus,
     check_equilibrium,
+    load_on_fixed_nodes,
     mesh_quality,
     parse_ccx_totals,
     radius_ratio,
@@ -53,6 +54,39 @@ def test_equilibrium_imbalance_on_a_fcstd():
     check = check_equilibrium(Vec3(0.0, 0.0, -18.0), reactions)
     assert check.status is EquilibriumStatus.IMBALANCE
     assert check.residual == pytest.approx((18.0 - 16.43262) / 18.0, rel=1e-6)
+
+
+# Spike 8.0 (decision 007), a (Copy).FCStd remeshed at 3 mm + curvature 12: the load
+# faces touch the fixed face; CalculiX reaction totals miss the load on shared nodes.
+DAT_SPIKE = """
+ total force (fx,fy,fz) for set CONSTRAINTFIXED and time  0.1000000E+01
+
+       -1.0E-13  2.0E-12  1.719600E+01
+"""
+
+
+def test_load_on_fixed_nodes_closes_the_balance():
+    reactions = parse_ccx_totals(DAT_SPIKE)["CONSTRAINTFIXED"]
+    applied = Vec3(0.0, 0.0, -18.0)
+    assert check_equilibrium(applied, reactions).status is EquilibriumStatus.IMBALANCE
+    on_supports = Vec3(0.0, 0.0, -0.8040)  # sum of *CLOAD on fixed nodes (39 nodes)
+    check = check_equilibrium(applied, reactions, load_on_supports=on_supports)
+    assert check.status is EquilibriumStatus.VERIFIED
+    assert check.reactions.z == pytest.approx(18.0)
+    assert check.load_on_supports == on_supports
+
+
+def test_load_on_fixed_nodes_sums_only_fixed_ones():
+    loads = {1: Vec3(0, 0, -1.0), 2: Vec3(0, 0, -2.0), 3: Vec3(1.0, 0, -4.0)}
+    assert load_on_fixed_nodes(loads, {2, 3, 99}) == Vec3(1.0, 0.0, -6.0)
+    assert load_on_fixed_nodes(loads, set()) == Vec3(0.0, 0.0, 0.0)
+
+
+def test_a_real_imbalance_is_still_reported():
+    reactions = parse_ccx_totals(DAT_SPIKE)["CONSTRAINTFIXED"]
+    check = check_equilibrium(Vec3(0.0, 0.0, -18.0), reactions,
+                              load_on_supports=Vec3(0.0, 0.0, 0.0))
+    assert check.status is EquilibriumStatus.IMBALANCE
 
 
 def test_equilibrium_without_load_is_not_verifiable():

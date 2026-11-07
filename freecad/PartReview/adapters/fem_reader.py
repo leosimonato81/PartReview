@@ -310,6 +310,50 @@ def elastic_constants(analysis):
         return None
 
 
+def nodal_loads_and_fixed_nodes(analysis):
+    """({node: Vec3 load in N}, {fixed node ids}) as FreeCAD writes them for CalculiX.
+
+    Uses FreeCAD's own MeshSetsGetter (the code behind the CalculiX input writer), so
+    the nodal loads are the *CLOAD values the solver received. Returns None when it
+    cannot be computed (several meshes, no solver, API change...).
+    """
+    try:
+        from femmesh.meshsetsgetter import MeshSetsGetter  # type: ignore
+        from femtools.membertools import AnalysisMember  # type: ignore
+    except ImportError as err:
+        App.Console.PrintWarning("PartReview: FreeCAD FEM tools unavailable: %s\n" % err)
+        return None
+    result_meshes = [getattr(o, "Mesh", None) for o in analysis.Group if is_mechanical_result(o)]
+    meshes = [m for m in analysis.Group if m.isDerivedFrom("Fem::FemMeshObject")
+              and not getattr(m, "Suppressed", False)
+              and not any(m is r for r in result_meshes)]
+    solvers = [o for o in analysis.Group if o.TypeId.startswith("Fem::FemSolverObject")]
+    if len(meshes) != 1 or not solvers:
+        return None
+    try:
+        member = AnalysisMember(analysis)
+        getter = MeshSetsGetter(analysis, solvers[0], meshes[0], member)
+        getter.get_constraints_fixed_nodes()
+        getter.get_constraints_force_nodeloads()
+        fixed = set()
+        for femobj in member.cons_fixed:
+            fixed.update(femobj.get("Nodes", ()))
+        loads = {}
+        for femobj in member.cons_force:
+            d = femobj["Object"].DirectionVector
+            for _name, table in femobj.get("NodeLoadTable", ()):
+                for node, value in table.items():
+                    newtons = float(getattr(value, "Value", value))
+                    old = loads.get(node, Vec3(0.0, 0.0, 0.0))
+                    loads[node] = Vec3(old.x + d.x * newtons, old.y + d.y * newtons,
+                                       old.z + d.z * newtons)
+        return loads, fixed
+    except Exception as err:  # rule 5: FreeCAD internals may change; report, then go on
+        App.Console.PrintWarning("PartReview: nodal loads on supports not computed: %s\n"
+                                 % err)
+        return None
+
+
 def ccx_dat_text(analysis):
     """Text of the CalculiX .dat output stored in the analysis, or None."""
     for obj in analysis.Group:

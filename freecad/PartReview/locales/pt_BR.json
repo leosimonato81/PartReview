@@ -148,6 +148,7 @@
   "eq.status.not_verifiable": "Não verificável",
   "eq.status.not_available": "Não disponível",
   "eq.detail": "cargas ΣF = {applied}; reações ΣR = {reactions}; resíduo |ΣF + ΣR| / |ΣF| = {residual}",
+  "eq.detail_supports": "As reações incluem {load} ({share} da carga) aplicados em nós que também estão no apoio fixo: essa parcela vai direto ao apoio e o CalculiX não a conta no total de reações, então a ferramenta a soma de volta.",
   "eq.reason.no_load": "não há forças aplicadas para comparar",
   "eq.reason.load_types": "há cargas que a ferramenta ainda não soma (pressão, peso próprio, deslocamento imposto ou outras)",
   "eq.reason.no_dat": "o documento não tem o texto de reações do CalculiX (ccx_dat_file)",
