@@ -90,7 +90,8 @@ class Cover:
     full_page: bool = True  # False: compact header on the first content page
 
 
-DEFAULT_ACCENT = (0.12, 0.29, 0.49)  # dark blue; templates may override (step g)
+DEFAULT_ACCENT_HEX = "#000000"  # black (owner's choice, v1.4.0); templates may override
+DEFAULT_ACCENT = (0.0, 0.0, 0.0)  # same color as DEFAULT_ACCENT_HEX, in 0..1
 
 
 @dataclass(frozen=True)
