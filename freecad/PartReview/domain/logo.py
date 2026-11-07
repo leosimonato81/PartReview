@@ -18,7 +18,7 @@ MIN_PRINT_DPI = 150.0
 GOOD_PRINT_DPI = 300.0
 
 # Logo boxes (width, height) in mm. The logo keeps its proportions inside.
-FULL_COVER_BOX_MM = (45.0, 22.0)  # dedicated cover page
+FULL_COVER_BOX_MM = (60.0, 30.0)  # dedicated cover page, centered at the bottom
 COMPACT_COVER_BOX_MM = (28.0, 14.0)  # title block of the quick summary
 _BOXES = (FULL_COVER_BOX_MM, COMPACT_COVER_BOX_MM)
 

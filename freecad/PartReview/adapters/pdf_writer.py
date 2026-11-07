@@ -92,6 +92,7 @@ class _Layout:
 
     def __init__(self, width, height):
         self.width = width
+        self.height = height
         self.top = mm(MARGIN_MM)
         self.bottom = height - mm(MARGIN_MM) - mm(FOOTER_MM)
         self.pages = [[]]
@@ -270,7 +271,7 @@ def _layout_bar_chart(layout, chart, x0, style):
 
 
 def _layout_full_cover(layout, cover, x0, style):
-    """Dedicated cover page: accent band, logo, company, title, info table."""
+    """Dedicated cover page: accent band, company, title, info table, logo at the bottom."""
     width = layout.width
     layout.add(_fill_op(QRectF(0, 0, x0 * 2 + width, mm(12)), style.accent))
     top = mm(24)
@@ -278,7 +279,9 @@ def _layout_full_cover(layout, cover, x0, style):
     if logo is not None:
         box_w, box_h = mm(FULL_COVER_BOX_MM[0]), mm(FULL_COVER_BOX_MM[1])
         scale = min(box_w / logo.width(), box_h / logo.height())
-        rect = QRectF(x0, top, logo.width() * scale, logo.height() * scale)
+        w, h = logo.width() * scale, logo.height() * scale
+        # Centered at the bottom of the cover (owner's choice, v1.4.0).
+        rect = QRectF(x0 + (width - w) / 2, layout.height - mm(MARGIN_MM) - h, w, h)
         layout.add(lambda p, r=rect, im=logo: p.drawImage(r, im))
     if cover.company:
         layout.add(_text_op(style.heading, cover.company, QRectF(x0, top, width, mm(22)),

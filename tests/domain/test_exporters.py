@@ -45,3 +45,19 @@ def test_html_is_self_contained_and_escapes_user_text():
         assert 'href="#%s"' % entry.anchor in page and 'id="%s"' % entry.anchor in page
     assert page.count("<figure>") >= len(inputs.views)
     assert "http" not in page.replace("https://", "")  # no external resources
+
+
+
+def test_html_logo_is_centered_at_the_bottom_of_the_full_cover_only():
+    from freecad.PartReview.domain.models import ReportLevel
+    logo = '<img class="logo"'
+    for level, at_bottom in ((ReportLevel.FULL, True), (ReportLevel.STANDARD, True),
+                             (ReportLevel.QUICK, False)):
+        inputs = make_inputs()
+        inputs.config.level = level
+        uris = ["data:image/png;base64,A%d" % i for i in range(len(inputs.views))]
+        page = render_html(build_report(inputs, Translator("pt_BR", strict=True)), uris,
+                           logo_uri="data:image/png;base64,LOGO")
+        assert page.count(logo) == 1
+        assert (page.index(logo) > page.index("<h1>")) is at_bottom, level
+        assert ('class="logo-center"' in page) is at_bottom

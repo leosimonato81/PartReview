@@ -67,7 +67,8 @@ padding:0 1.2em;line-height:1.45}
 h1{color:%(c)s;font-size:2em;margin-bottom:.2em}h2{color:%(c)s;border-bottom:2px solid %(c)s;
 padding-bottom:.15em;margin-top:2em}
 .cover{border-top:10px solid %(c)s;padding-top:1em}.cover .company{float:right;font-weight:bold}
-.cover img.logo{max-height:70px;max-width:200px}.subtitle{color:#6e6e6e;font-size:1.1em}
+.cover img.logo{max-height:90px;max-width:240px}.logo-center{clear:both;text-align:center;
+margin:1em 0}.subtitle{color:#6e6e6e;font-size:1.1em}
 table{border-collapse:collapse;width:100%%;margin:.6em 0 1em}td,th{border-bottom:1px solid #ccc;
 padding:.35em .5em;text-align:left;vertical-align:top;white-space:pre-line}
 th{background:%(l)s}.kv td:first-child{color:#555;width:34%%}
@@ -125,14 +126,17 @@ def render_html(doc, image_uris, logo_uri: str = "", language: str = "pt_BR") ->
         "<style>%s</style></head><body>" % _css(doc.accent), '<header class="cover">']
     if cover.company:
         parts.append('<div class="company">%s</div>' % _e(cover.company))
-    if logo_uri:
-        parts.append('<img class="logo" src="%s" alt="logo">' % logo_uri)
+    logo = '<img class="logo" src="%s" alt="logo">' % logo_uri if logo_uri else ""
+    if logo and not cover.full_page:  # quick summary: logo next to the title, as before
+        parts.append(logo)
     parts.append("<h1>%s</h1>" % _e(cover.title))
     if cover.subtitle:
         parts.append('<div class="subtitle">%s</div>' % _e(cover.subtitle))
     rows = list(cover.info) + ([(cover.level_caption, cover.level_label)]
                                if cover.level_label else [])
     parts.append(_table(Table((), tuple(rows), (0.3, 0.7))))
+    if logo and cover.full_page:  # full cover: centered at the bottom (same as the PDF)
+        parts.append('<div class="logo-center">%s</div>' % logo)
     parts.append("</header>")
     if doc.toc:
         parts.append("<nav><h2>%s</h2><ol>" % _e(doc.toc_title))
