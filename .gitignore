@@ -24,7 +24,3 @@ CLAUDE.md
 PLANO.md
 docs/
 spikes/
-
-# Addon Manager metadata: kept local until phase 7b (the workbench loads
-# without it; verified on FreeCAD 1.1.4)
-package.xml
