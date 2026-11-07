@@ -28,7 +28,9 @@ from PySide6.QtGui import (  # type: ignore
 
 from .. import __version__
 from ..domain import colormap
+from ..domain.logo import COMPACT_COVER_BOX_MM, FULL_COVER_BOX_MM
 from ..domain.blocks import BarChart, BulletList, Figure, Heading, Notice, Paragraph, Table
+from .logo_loader import load_logo
 
 DPI = 300
 MARGIN_MM = 18.0
@@ -267,21 +269,14 @@ def _layout_bar_chart(layout, chart, x0, style):
     layout.y = y_axis_title + mm(5) + cap_h + mm(4)
 
 
-def _logo_image(path):
-    if not path:
-        return None
-    image = QImage(path)
-    return None if image.isNull() else image
-
-
 def _layout_full_cover(layout, cover, x0, style):
     """Dedicated cover page: accent band, logo, company, title, info table."""
     width = layout.width
     layout.add(_fill_op(QRectF(0, 0, x0 * 2 + width, mm(12)), style.accent))
     top = mm(24)
-    logo = _logo_image(cover.logo_path)
+    logo = load_logo(cover.logo_path, FULL_COVER_BOX_MM)
     if logo is not None:
-        box_w, box_h = mm(45), mm(22)
+        box_w, box_h = mm(FULL_COVER_BOX_MM[0]), mm(FULL_COVER_BOX_MM[1])
         scale = min(box_w / logo.width(), box_h / logo.height())
         rect = QRectF(x0, top, logo.width() * scale, logo.height() * scale)
         layout.add(lambda p, r=rect, im=logo: p.drawImage(r, im))
@@ -315,11 +310,11 @@ def _layout_full_cover(layout, cover, x0, style):
 def _layout_compact_cover(layout, cover, x0, style):
     """First-page title block for the quick summary (no separate cover page)."""
     width = layout.width
-    logo = _logo_image(cover.logo_path)
+    logo = load_logo(cover.logo_path, COMPACT_COVER_BOX_MM)
     title_x = x0
     if logo is not None:
-        box = mm(14)
-        scale = min(box * 2 / logo.width(), box / logo.height())
+        box_w, box_h = mm(COMPACT_COVER_BOX_MM[0]), mm(COMPACT_COVER_BOX_MM[1])
+        scale = min(box_w / logo.width(), box_h / logo.height())
         rect = QRectF(x0 + width - logo.width() * scale, layout.y,
                       logo.width() * scale, logo.height() * scale)
         layout.add(lambda p, r=rect, im=logo: p.drawImage(r, im))

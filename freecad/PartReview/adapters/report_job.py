@@ -42,6 +42,7 @@ from ..domain.surface import build_surface
 from . import fem_reader, trace_reader
 from .error_estimator import estimate
 from .html_writer import write_html
+from .logo_loader import inspect_logo
 from .pdf_writer import write_pdf
 from .view_state import ViewState
 from .visibility import RayVisibility
@@ -151,8 +152,10 @@ def _error_estimate(analysis, result_obj, result, tets):
 def generate_fem_report(doc, config, progress=_no_progress):
     """Create the PDF (and the CSV/HTML exports asked for); returns the written paths."""
     errors = config.validate()
-    if config.logo_path and not os.path.isfile(config.logo_path):
-        errors.append("config.error.logo")
+    if config.logo_path:
+        logo_error = inspect_logo(config.logo_path)[0]
+        if logo_error:
+            errors.append(logo_error)
     if errors:
         raise ConfigError(errors[0])
     tr = Translator(config.language)

@@ -4,6 +4,7 @@
 
 import os
 import traceback
+from dataclasses import replace
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
@@ -34,9 +35,12 @@ from PySide6.QtWidgets import (  # type: ignore
     QWidget,
 )
 
-from ..adapters import fem_reader, template_store
+from ..adapters import fem_reader, preferences, template_store
+from ..adapters.logo_loader import inspect_logo, load_logo
 from ..adapters.report_job import Cancelled, ConfigError, generate_fem_report
+from ..domain.blocks import DEFAULT_ACCENT_HEX
 from ..domain.i18n import Translator
+from ..domain.logo import COMPACT_COVER_BOX_MM, check_sharpness
 from ..domain.models import ReportConfig, ReportLevel, UnitSystem
 from ..domain.templates import ReportTemplate
 
@@ -187,6 +191,18 @@ class ReportDialog(QDialog):
         form.addRow(t("ui.author"), self.author_edit)
         form.addRow(t("ui.company"), self.company_edit)
         form.addRow(t("ui.logo"), self._with_button(self.logo_edit, self._browse_logo))
+        self.logo_preview = QLabel()
+        self.logo_preview.setFixedSize(72, 36)
+        self.logo_preview.setAlignment(Qt.AlignCenter)
+        self.logo_info = QLabel()
+        self.logo_info.setWordWrap(True)
+        logo_row = QWidget()
+        logo_layout = QHBoxLayout(logo_row)
+        logo_layout.setContentsMargins(0, 0, 0, 0)
+        logo_layout.addWidget(self.logo_preview)
+        logo_layout.addWidget(self.logo_info, 1)
+        form.addRow("", logo_row)
+        self.logo_edit.textChanged.connect(self._update_logo_info)
         form.addRow(t("ui.yield"), self.yield_edit)
         layout.addLayout(form)
 
@@ -245,8 +261,18 @@ class ReportDialog(QDialog):
         buttons.rejected.connect(self.reject)
         main.addWidget(buttons)
 
+        # Remember the logo of the last report (repetitive analyses); a template
+        # chosen afterwards still replaces it.
+        last_logo = preferences.last_logo_path()
+        self._last_logo_missing = ""
+        if last_logo and os.path.isfile(last_logo):
+            self.config.logo_path = last_logo
+        elif last_logo:
+            self._last_logo_missing = last_logo
+
         self._load_widgets_from_config()
         self._reload_templates()
+        self._update_logo_info()
         self._fit_to_screen()
 
     # --- helpers -----------------------------------------------------------------
@@ -271,8 +297,30 @@ class ReportDialog(QDialog):
         row.addWidget(button)
         return widget
 
+    def _update_logo_info(self, *_):
+        """Preview + sharpness note under the logo field (information, not an error)."""
+        t = self.tr_ui.t
+        path = self.logo_edit.text().strip()
+        self.logo_preview.clear()
+        if not path:
+            self.logo_info.setText(t("ui.logo_last_missing", path=self._last_logo_missing)
+                                   if self._last_logo_missing else "")
+            return
+        self._last_logo_missing = ""
+        error, width, height = inspect_logo(path)
+        if error:
+            self.logo_info.setText(t(error))
+            return
+        image = load_logo(path, COMPACT_COVER_BOX_MM)
+        if image is not None:
+            self.logo_preview.setPixmap(QPixmap.fromImage(image).scaled(
+                self.logo_preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        sharp = check_sharpness(path, width, height)
+        self.logo_info.setText(t("ui.logo_info." + sharp.level, w=width, h=height,
+                                 dpi=int(round(sharp.dpi)), need=sharp.min_width_px))
+
     def _show_color(self):
-        color = self.config.accent_color or "#1f4a7d"
+        color = self.config.accent_color or DEFAULT_ACCENT_HEX
         self.color_button.setText(color)
         self.color_button.setStyleSheet("background:%s;color:white" % color)
 
@@ -338,7 +386,7 @@ class ReportDialog(QDialog):
             self.logo_edit.setText(path)
 
     def _pick_color(self):
-        color = QColorDialog.getColor(QColor(self.config.accent_color or "#1f4a7d"), self,
+        color = QColorDialog.getColor(QColor(self.config.accent_color or DEFAULT_ACCENT_HEX), self,
                                       self.tr_ui.t("ui.accent"))
         if color.isValid():
             self.config.accent_color = color.name()
@@ -406,6 +454,16 @@ class ReportDialog(QDialog):
         if errors:
             QMessageBox.warning(self, t("ui.dialog_title"), "\n".join(t(e) for e in errors))
             return
+        run_config = self.config
+        if run_config.logo_path:
+            logo_error = inspect_logo(run_config.logo_path)[0]
+            if logo_error:
+                answer = QMessageBox.question(
+                    self, t("ui.dialog_title"),
+                    t("ui.logo_generate_without", error=t(logo_error)))
+                if answer != QMessageBox.Yes:
+                    return
+                run_config = replace(self.config, logo_path="")  # this run only
 
         progress = QProgressDialog("", t("ui.cancel"), 0, 100, self)
         progress.setWindowTitle(t("ui.dialog_title"))
@@ -421,7 +479,7 @@ class ReportDialog(QDialog):
             QApplication.processEvents()
 
         try:
-            written = generate_fem_report(self.doc, self.config, report_progress)
+            written = generate_fem_report(self.doc, run_config, report_progress)
         except Cancelled:
             QMessageBox.information(self, t("ui.dialog_title"), t("ui.cancelled"))
             return
@@ -435,6 +493,7 @@ class ReportDialog(QDialog):
         finally:
             progress.close()
 
+        preferences.remember_logo_path(run_config.logo_path)
         QMessageBox.information(self, t("ui.dialog_title"),
                                 t("ui.done_many", paths="\n".join(written)))
         QDesktopServices.openUrl(QUrl.fromLocalFile(written[0]))
