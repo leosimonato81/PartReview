@@ -1,0 +1,25 @@
+PartReview
+Copyright (C) 2026 Leonardo Simonato
+
+This project is licensed under the GNU Lesser General Public License,
+version 2.1 or (at your option) any later version (LGPL-2.1-or-later).
+See the LICENSE file.
+
+Origin and credits
+------------------
+PartReview was conceived from:
+
+  FreeCAD-DFM-Workbench
+  Copyright (C) 2025 Ryan Kembrey <ryan.FreeCAD@gmail.com>
+  https://github.com/ryankembrey/FreeCAD-DFM-Workbench
+  License: LGPL-2.1-or-later
+
+This release (1.3.0) contains no code from FreeCAD-DFM-Workbench.
+
+Inherited files
+---------------
+(none in this release)
+
+When code from FreeCAD-DFM-Workbench is incorporated, every inherited file
+will keep its original copyright header, carry a modification note, and be
+listed above.

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- SPDX-FileCopyrightText: 2026 Leonardo Simonato -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect x="6" y="10" width="40" height="48" rx="4" fill="#f5f5f5" stroke="#37474f" stroke-width="3"/>
+  <path d="M14 24h24M14 32h24M14 40h14" stroke="#37474f" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="44" cy="40" r="11" fill="none" stroke="#e65100" stroke-width="4"/>
+  <path d="M52 48l8 8" stroke="#e65100" stroke-width="5" stroke-linecap="round"/>
+</svg>

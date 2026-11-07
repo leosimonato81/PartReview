@@ -1,0 +1,30 @@
+# Read-only copy of the old fork and audit notes (never commit)
+_referencia/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# FreeCAD
+*.FCBak
+*.FCStd1
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Private development notes and plans (kept local for now; owner decides
+# when to publish them)
+CLAUDE.md
+PLANO.md
+docs/
+spikes/
+
+# Addon Manager metadata: kept local until phase 7b (the workbench loads
+# without it; verified on FreeCAD 1.1.4)
+package.xml

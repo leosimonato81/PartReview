@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: 2026 Leonardo Simonato
+
+import pytest
+
+from freecad.PartReview.domain.blocks import BarChart, Figure, Heading, Notice, Table
+from freecad.PartReview.domain.i18n import Translator
+from freecad.PartReview.domain.models import FieldKind, ReportLevel, ResultField, Vec3
+from freecad.PartReview.domain.quality import (
+    EquilibriumCheck,
+    EquilibriumStatus,
+    ErrorEstimate,
+    check_equilibrium,
+    mesh_quality,
+)
+from freecad.PartReview.domain.report import build_report
+
+from test_i18n_report import make_inputs
+from test_surface_hotspots import bar_mesh
+
+
+def with_quality(level, equilibrium=None, error=True):
+    inputs = make_inputs()
+    inputs.config.level = level
+    mesh, elements = bar_mesh(6)
+    inputs.mesh_quality = mesh_quality(elements, mesh.node_positions)
+    inputs.equilibrium = equilibrium or check_equilibrium(Vec3(0, 0, -18.0), Vec3(0, 0, 16.43))
+    if error:
+        ids = tuple(inputs.result.mesh.node_positions)
+        inputs.error_estimate = ErrorEstimate(True, 0.16, 0.88, 0.22, 0)
+        inputs.error_field = ResultField(FieldKind.ESTIMATED_ERROR, "%", ids,
+                                         tuple(float(i % 7) for i in range(len(ids))))
+        inputs.error_view = inputs.views[0]
+    return inputs
+
+
+def quality_blocks(doc):
+    blocks = list(doc.blocks)
+    start = next(i for i, b in enumerate(blocks)
+                 if isinstance(b, Heading) and b.anchor == "fem.quality")
+    end = next((i for i, b in enumerate(blocks[start + 1:], start + 1)
+                if isinstance(b, Heading)), len(blocks))
+    return blocks[start + 1:end]
+
+
+def test_full_level_has_table_alert_map_and_histogram():
+    inputs = with_quality(ReportLevel.FULL)
+    doc = build_report(inputs, Translator("pt_BR", strict=True))
+    blocks = quality_blocks(doc)
+    table = blocks[0]
+    text = "\n".join(v for _, v in table.rows)
+    assert "16,0 %" in text and "Não fecha" in text and "= 8,7 %" in text
+    assert any(isinstance(b, Notice) and "não equilibram" in b.text for b in blocks)
+    figure = next(b for b in blocks if isinstance(b, Figure))
+    assert figure.view_index == len(inputs.views)  # captured right after the regular views
+    assert figure.legend.title.startswith("Erro local estimado")
+    assert any(isinstance(b, BarChart) and sum(b.values) == 36 for b in blocks)  # 6 cubes x 6
+
+
+def test_quick_level_keeps_only_the_verdict_rows():
+    doc = build_report(with_quality(ReportLevel.QUICK), Translator("en", strict=True))
+    blocks = quality_blocks(doc)
+    assert not any(isinstance(b, (Figure, BarChart)) for b in blocks)
+    labels = [k for k, _ in blocks[0].rows]
+    assert labels == ["Inverted or degenerate elements",
+                      "Equilibrium (applied loads + reactions = 0)",
+                      "Estimated analysis error (ZZ indicator, energy norm)"]
+
+
+def test_unavailable_items_say_why():
+    eq = EquilibriumCheck(EquilibriumStatus.NOT_AVAILABLE, reason_key="eq.reason.no_dat")
+    inputs = with_quality(ReportLevel.STANDARD, equilibrium=eq, error=False)
+    inputs.error_estimate = ErrorEstimate(False, reason_key="zz.reason.material")
+    doc = build_report(inputs, Translator("pt_BR", strict=True))
+    text = "\n".join(v for b in quality_blocks(doc) if isinstance(b, Table) for _, v in b.rows)
+    assert "Não disponível: o documento não tem o texto de reações" in text
+    assert "não disponível: a estimativa exige um único material" in text
