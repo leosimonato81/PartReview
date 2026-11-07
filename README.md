@@ -10,6 +10,67 @@ already computed in FreeCAD (CalculiX, linear static analysis): automatic views
 of the critical spots, executive summary, mesh quality, equilibrium check,
 estimated error, and PDF, HTML and CSV export.
 
+## Instalação / Installation
+
+**Repositório / Repository:** https://github.com/leosimonato81/PartReview
+(ramo / branch `main`)
+
+**Requisitos / Requirements:** FreeCAD 1.1 ou mais novo, com o Workbench FEM e
+o CalculiX que já vêm com ele. Nada mais para instalar. / FreeCAD 1.1 or newer
+with its bundled FEM workbench and CalculiX. Nothing else to install.
+
+### 1. Descubra a pasta `Mod` do FreeCAD / Find FreeCAD's `Mod` folder
+
+No FreeCAD, abra **Exibir → Painéis → Console Python** e rode:
+In FreeCAD, open **View → Panels → Python console** and run:
+
+```python
+import os; print(os.path.join(App.getUserAppDataDir(), "Mod"))
+```
+
+Caminhos usuais no FreeCAD 1.1 / Usual paths in FreeCAD 1.1:
+
+| Sistema / System | Pasta `Mod` / `Mod` folder |
+|---|---|
+| Linux (Flatpak) | `~/.var/app/org.freecad.FreeCAD/data/FreeCAD/v1-1/Mod` |
+| Linux (AppImage, pacote / package) | `~/.local/share/FreeCAD/v1-1/Mod` |
+| Windows | `%APPDATA%\FreeCAD\v1-1\Mod` |
+| macOS | `~/Library/Application Support/FreeCAD/v1-1/Mod` |
+
+Se a pasta `Mod` não existir, crie-a. / Create the `Mod` folder if it does not exist.
+
+### 2a. Com git / With git
+
+```bash
+cd "<pasta Mod / Mod folder>"
+git clone -b main https://github.com/leosimonato81/PartReview.git
+```
+
+Para atualizar / To update: `git pull` dentro da pasta / inside the folder `PartReview`.
+
+### 2b. Sem git (ZIP) / Without git (ZIP)
+
+1. Baixe / Download: https://github.com/leosimonato81/PartReview/archive/refs/heads/main.zip
+2. Extraia dentro da pasta `Mod`. Vai surgir a pasta `PartReview-main` (o nome
+   não importa). / Extract it inside the `Mod` folder. It creates
+   `PartReview-main` (the name does not matter).
+
+### 3. Confira / Check
+
+Reinicie o FreeCAD. Na lista de workbenches deve aparecer **PartReview**, com
+o botão **Relatório FEM**. Para testar, abra `examples/viga_em_balanco.FCStd`
+(dentro da pasta instalada) e gere um relatório.
+Restart FreeCAD. **PartReview** should appear in the workbench list, with the
+**FEM report** button. To try it, open `examples/viga_em_balanco.FCStd` (inside
+the installed folder) and create a report.
+
+Para desinstalar, apague a pasta do PartReview dentro de `Mod`.
+To uninstall, delete the PartReview folder inside `Mod`.
+
+> Testado / Tested: FreeCAD 1.1.4 no Linux (Flatpak), com a pasta chamada
+> `PartReview` e `PartReview-main`. Windows e macOS: **ainda não testados** /
+> **not tested yet**.
+
 ## Desenvolvimento / Development
 
 - FreeCAD 1.1.x, Python ≥ 3.11
