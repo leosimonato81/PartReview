@@ -222,6 +222,7 @@
   "ui.template_saved": "Template salvo em:\n{path}",
   "ui.template_confirm_delete": "Excluir o template \"{name}\"?",
   "ui.accent": "Cor de destaque",
+  "ui.accent_adjusted": "Cor clara: para continuar legíveis no papel branco, os títulos usarão um tom mais escuro da mesma cor ({text}). A faixa da capa fica com a cor escolhida.",
   "ui.intro": "Texto de abertura (opcional)",
   "ui.disclaimer": "Texto de responsabilidade (opcional)",
   "ui.advanced": "Aparência e textos fixos",

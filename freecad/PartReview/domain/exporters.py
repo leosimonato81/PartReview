@@ -13,6 +13,7 @@ import io
 
 from . import colormap
 from .blocks import BarChart, BulletList, Figure, Heading, Notice, Paragraph, Table
+from .colors import accent_palette, to_hex
 from .i18n import Translator
 from .models import FieldKind, FemResult
 
@@ -56,17 +57,16 @@ def _e(text) -> str:
 
 
 def _css(accent) -> str:
-    r, g, b = (int(c * 255) for c in accent)
-    color = "rgb(%d,%d,%d)" % (r, g, b)
-    light = "rgba(%d,%d,%d,0.12)" % (r, g, b)
+    # Same WCAG-checked shades as the PDF (domain/colors.py).
+    palette = accent_palette(accent)
     stops = ", ".join("rgb(%d,%d,%d) %d%%" % (int(c[0] * 255), int(c[1] * 255), int(c[2] * 255),
                                               round(pos * 100)) for pos, c in colormap.STOPS)
     return """
 body{font-family:"DejaVu Sans",Arial,sans-serif;color:#1e1e1e;max-width:980px;margin:2em auto;
 padding:0 1.2em;line-height:1.45}
-h1{color:%(c)s;font-size:2em;margin-bottom:.2em}h2{color:%(c)s;border-bottom:2px solid %(c)s;
+h1{color:%(t)s;font-size:2em;margin-bottom:.2em}h2{color:%(t)s;border-bottom:2px solid %(c)s;
 padding-bottom:.15em;margin-top:2em}
-.cover{border-top:10px solid %(c)s;padding-top:1em}.cover .company{float:right;font-weight:bold}
+.cover{border-top:10px solid %(b)s;padding-top:1em}.cover .company{float:right;font-weight:bold}
 .cover img.logo{max-height:90px;max-width:240px}.logo-center{clear:both;text-align:center;
 margin:1em 0}.subtitle{color:#6e6e6e;font-size:1.1em}
 table{border-collapse:collapse;width:100%%;margin:.6em 0 1em}td,th{border-bottom:1px solid #ccc;
@@ -85,7 +85,8 @@ border-bottom:1px solid #888;padding:0 4px}.chart div{flex:1;background:%(c)s;po
 .chart span{position:absolute;top:-1.3em;width:100%%;text-align:center;font-size:.75em;color:#333}
 .chart-labels{display:flex;gap:4px;padding:0 4px;font-size:.75em;color:#666}
 .chart-labels div{flex:1;text-align:center}footer{margin-top:3em;color:#888;font-size:.85em}
-""" % {"c": color, "l": light, "s": stops}
+""" % {"c": to_hex(palette.graphic), "t": to_hex(palette.text), "b": to_hex(palette.base),
+       "l": to_hex(palette.light), "s": stops}
 
 
 def _table(block: Table) -> str:

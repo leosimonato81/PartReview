@@ -61,3 +61,12 @@ def test_html_logo_is_centered_at_the_bottom_of_the_full_cover_only():
         assert page.count(logo) == 1
         assert (page.index(logo) > page.index("<h1>")) is at_bottom, level
         assert ('class="logo-center"' in page) is at_bottom
+
+
+def test_html_uses_legible_shades_of_a_light_accent():
+    inputs = make_inputs()
+    inputs.config.accent_color = "#ffff00"
+    uris = ["data:image/png;base64,A%d" % i for i in range(len(inputs.views))]
+    page = render_html(build_report(inputs, Translator("pt_BR", strict=True)), uris)
+    assert "h1{color:#7a7a00" in page  # titles: darker shade, 4.5:1 on white
+    assert "border-top:10px solid #ffff00" in page  # decorative band: exact color

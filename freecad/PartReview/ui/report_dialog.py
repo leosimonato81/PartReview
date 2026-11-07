@@ -39,6 +39,7 @@ from ..adapters import fem_reader, preferences, template_store
 from ..adapters.logo_loader import inspect_logo, load_logo
 from ..adapters.report_job import Cancelled, ConfigError, generate_fem_report
 from ..domain.blocks import DEFAULT_ACCENT_HEX
+from ..domain.colors import accent_palette, readable_on, to_hex, to_rgb
 from ..domain.i18n import Translator
 from ..domain.logo import COMPACT_COVER_BOX_MM, check_sharpness
 from ..domain.models import ReportConfig, ReportLevel, UnitSystem
@@ -218,7 +219,10 @@ class ReportDialog(QDialog):
         for edit in (self.intro_edit, self.disclaimer_edit):
             edit.setFixedHeight(54)
             edit.textChanged.connect(self._sync)
+        self.color_note = QLabel()
+        self.color_note.setWordWrap(True)
         adv.addRow(t("ui.accent"), self.color_button)
+        adv.addRow("", self.color_note)
         adv.addRow(t("ui.intro"), self.intro_edit)
         adv.addRow(t("ui.disclaimer"), self.disclaimer_edit)
         adv_widget = QWidget()
@@ -321,8 +325,12 @@ class ReportDialog(QDialog):
 
     def _show_color(self):
         color = self.config.accent_color or DEFAULT_ACCENT_HEX
+        palette = accent_palette(to_rgb(color))
         self.color_button.setText(color)
-        self.color_button.setStyleSheet("background:%s;color:white" % color)
+        self.color_button.setStyleSheet("background:%s;color:%s" % (
+            color, to_hex(readable_on(palette.base))))
+        self.color_note.setText(self.tr_ui.t("ui.accent_adjusted", text=to_hex(palette.text))
+                                if palette.adjusted else "")
 
     # --- config binding (the only state) --------------------------------------
 

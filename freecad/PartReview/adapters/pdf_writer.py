@@ -28,6 +28,7 @@ from PySide6.QtGui import (  # type: ignore
 
 from .. import __version__
 from ..domain import colormap
+from ..domain.colors import accent_palette
 from ..domain.logo import COMPACT_COVER_BOX_MM, FULL_COVER_BOX_MM
 from ..domain.blocks import BarChart, BulletList, Figure, Heading, Notice, Paragraph, Table
 from .logo_loader import load_logo
@@ -51,12 +52,6 @@ def mm(value):
     return value * DPI / 25.4
 
 
-def _tint(color, amount):
-    """Mix ``color`` with white; amount 0 = color, 1 = white."""
-    return QColor.fromRgbF(*(c + (1.0 - c) * amount for c in (color.redF(), color.greenF(),
-                                                              color.blueF())))
-
-
 def make_font(size, bold=False, italic=False):
     font = QFont(FONT_FAMILY)
     font.setPointSizeF(size)
@@ -71,8 +66,13 @@ class _Style:
 
     def __init__(self, device, accent):
         self.device = device
-        self.accent = QColor.fromRgbF(*accent)
-        self.accent_light = _tint(self.accent, 0.88)
+        # WCAG-checked shades of the user's color (domain/colors.py): titles >= 4.5:1,
+        # rules and chart bars >= 3:1; the decorative cover band keeps the exact color.
+        palette = accent_palette(accent)
+        self.accent_band = QColor.fromRgbF(*palette.base)
+        self.accent = QColor.fromRgbF(*palette.graphic)
+        self.accent_text = QColor.fromRgbF(*palette.text)
+        self.accent_light = QColor.fromRgbF(*palette.light)
         self.cover_title = make_font(26, bold=True)
         self.cover_subtitle = make_font(13)
         self.title = make_font(18, bold=True)
@@ -273,7 +273,7 @@ def _layout_bar_chart(layout, chart, x0, style):
 def _layout_full_cover(layout, cover, x0, style):
     """Dedicated cover page: accent band, company, title, info table, logo at the bottom."""
     width = layout.width
-    layout.add(_fill_op(QRectF(0, 0, x0 * 2 + width, mm(12)), style.accent))
+    layout.add(_fill_op(QRectF(0, 0, x0 * 2 + width, mm(12)), style.accent_band))
     top = mm(24)
     logo = load_logo(cover.logo_path, FULL_COVER_BOX_MM)
     if logo is not None:
@@ -288,7 +288,8 @@ def _layout_full_cover(layout, cover, x0, style):
                             INK, int(Qt.AlignRight | Qt.AlignTop | Qt.TextWordWrap)))
     y = mm(95)
     h = style.height(style.cover_title, cover.title, width)
-    layout.add(_text_op(style.cover_title, cover.title, QRectF(x0, y, width, h), style.accent))
+    layout.add(_text_op(style.cover_title, cover.title, QRectF(x0, y, width, h),
+                        style.accent_text))
     y += h + mm(3)
     if cover.subtitle:
         h = style.height(style.cover_subtitle, cover.subtitle, width)
@@ -324,7 +325,7 @@ def _layout_compact_cover(layout, cover, x0, style):
     text_w = width - (mm(32) if logo is not None else 0)
     h = style.height(style.title, cover.title, text_w)
     layout.add(_text_op(style.title, cover.title, QRectF(title_x, layout.y, text_w, h),
-                        style.accent))
+                        style.accent_text))
     layout.y += h + mm(1.5)
     lines = [cover.subtitle] if cover.subtitle else []
     lines += ["%s: %s" % (k, v) for k, v in cover.info]
@@ -346,7 +347,8 @@ def _layout_toc(layout, doc, x0, style):
     """Contents page. Page numbers are read at paint time, when all are known."""
     width = layout.width
     h = style.height(style.title, doc.toc_title, width)
-    layout.add(_text_op(style.title, doc.toc_title, QRectF(x0, layout.y, width, h), style.accent))
+    layout.add(_text_op(style.title, doc.toc_title, QRectF(x0, layout.y, width, h),
+                        style.accent_text))
     layout.y += h + mm(6)
     pages = layout.anchor_pages  # filled while the rest of the document is laid out
     row_h = style.height(style.body, "Ag", width) + mm(2.5)
@@ -402,7 +404,7 @@ def layout_document(doc, image_paths, style, page_w, page_h):
             if block.anchor:
                 layout.anchor_pages[block.anchor] = len(layout.pages)
             layout.add(_text_op(style.heading, block.text,
-                                QRectF(x0, layout.y, layout.width, h), style.accent))
+                                QRectF(x0, layout.y, layout.width, h), style.accent_text))
             layout.y += h + mm(2)
         elif isinstance(block, Paragraph):
             h = style.height(style.body, block.text, layout.width)

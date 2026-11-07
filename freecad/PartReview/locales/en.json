@@ -222,6 +222,7 @@
   "ui.template_saved": "Template saved to:\n{path}",
   "ui.template_confirm_delete": "Delete the template \"{name}\"?",
   "ui.accent": "Accent colour",
+  "ui.accent_adjusted": "Light color: to stay legible on white paper, titles will use a darker shade of the same color ({text}). The cover band keeps the chosen color.",
   "ui.intro": "Opening text (optional)",
   "ui.disclaimer": "Responsibility text (optional)",
   "ui.advanced": "Look and fixed texts",
