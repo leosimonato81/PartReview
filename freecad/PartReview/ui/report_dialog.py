@@ -7,7 +7,7 @@ import traceback
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
-from PySide6.QtCore import QRectF, QSize, Qt, QUrl  # type: ignore
+from PySide6.QtCore import QEvent, QObject, QRectF, QSize, Qt, QUrl  # type: ignore
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QPixmap  # type: ignore
 from PySide6.QtWidgets import (  # type: ignore
     QApplication,
@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (  # type: ignore
     QPlainTextEdit,
     QProgressDialog,
     QPushButton,
+    QScrollArea,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -76,6 +77,24 @@ def page_stack_icon(pages, accent=QColor(31, 74, 125), size=64):
     return QIcon(pixmap)
 
 
+class _WheelGuard(QObject):
+    """Mouse wheel over a combo box scrolls the dialog instead of changing the
+    choice, unless the user clicked the combo first (no accidental changes)."""
+
+    target = None  # scroll bar that receives the redirected wheel events
+
+    def watch(self, widget):
+        widget.setFocusPolicy(Qt.StrongFocus)
+        widget.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Wheel and not obj.hasFocus():
+            if self.target is not None:
+                QApplication.sendEvent(self.target, event)
+            return True
+        return False
+
+
 class ReportDialog(QDialog):
     def __init__(self, doc, parent=None):
         super().__init__(parent or Gui.getMainWindow())
@@ -85,7 +104,11 @@ class ReportDialog(QDialog):
         self.config = ReportConfig(language=self.tr_ui.language)
         self._loading = False
         self.setWindowTitle(t("ui.dialog_title"))
-        layout = QVBoxLayout(self)
+        # Everything except the Generate/Cancel buttons scrolls, so the buttons
+        # stay reachable on small screens or with "Appearance" open (P2).
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        self._wheel_guard = _WheelGuard(self)
 
         # --- template row
         self.template_box = QComboBox()
@@ -145,6 +168,8 @@ class ReportDialog(QDialog):
             self.units_box.addItem(t("ui.units." + system.value), system)
         for box in (self.result_box, self.language_box, self.units_box):
             box.currentIndexChanged.connect(self._sync)
+        for box in (self.template_box, self.result_box, self.language_box, self.units_box):
+            self._wheel_guard.watch(box)
         self.title_edit = QLineEdit()
         self.author_edit = QLineEdit()
         self.company_edit = QLineEdit()
@@ -184,6 +209,7 @@ class ReportDialog(QDialog):
         adv_widget.setLayout(adv)
         adv_widget.setVisible(False)
         advanced.toggled.connect(adv_widget.setVisible)
+        advanced.toggled.connect(self._fit_to_screen)
         box = QVBoxLayout(advanced)
         box.addWidget(adv_widget)
         layout.addWidget(advanced)
@@ -201,19 +227,39 @@ class ReportDialog(QDialog):
         exports.addStretch(1)
         out.addRow(t("ui.export"), exports)
         layout.addLayout(out)
+        layout.addStretch(1)
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QScrollArea.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._scroll.setWidget(content)
+        self._wheel_guard.target = self._scroll.verticalScrollBar()
+        main = QVBoxLayout(self)
+        main.addWidget(self._scroll, 1)
 
         buttons = QDialogButtonBox()
         buttons.addButton(t("ui.generate"), QDialogButtonBox.AcceptRole)
         buttons.addButton(t("ui.cancel"), QDialogButtonBox.RejectRole)
         buttons.accepted.connect(self._generate)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        main.addWidget(buttons)
 
         self._load_widgets_from_config()
         self._reload_templates()
-        self.resize(620, self.sizeHint().height())
+        self._fit_to_screen()
 
     # --- helpers -----------------------------------------------------------------
+
+    def _fit_to_screen(self, *_):
+        """Size the dialog to its content, but never taller than the screen."""
+        content = self._scroll.widget()
+        content.adjustSize()
+        wanted = content.sizeHint().height() + self.sizeHint().height() \
+            - self._scroll.sizeHint().height()
+        screen = self.screen() or QApplication.primaryScreen()
+        limit = int(screen.availableGeometry().height() * 0.9) if screen else wanted
+        self.resize(max(self.width(), 620), max(min(wanted, limit), min(400, limit)))
 
     def _with_button(self, edit, slot):
         button = QPushButton(self.tr_ui.t("ui.browse"))
