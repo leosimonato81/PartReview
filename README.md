@@ -102,9 +102,15 @@ To uninstall, delete the PartReview folder inside `Mod`.
    *Intermediário* (~8) ou *Completo* (~10).
 4. Preencha resultado, idioma (PT-BR ou EN), unidades (MPa/mm/N ou as do
    FreeCAD), título, autor, empresa, logo e, se quiser, o limite de escoamento
-   (ex.: `250 MPa`) para obter o fator de segurança.
-5. Opcional: em **Aparência e textos fixos**, escolha a cor de destaque e os
-   textos de abertura e de responsabilidade. Salve tudo como **template**, que
+   (ex.: `250 MPa`) para obter o fator de segurança. O logo (SVG, PNG ou JPG)
+   aparece centralizado embaixo da capa; o diálogo mostra uma prévia e avisa se
+   uma imagem pequena pode sair borrada na impressão (SVG sai sempre nítido). O
+   último logo usado é lembrado para o próximo relatório.
+5. Opcional: em **Aparência e textos fixos**, escolha a cor de destaque (padrão:
+   preto) e os textos de abertura e de responsabilidade. Com cores claras, os
+   títulos usam automaticamente um tom mais escuro da mesma cor, para manter o
+   contraste mínimo de leitura da WCAG (4,5:1); o diálogo avisa quando isso
+   acontece. Salve tudo como **template**, que
    fica numa pasta própria do PartReview, para reaproveitar depois.
 6. Opcional: marque **HTML** (relatório num arquivo único) e/ou **CSV** (valores
    por nó).
@@ -176,7 +182,7 @@ no modelo de referência do autor (FreeCAD 1.1.4, CalculiX, malha de tetraedros 
 | 10 | **Interface gráfica** | A geração de relatório depende do FreeCAD com interface aberta. Não roda em modo sem interface. | Precisa do FreeCAD com interface, porque a captura usa a vista 3D. Funciona também com a interface **invisível** (`QT_QPA_PLATFORM=offscreen`), que é como os testes automáticos rodam. Não funciona no `freecadcmd`. | Por projeto |
 | 11 | **Desempenho** | Modelos grandes podem travar a interface. | No modelo de referência (40 mil nós), o relatório completo leva de 5 a 15 s, com barra de progresso e botão de cancelar. Ainda não foi testado com malhas muito maiores. | A verificar |
 | 12 | **Tensão máxima no interior** | As imagens só mostram a superfície. | Se o nó de tensão máxima estiver dentro da peça, o PDF avisa. | Sinalizado |
-| 13 | **Equilíbrio** | Cargas e reações podem não fechar (modelo errado ou arquivo de reações antigo). | Compara a soma das forças com as reações do `ccx_dat_file` (resíduo relativo). Fica "não verificável" quando há pressão, peso próprio, deslocamento imposto ou outras cargas que ainda não somamos. Momentos não são verificados. Na viga de exemplo, o resíduo é da ordem de 10⁻¹². | Implementado |
+| 13 | **Equilíbrio** | Cargas e reações podem não fechar (modelo errado ou arquivo de reações antigo). | Compara a soma das forças com as reações do `ccx_dat_file` (resíduo relativo). Fica "não verificável" quando há pressão, peso próprio, deslocamento imposto ou outras cargas que ainda não somamos. Momentos não são verificados. Na viga de exemplo, o resíduo é da ordem de 10⁻¹². Quando uma face de carga encosta num apoio fixo, a carga nos nós compartilhados vai direto ao apoio e o CalculiX não a inclui no total de reações; a ferramenta recalcula essa parcela (com as mesmas funções do FreeCAD que escrevem a entrada do CalculiX), soma de volta e explica no relatório. | Implementado |
 | 14 | **Erro estimado (ZZ)** | Uma malha só não mostra o erro real. | Estimador de Zienkiewicz–Zhu validado contra a viga em balanço: acompanha o erro verdadeiro, mas o subestima (fator 1,2 a 1,9). Exige um único material isotrópico e tetraedros. É um erro global em energia, não o erro da tensão máxima. | Validado em 1 caso |
 
 ### Como reportar um caso que não funcionou
