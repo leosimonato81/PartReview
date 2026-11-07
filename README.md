@@ -48,6 +48,21 @@ git clone -b main https://github.com/leosimonato81/PartReview.git
 
 Para atualizar / To update: `git pull` dentro da pasta / inside the folder `PartReview`.
 
+### 2c. Pelo Addon Manager (repositório personalizado) / Via the Addon Manager (custom repository)
+
+Em **Editar → Preferências → Addon Manager → Repositórios personalizados**,
+adicione / In **Edit → Preferences → Addon Manager → Custom repositories**, add:
+
+- URL: `https://github.com/leosimonato81/PartReview`
+- Branch: `main`
+
+Depois abra **Ferramentas → Addon Manager**, instale o PartReview e reinicie.
+Atualizações aparecem como "atualização disponível". Por enquanto a lista
+mostra "versão desconhecida": a versão instalada aparece na dica do workbench.
+/ Then open **Tools → Addon Manager**, install PartReview and restart. Updates
+show up as "update available". For now the list shows "unknown version": the
+installed version is shown in the workbench tooltip.
+
 ### 2b. Sem git (ZIP) / Without git (ZIP)
 
 1. Baixe / Download: https://github.com/leosimonato81/PartReview/archive/refs/heads/main.zip

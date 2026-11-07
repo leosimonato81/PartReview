@@ -5,6 +5,8 @@ import os
 
 import FreeCADGui as Gui  # type: ignore
 
+from . import __version__
+
 ICON_PATH = os.path.join(os.path.dirname(__file__), "resources", "icons", "partreview.svg")
 
 
@@ -12,7 +14,7 @@ class PartReviewWorkbench(Gui.Workbench):
     """PartReview workbench: professional reports of FEM results."""
 
     MenuText = "PartReview"
-    ToolTip = "Professional reports of FreeCAD FEM results"
+    ToolTip = "Professional reports of FreeCAD FEM results (version %s)" % __version__
     Icon = ICON_PATH
 
     def Initialize(self):
