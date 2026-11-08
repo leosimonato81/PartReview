@@ -71,12 +71,13 @@ def _median(values):
 @dataclass(frozen=True)
 class Pass:
     nodes: int
-    error: float  # global estimated error, 0..1
+    error: float  # estimated error AWAY from supports/singular regions, 0..1 (the target)
     max_stress: float  # von Mises, MPa (whole part)
     max_stress_regular: float  # von Mises away from singular faces, MPa
     max_displacement: float  # mm
     seconds: float  # total wall time of the pass
     peak_mb: float  # CalculiX peak memory
+    global_error: float = 0.0  # whole part, supports included (shown, not targeted)
 
 
 def stop_reason(history, target):

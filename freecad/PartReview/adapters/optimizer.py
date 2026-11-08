@@ -155,6 +155,13 @@ class SolveJob:
         return "\n".join(self.process.log_text().splitlines()[-lines:])
 
 
+def _element_energy(zz):
+    """||u_h||^2 per element, from the local relative error eta_e and ||e||^2:
+    eta^2 = e^2 / (u^2 + e^2)  ->  u^2 = e^2 (1 - eta^2) / eta^2."""
+    eta2 = np.maximum(zz.element_relative ** 2, 1e-300)
+    return zz.element_error_sq * (1.0 - eta2) / eta2
+
+
 def latest_result(analysis):
     results = [o for o in analysis.Group if fem_reader.is_mechanical_result(o)]
     return results[-1] if results else None
@@ -176,6 +183,7 @@ def error_by_element(analysis, mesh_obj, singular, stress_excluded=()):
     positions = {n: (v.x, v.y, v.z) for n, v in result_mesh.FemMesh.Nodes.items()}
     elements = fem_reader.read_volume_elements(result_mesh)
     zz = estimate(positions, elements, fem_reader.read_displacement_vectors(result), *constants)
+    energy_e = _element_energy(zz)
     ids = sorted(positions)
     index = {n: i for i, n in enumerate(ids)}
     coords = np.array([positions[n] for n in ids])
@@ -195,11 +203,20 @@ def error_by_element(analysis, mesh_obj, singular, stress_excluded=()):
             for face in node_faces.get(n, ()):
                 counts[face] = counts.get(face, 0) + 1
         element_faces.append(tuple(f for f, c in counts.items() if c >= 3))  # a whole side
+    # Error AWAY from supports and singular regions (Saint-Venant: idealised rigid
+    # supports and line/point loads disturb the solution only locally, and there the
+    # error does not converge). Used as the optimisation target.
+    skip_faces = set(singular) | set(stress_excluded)
+    regular = [i for i, faces in enumerate(element_faces) if not set(faces) & skip_faces]
+    err_r = float(np.sum(zz.element_error_sq[regular])) if regular else 0.0
+    ene_r = float(np.sum(energy_e[regular])) if regular else 0.0
+    error_regular = (err_r / (ene_r + err_r)) ** 0.5 if ene_r + err_r > 0 else zz.relative_error
     stress = dict(zip(result.NodeNumbers, result.vonMises))
     skip = set(singular) | set(stress_excluded)
     singular_nodes = set().union(*(by_face.get(f, set()) for f in skip)) if skip else set()
     regular = [v for n, v in stress.items() if n not in singular_nodes]
-    return {"error": zz.relative_error, "nodes": len(positions),
+    return {"error": zz.relative_error, "error_regular": error_regular,
+            "nodes": len(positions),
             "error_sq": zz.element_error_sq.tolist(), "energy_sq": zz.energy_norm_sq,
             "sizes": sizes.tolist(), "faces": element_faces,
             "max_stress": max(stress.values()) if stress else 0.0,

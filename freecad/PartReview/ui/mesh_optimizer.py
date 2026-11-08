@@ -51,8 +51,8 @@ SOLVE_TIME_LIMIT_S = 1800  # hard stop of one CalculiX run
 SOLVE_MEMORY_SHARE = 0.8  # hard stop (the plan keeps each run within 60 %)
 GMSH_TIME_LIMIT_S = 300
 GMSH_MEMORY_SHARE = 0.7
-COLUMNS = ("mo.col.pass", "mo.col.nodes", "mo.col.error", "mo.col.stress", "mo.col.disp",
-           "mo.col.time", "mo.col.memory")
+COLUMNS = ("mo.col.pass", "mo.col.nodes", "mo.col.error", "mo.col.global", "mo.col.stress",
+           "mo.col.disp", "mo.col.time", "mo.col.memory")
 
 
 class MeshOptimizerPanel:
@@ -284,9 +284,10 @@ class MeshOptimizerPanel:
         sample = SolverSample(info["nodes"], job.seconds, job.peak_mb)
         self.samples.append(sample)
         machine_calibration.save(self.machine, [sample])  # real solves teach the computer
-        self.passes.append(ad.Pass(info["nodes"], info["error"], info["max_stress"],
+        self.passes.append(ad.Pass(info["nodes"], info["error_regular"], info["max_stress"],
                                    info["max_stress_regular"], info["max_displacement"],
-                                   time.monotonic() - self.pass_started, job.peak_mb))
+                                   time.monotonic() - self.pass_started, job.peak_mb,
+                                   global_error=info["error"]))
         self._add_row(self.passes[-1])
         target = self.target_box.currentData()
         reason = ad.stop_reason(self.passes, target)
@@ -298,7 +299,9 @@ class MeshOptimizerPanel:
         for faces in info["faces"]:
             for face in faces:
                 current.setdefault(face, global_size)
-        refined = ad.face_sizes(info["faces"], info["sizes"], ratios, current, self.singular)
+        # supports and singular regions are not refined: there the error does not converge
+        refined = ad.face_sizes(info["faces"], info["sizes"], ratios, current,
+                                self.singular | self.stress_excluded)
         if not refined:
             return self._finish("nothing")
         merged = dict(mesh_runner.region_sizes(self.mesh))
@@ -356,6 +359,7 @@ class MeshOptimizerPanel:
         row = self.table.rowCount()
         self.table.insertRow(row)
         cells = [str(row), self.tr.integer(p.nodes), self.tr.number(100 * p.error, 3) + " %",
+                 self.tr.number(100 * p.global_error, 3) + " %",
                  "%s MPa" % self.tr.number(p.max_stress_regular, 3),
                  "%s mm" % self.tr.number(p.max_displacement, 4), format_duration(p.seconds),
                  mt.memory(self.tr, p.peak_mb)]

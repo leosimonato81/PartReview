@@ -370,7 +370,7 @@
   "mo.mesh_value": "{label} ({nodes} nós)",
   "mo.need_assistant_mesh": "Nenhuma malha do assistente numa análise. Crie a malha com o Assistente de malha primeiro (ele coloca a malha na análise); malhas feitas à mão não são alteradas.",
   "mo.singular": "Apoio ou carga em arestas/vértices: as faces vizinhas ({faces}) ficam fora do refino, porque ali a tensão teórica é infinita e o erro não converge. Sistemas assim são mal condicionados: cálculos idênticos com vários núcleos podem dar resultados um pouco diferentes. Apoie nas faces para resultados confiáveis.",
-  "mo.corners": "As faces de apoio fixo também têm quinas singulares: a coluna de tensão mostra o máximo fora delas.",
+  "mo.corners": "Apoios idealizados (faces presas por inteiro) criam tensões concentradas na borda da região presa, onde o erro não converge com o refino (singularidade). Pelo princípio de Saint-Venant isso é local: a meta usa o erro FORA dos apoios, e a tabela mostra também o global. As tensões junto ao apoio dependem de como ele é modelado, não da malha.",
   "mo.uses_results": "Esta ferramenta usa resultados de cálculo e troca os resultados do documento a cada rodada (só depois que o novo cálculo terminar bem). As mudanças na malha podem ser desfeitas com Ctrl+Z.",
   "mo.group.goal": "2 · Meta",
   "mo.target": "Erro estimado desejado",
@@ -389,7 +389,7 @@
   "mo.progress": "{what} · decorrido {elapsed} de no máximo {limit}",
   "mo.col.pass": "Rodada",
   "mo.col.nodes": "Nós",
-  "mo.col.error": "Erro estimado",
+  "mo.col.error": "Erro (fora dos apoios)",
   "mo.col.stress": "Tensão máx. (fora de singularidades)",
   "mo.col.disp": "Desloc. máx.",
   "mo.col.time": "Tempo",
@@ -403,8 +403,9 @@
   "mo.stop.cancelled": "Cancelado. A malha e os resultados da última rodada completa ficaram no documento.",
   "mo.stop.failed": "Um processo falhou (CalculiX ou Gmsh). Detalhes:",
   "mo.stop.prerequisite": "O FreeCAD não consegue calcular a análise como está:",
-  "mo.final": "Resultado: erro estimado {error} % com {nodes} nós, em {elapsed}. Gere o relatório para ver os detalhes.",
+  "mo.final": "Resultado: erro estimado fora dos apoios {error} % com {nodes} nós, em {elapsed}. Gere o relatório para ver os detalhes.",
   "mo.stop.first_too_big": "Não comecei: a malha atual ({nodes} nós) precisa de pelo menos ~{memory} no CalculiX, e não há memória livre para isso. Crie uma malha mais grossa no Assistente de malha ou feche outros programas.",
   "mo.stop.killed_memory": "O CalculiX passou do limite de memória (chegou a {memory}; havia {free} livres) e foi interrompido antes de travar o computador. Os resultados anteriores continuam no documento. Use uma malha mais grossa no Assistente de malha ou feche outros programas.",
-  "mo.stop.killed_timeout": "O CalculiX passou do tempo limite e foi interrompido. Os resultados anteriores continuam no documento."
+  "mo.stop.killed_timeout": "O CalculiX passou do tempo limite e foi interrompido. Os resultados anteriores continuam no documento.",
+  "mo.col.global": "Erro global"
 }
