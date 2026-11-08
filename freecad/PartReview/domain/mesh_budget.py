@@ -88,21 +88,3 @@ def check_budget(nodes: int, machine: MachineProfile) -> BudgetCheck:
     else:
         status = BudgetStatus.TOO_BIG
     return BudgetCheck(status, nodes, memory, free, max_nodes_for(FITS_FRACTION * free))
-
-
-def budget_message(check: BudgetCheck, machine: MachineProfile, tr) -> str:
-    """User text for the 'check before solving' command (``tr``: domain Translator)."""
-    def gb(mb):  # "4,07 GB", or "640 MB" below 1 GB
-        return (tr.number(mb / 1024.0, 3) + " GB") if mb >= 1024.0 else (
-            tr.integer(mb) + " MB")
-
-    parts = [tr.t("budget.status." + check.status.value),
-             tr.t("budget.numbers", nodes=tr.integer(check.nodes),
-                  memory=gb(check.memory_mb), free=gb(check.available_mb),
-                  total=gb(machine.total_mb)),
-             tr.t("budget.advice." + check.status.value,
-                  max_nodes=tr.integer(round(check.max_nodes_fits, -3)))]
-    if machine.estimated:
-        parts.append(tr.t("budget.free_estimated"))
-    parts.append(tr.t("budget.basis"))
-    return "\n\n".join(parts)

@@ -6,8 +6,7 @@ do começo ao fim, sem travar o seu computador:
 1. **Assistente de malha** — analisa a peça, avisa sobre detalhes que atrapalham
    a malha, testa malhas de várias finuras **medindo o seu computador** e cria a
    malha recomendada (ou a melhor para um objetivo de memória ou de tempo).
-2. **Conferir antes de calcular** — diz se o CalculiX deve caber na memória livre.
-3. **Relatório FEM** — relatório profissional do resultado: vistas automáticas
+2. **Relatório FEM** — relatório profissional do resultado: vistas automáticas
    com balões, resumo executivo, qualidade da malha, checagem de equilíbrio,
    erro estimado, alertas de singularidade; PDF, HTML e CSV.
 
@@ -17,8 +16,7 @@ to finish, without freezing your computer:
 1. **Mesh assistant** — analyses the part, warns about details that hurt the
    mesh, tries meshes of several sizes **measuring your computer**, and creates
    the recommended mesh (or the best one for a memory or time objective).
-2. **Check before solving** — tells whether CalculiX should fit in free memory.
-3. **FEM report** — professional report of the result: automatic views with
+2. **FEM report** — professional report of the result: automatic views with
    balloons, executive summary, mesh quality, equilibrium check, estimated
    error, singularity alerts; PDF, HTML and CSV.
 
@@ -111,9 +109,10 @@ To uninstall, delete the PartReview folder inside `Mod`.
 Use **antes** de calcular, normalmente num modelo que ainda não tem malha.
 Use it **before** solving, usually on a model that has no mesh yet.
 
-1. Selecione a peça (um sólido) e clique em **Assistente de malha**. O painel
-   abre ao lado, em passos numerados.
-2. **1 · Peça:** dimensões, volume e a *espessura característica*
+1. Clique em **Assistente de malha**. O painel abre ao lado, em passos numerados.
+2. **1 · Peça:** escolha a peça na lista (as peças finais do documento; se houver
+   só uma, ela já vem escolhida, e a selecionada na tela também). O painel mostra
+   dimensões, volume e a *espessura característica*
    (t = 2·volume/área; todas as sugestões partem dela, por isso servem para
    peças de qualquer tamanho). **Avisos de geometria:** paredes muito mais finas
    que a peça (provável sobra de modelagem), furos e raios pequenos, e apoios ou
@@ -121,17 +120,21 @@ Use it **before** solving, usually on a model that has no mesh yet.
    vezes num aviso para selecionar a face na tela.
 3. **2 · Seu computador:** memória total e livre, núcleos e o que já foi medido
    neste computador.
-4. **3 · Escolha da malha:** clique em **Testar as opções**. O assistente gera
-   cinco malhas (muito grossa a muito fina) num documento oculto — o seu arquivo
-   não muda — e roda o CalculiX em malhas de ensaio pequenas **da sua peça, no
-   seu computador**, para medir memória e tempo. Cada opção mostra nós, memória
+4. **3 · Escolha da malha:** se a peça já tem malha, o cartão **Malha atual**
+   diz se ela deve caber na memória. Clique em **Testar as opções** (cerca de
+   meio minuto a um minuto): o assistente gera as malhas baratas num documento
+   oculto — o seu arquivo não muda —, roda o CalculiX em malhas de ensaio
+   pequenas **da sua peça, no seu computador** para medir memória e tempo, e só
+   gera as malhas finas que têm chance de caber (as outras aparecem como
+   "previsto"). Cada opção mostra nós, memória
    e tempo total previstos e um selo ✔ cabe / ⚠ no limite / ✖ não cabe. A
    recomendada leva ★ (normalmente a média: cerca de 2 elementos na espessura).
    Ou escolha um **objetivo** (a malha mais fina que cabe na memória, ou cálculo
    em até ~1, 5 ou 10 minutos) e clique em **Gerar malha automática**.
 5. **4 · Criar a malha:** cria um objeto de malha Gmsh **novo** (nada do que já
    existe é alterado; Ctrl+Z desfaz), com refino local nas faces pequenas de
-   apoio e carga. **Remover malhas do assistente** apaga só o que ele criou.
+   apoio e carga, gera a malha, seleciona-a na árvore e fecha o painel.
+   **Remover malhas do assistente** apaga só o que ele criou.
 6. Gere a malha (se ainda não estiver gerada) e calcule pelo Workbench FEM.
 
 **Segurança / Safety:** o Gmsh e o CalculiX sempre rodam como processos
@@ -145,13 +148,6 @@ processes with a time limit, a memory watchdog, progress (elapsed and remaining
 time) and Cancel. Nothing is predicted from another computer: CalculiX memory
 depends on the mesh (a band before measuring) and time depends on the computer
 ("to be measured" until the first trial). Each computer keeps what it measured.
-
-## Conferir antes de calcular / Check before solving
-
-Selecione a malha (ou deixe a única do documento) e clique em **Conferir antes
-de calcular**: o PartReview estima a memória do CalculiX para essa malha e
-compara com a memória livre agora (✔ / ⚠ / ✖), dizendo até quantos nós cabem com
-folga. / Estimates CalculiX memory for the mesh against the free memory now.
 
 ## Como gerar o relatório FEM
 

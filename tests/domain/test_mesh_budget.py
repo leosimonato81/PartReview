@@ -52,25 +52,3 @@ def test_tight_band_between_fits_and_too_big():
     assert check_budget(n_fits, machine).status is BudgetStatus.FITS
     assert check_budget((n_fits + n_tight) // 2, machine).status is BudgetStatus.TIGHT
     assert check_budget(n_tight + 5000, machine).status is BudgetStatus.TOO_BIG
-
-
-def test_message_for_the_mesh_that_froze_the_owner_pc():
-    from freecad.PartReview.domain.i18n import Translator
-    from freecad.PartReview.domain.mesh_budget import budget_message
-    text = budget_message(check_budget(183059, OWNER_PC), OWNER_PC, Translator("pt_BR", strict=True))
-    assert "Não deve caber" in text and "183 059 nós" in text
-    assert "109 000 nós" in text and "4,07 GB" in text  # free memory, 2 decimals
-    for lang in ("pt_BR", "en"):
-        for status in BudgetStatus:
-            check = check_budget({"fits": 1000, "tight": 120000, "too_big": 500000}[status.value],
-                                 OWNER_PC)
-            assert check.status is status
-            budget_message(check, MachineProfile(8000, 4170, estimated=True),
-                           Translator(lang, strict=True))
-
-
-def test_small_memory_is_shown_in_megabytes():
-    from freecad.PartReview.domain.i18n import Translator
-    from freecad.PartReview.domain.mesh_budget import budget_message
-    text = budget_message(check_budget(5362, OWNER_PC), OWNER_PC, Translator("en", strict=True))
-    assert "~43 MB" in text and "4.07 GB" in text

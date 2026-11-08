@@ -45,7 +45,7 @@ from PySide6.QtWidgets import (  # type: ignore
 )
 
 from .. import __version__
-from ..adapters import geometry_reader, mesh_runner
+from ..adapters import fem_reader, geometry_reader, mesh_runner
 from ..adapters import machine_calibration
 from ..adapters.machine import machine_profile
 from ..domain import mesh_plan as mp
@@ -63,6 +63,9 @@ GMSH_MEMORY_SHARE = 0.7  # a Gmsh run may use up to 70 % of the free memory
 PROBE_TIME_LIMIT_S = 180  # one CalculiX trial is planned below 60 s; hard stop at 180 s
 PROBE_MEMORY_SHARE = 0.65  # hard stop for a CalculiX trial
 MAX_PROBES = 3
+# Meshed first; finer sizes are meshed only if the law measured on this part says
+# they may fit (each fine Gmsh trial costs 15-30 s on a typical part).
+CHEAP_LEVELS = (MeshLevel.VERY_COARSE, MeshLevel.COARSE, MeshLevel.MEDIUM)
 REFINE_MAX_AREA_SHARE = 0.05  # refine support/load faces only when small (<= 5 % of the area)
 AUTO_ATTEMPTS = 3  # size search for an objective (CLAUDE.md rule 6)
 GMSH_S_PER_NODE = 7e-5  # spike 8.0: 13.3 s for 198 000 nodes; replaced by measurements
@@ -157,6 +160,8 @@ class MeshAssistantPanel:
         self.auto_attempt = 0
         self.auto_target = 0
         self.probes_pending = False
+        self.finer_pending = []
+        self.predicted = {}
         self.probe_samples = []  # CalculiX trials of this part on this computer
         self.fixing = False
         self.refine = ()  # faces refined locally: supports, loads, small radii
@@ -192,6 +197,7 @@ class MeshAssistantPanel:
         self.issues.setWordWrap(True)
         self.issues.setToolTip(t("ma.issue_tip"))
         self.issues.itemDoubleClicked.connect(self._select_issue)
+        self.issues.setMaximumHeight(120)  # compact: scroll for long lists
         issues_layout.addWidget(self.issues)
         layout.addWidget(self.issues_box)
 
@@ -201,6 +207,9 @@ class MeshAssistantPanel:
         self.machine_label.setWordWrap(True)
         self.model_label = QLabel()
         self.model_label.setWordWrap(True)
+        small = self.model_label.font()
+        small.setPointSizeF(small.pointSizeF() * 0.9)
+        self.model_label.setFont(small)
         machine_layout.addWidget(self.machine_label)
         machine_layout.addWidget(self.model_label)
         layout.addWidget(self.machine_box)
@@ -215,8 +224,6 @@ class MeshAssistantPanel:
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.itemSelectionChanged.connect(self._show_selected)
-        self.reason_label = QLabel()
-        self.reason_label.setWordWrap(True)
         self.test_button = _button(t("ma.test"), QStyle.SP_MediaPlay, self.test_options,
                                    primary=True, tip=t("ma.test_tip"))
         self.objective_box = QComboBox()
@@ -242,23 +249,9 @@ class MeshAssistantPanel:
         self.card_group = QButtonGroup(self.form)
         self.card_group.setExclusive(True)
         self.cards = {}
-        self.numbers_box = QGroupBox(t("ma.group.numbers"))
-        self.numbers_box.setCheckable(True)
-        self.numbers_box.setChecked(False)
-        self.numbers_box.setFlat(True)
-        numbers_layout = QVBoxLayout(self.numbers_box)
-        numbers_layout.addWidget(self.table)
-        self.table.setVisible(False)
-        self.numbers_box.toggled.connect(self.table.setVisible)
-        options_layout.addWidget(self.recommend_label)
-        options_layout.addWidget(self.cards_widget)
-        options_layout.addWidget(self.reason_label)
-        options_layout.addWidget(self.refine_label)
-        options_layout.addWidget(self.numbers_box)
-        options_layout.addWidget(self.test_button)
-        options_layout.addWidget(auto_box)
-        layout.addWidget(self.options_box)
-
+        self.current_label = QLabel()  # the mesh the analysis already has, if any
+        self.current_label.setWordWrap(True)
+        self.current_label.setTextFormat(Qt.RichText)
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
         self.progress = QProgressBar()
@@ -266,8 +259,14 @@ class MeshAssistantPanel:
         progress_row = QHBoxLayout()
         progress_row.addWidget(self.progress, 1)
         progress_row.addWidget(self.cancel_button)
-        layout.addWidget(self.status_label)
-        layout.addLayout(progress_row)
+        options_layout.addWidget(self.recommend_label)
+        options_layout.addWidget(self.current_label)
+        options_layout.addWidget(self.cards_widget)
+        options_layout.addWidget(self.test_button)
+        options_layout.addWidget(self.status_label)
+        options_layout.addLayout(progress_row)
+        options_layout.addWidget(auto_box)
+        layout.addWidget(self.options_box)
 
         self.create_title = QLabel("<b>%s</b>" % t("ma.group.create"))
         layout.addWidget(self.create_title)
@@ -287,9 +286,16 @@ class MeshAssistantPanel:
         details_layout = QVBoxLayout(self.details_box)
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)
-        self.details.setVisible(False)
-        self.details_box.toggled.connect(self.details.setVisible)
-        details_layout.addWidget(self.details)
+        details_inner = QWidget()  # numbers table, refinement note, Gmsh settings and log
+        inner = QVBoxLayout(details_inner)
+        inner.setContentsMargins(0, 0, 0, 0)
+        inner.addWidget(self.table)
+        inner.addWidget(self.refine_label)
+        inner.addWidget(self.details)
+        self.table.setVisible(True)
+        details_inner.setVisible(False)
+        self.details_box.toggled.connect(details_inner.setVisible)
+        details_layout.addWidget(details_inner)
         layout.addWidget(self.details_box)
         layout.addStretch(1)
 
@@ -405,10 +411,17 @@ class MeshAssistantPanel:
         self.refine = tuple(dict.fromkeys(faces + small))
         self.refine_label.setText(t("ma.refine", count=len(self.refine)) if self.refine
                                   else t("ma.refine_none"))
+        count = sum(1 for i in range(self.issues.count()))
+        self.issues_box.setTitle("%s (%d)" % (t("ma.group.issues"), count))
         if not issues:
             self.issues.addItem(QListWidgetItem("✔ " + t("ma.no_issues")))
         self.machine = machine_profile()
         self._show_machine()
+        mine = [m for m in fem_reader.solver_meshes(self.doc)
+                if getattr(getattr(m, "Shape", None), "Name", None) == self.solid.Name]
+        grouped = {o.Name for a in mesh_runner.analyses(self.doc) for o in a.Group}
+        in_analysis = [m for m in mine if m.Name in grouped]
+        self.current_mesh = (in_analysis or mine or [None])[0]
         self.recommended = None
         for button in self.cards.values():
             self.card_group.removeButton(button)
@@ -432,8 +445,11 @@ class MeshAssistantPanel:
         self.options = [o for o in self.options if o.level is not MeshLevel.AUTO]
         self.recommended = None
         self.test_run = True
+        self.predicted = {}
         self._fill_table()
-        self._run([("gmsh", o) for o in self.options])
+        cheap = [o for o in self.options if o.level in CHEAP_LEVELS]
+        self.finer_pending = [o for o in self.options if o.level not in CHEAP_LEVELS]
+        self._run([("gmsh", o) for o in cheap])
 
     def auto_mesh(self):
         t = self.tr.t
@@ -509,6 +525,8 @@ class MeshAssistantPanel:
                     and not any(kind == "gmsh" for kind, _ in self.tasks)):
                 self.probes_pending = False  # all sizes meshed (or skipped): measure CalculiX
                 self._queue_probes()
+            if (not self.tasks and self.finer_pending and not self.probes_pending):
+                self._queue_finer()  # probes done: mesh only the finer sizes that may fit
             if not self.tasks:
                 break
             kind, payload = self.tasks.pop(0)
@@ -688,10 +706,30 @@ class MeshAssistantPanel:
                       old=mesh_runner.analysis_meshes(busy[0])[0].Label)
         else:
             where = t("ma.created_at_root")
-        self.status_label.setText("%s %s" % (
-            t("ma.created", label=mesh.Label, nodes=self.tr.integer(nodes),
-              status=t("ma.status." + status.value)), where))
-        self.details.setPlainText("%s\n\n%s" % (mt.gmsh_settings(option, self.tr), job.log_tail()))
+        text = "%s %s" % (t("ma.created", label=mesh.Label, nodes=self.tr.integer(nodes),
+                               status=t("ma.status." + status.value)), where)
+        App.Console.PrintMessage("PartReview: %s\n" % text)
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(mesh)  # the new mesh is selected in the tree
+        if inside:  # all set: a short note in the status bar is enough
+            Gui.getMainWindow().statusBar().showMessage(text, 20000)
+        else:  # something to do (mesh outside the analysis): say it clearly
+            QMessageBox.information(Gui.getMainWindow(), t("ma.title"), text)
+        self.reject()  # task done: close the panel
+
+    def _queue_finer(self):
+        known = [(tr.option.max_size, tr.nodes) for tr in self.trials.values()]
+        for option in self.finer_pending:
+            nodes = mp.nodes_law(known)(option.max_size) if len(known) >= 2 else None
+            if nodes is None:
+                continue
+            upper = self.model.memory_mb(nodes) * (1 + self.model.error)
+            if upper <= TIGHT_FRACTION * self.machine.available_mb:
+                self.tasks.append(("gmsh", option))
+                self.steps_total += 1
+            else:
+                self.predicted[option.level] = int(nodes)  # shown as predicted, not meshed
+        self.finer_pending = []
 
     def _predicted_nodes(self, option):
         trial = self.trials.get(option.level)
@@ -729,6 +767,7 @@ class MeshAssistantPanel:
 
     def _fill_table(self):
         t = self.tr.t
+        self._show_current()
         self.table.setRowCount(len(self.options))
         for row, option in enumerate(self.options):
             trial = self.trials.get(option.level)
@@ -753,6 +792,16 @@ class MeshAssistantPanel:
                 cells += [self.tr.integer(nodes), memory, seconds, text,
                           "%s · %s" % (format_duration(trial.job.elapsed),
                                        mt.memory(self.tr, trial.job.peak_mb))]
+                color = STATUS_COLORS[status]
+            elif option.level in self.predicted:  # predicted from the measured law
+                nodes = self.predicted[option.level]
+                status = mp.classify(self.model, nodes, self.machine.available_mb)
+                total = (mp.total_seconds(self.model, nodes, None, self._speed())
+                         if self.model.time_known else None)
+                cells += ["~%s" % self.tr.integer(round(nodes, -3)),
+                          "~" + mt.memory(self.tr, self.model.memory_mb(nodes)),
+                          t("ma.time_unknown") if total is None else "~" + format_duration(total),
+                          t("ma.status." + status.value) + t("ma.status.predicted"), ""]
                 color = STATUS_COLORS[status]
             else:
                 text = (t("ma.status.big_for_gmsh") if option.level in self.skipped
@@ -784,14 +833,41 @@ class MeshAssistantPanel:
             index = len(self.cards) - 1
             self.cards_layout.addWidget(button, index // 3, index % 3)
             self.cards_layout.setColumnStretch(index % 3, 1)
-        if trial is not None:
+        nodes = trial.nodes if trial is not None else self.predicted.get(option.level)
+        if nodes is not None:
             lines = [cells[0], "%s · %s" % (cells[1], t(
-                         "ma.card.nodes", nodes=self.tr.integer(round(trial.nodes, -3) / 1000))),
+                         "ma.card.nodes", nodes=self.tr.integer(round(nodes, -3) / 1000))),
                      "%s · %s" % (cells[4], cells[5].split(" (")[0])]
         else:
             lines = [cells[0], cells[1], t("ma.card.not_tested")]
         button.setText("\n".join(lines))
-        button.setToolTip(mt.option_reason(option, self.summary, self.tr))
+        tip = mt.option_reason(option, self.summary, self.tr)
+        if option.level in self.predicted:
+            tip += "\n" + t("ma.predicted_tip")
+        button.setToolTip(tip)
+
+    def _show_current(self):
+        """The mesh the user already has for this part, judged with the same model."""
+        t = self.tr.t
+        mesh = getattr(self, "current_mesh", None)
+        if mesh is None or mesh.Document is None:
+            self.current_label.setText("")
+            self.current_label.setVisible(False)
+            return
+        nodes = mesh.FemMesh.NodeCount
+        status = mp.classify(self.model, nodes, self.machine.available_mb)
+        if self.model.memory_low is not None:
+            memory = "%s – %s" % (mt.memory(self.tr, self.model.memory_low(nodes)),
+                                  mt.memory(self.tr, self.model.memory_mb(nodes)))
+        else:
+            memory = mt.memory(self.tr, self.model.memory_mb(nodes))
+        total = (mp.total_seconds(self.model, nodes, None, self._speed())
+                 if self.model.time_known else None)
+        self.current_label.setText(t(
+            "ma.current", label=mesh.Label, nodes=self.tr.integer(nodes), memory=memory,
+            seconds=t("ma.time_unknown") if total is None else format_duration(total),
+            status=t("ma.status." + status.value)))
+        self.current_label.setVisible(True)
 
     def _select_level(self, level):
         for row, option in enumerate(self.options):
@@ -811,7 +887,6 @@ class MeshAssistantPanel:
             return
         trial = self.trials.get(option.level)
         shown = trial.option if trial is not None else option
-        self.reason_label.setText(mt.option_reason(option, self.summary, self.tr))
         if self.job is None:
             self.details.setPlainText(mt.gmsh_settings(shown, self.tr))
 

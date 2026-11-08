@@ -25,8 +25,11 @@ All notable changes to PartReview. / Mudanças importantes do PartReview.
   new Gmsh mesh object (undoable); removes only what it created. / Sempre em
   processos vigiados, com cancelar; cria uma malha nova, desfazível.
 
-**Check before solving / Conferir antes de calcular** (new command): estimates
-CalculiX memory for a mesh against the free memory.
+- Part chosen from a list of the document's final solids; a mesh the part
+  already has is judged too ("Current mesh" card). Expensive fine meshes are
+  generated only when the measured law says they may fit; the panel closes and
+  selects the new mesh when it is created. / Peça escolhida numa lista; cartão
+  "Malha atual"; ensaio mais curto; o painel fecha ao criar a malha.
 
 **Report / Relatório:**
 - Balloons rebuilt: anchored on the part (never in the air), one per visible
