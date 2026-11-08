@@ -13,7 +13,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from .solver_model import (MEMORY_HIGH, MEMORY_LOW, REFERENCE_TIME, PowerLaw, SolverModel,
+from .solver_model import (REFERENCE_TIME, PowerLaw, SolverModel,
                            fit_model, fit_power_law, prior_model, speed_factor)
 
 PROBE_MIN_NODES = 15000  # below this the solver's fixed memory dominates the fit

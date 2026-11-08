@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: 2026 Leonardo Simonato
 """Texts of the mesh assistant panel: plain words first, numbers right after (pure)."""
 
-from .geometry_summary import GeometryIssue, GeometrySummary, IssueKind
-from .mesh_budget import BudgetCheck, MachineProfile, max_nodes_for, FITS_FRACTION
+from .geometry_summary import GeometryIssue, GeometrySummary
+from .mesh_budget import BudgetCheck, MachineProfile, FITS_FRACTION
 from .mesh_sizing import MeshOption
 
 

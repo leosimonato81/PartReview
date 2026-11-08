@@ -174,6 +174,13 @@ ou quando o erro para de cair — o sinal típico de singularidade (apoio ou car
 em aresta, canto vivo), que o painel explica. Faces junto a apoios/cargas em
 arestas não são refinadas, e a tabela mostra a tensão máxima fora das regiões
 singulares. Na viga de exemplo: 2,25 % → 1,85 % (meta 2 %) em 9 s.
+Depois do primeiro cálculo, o painel mostra **quais metas cabem neste
+computador**: para 10, 5 e 2 %, quantos nós seriam necessários (taxa teórica de
+convergência dos elementos quadráticos, erro ∝ N^(−2/3), estimativa do lado
+seguro), com memória e tempo medidos nesta peça. Num computador com mais memória
+livre, metas mais exigentes cabem. Com várias peças no documento, escolha a peça
+no próprio painel. As rodadas ficam gravadas na malha e viram o **estudo de
+convergência** do relatório.
 / After creating the mesh with the assistant, pick a target error and a time
 limit; each pass solves, estimates the error per element and refines only the
 faces where it is high, trying every new mesh first and stopping at the target,

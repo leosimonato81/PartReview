@@ -33,7 +33,7 @@ def test_supports_and_loads_figure_comes_first_with_category_legend():
     first = figs[0]
     assert first.view_index == 0 and first.caption.startswith("Figura 1 — Apoios e cargas")
     assert [rgb for rgb, _ in first.legend.swatches] == [SUPPORT_RGB, LOAD_RGB]
-    assert first.markers == ()  # colors and arrows only, no balloons (owner's request)
+    assert first.markers == ()  # colors only, no balloons (owner's request)
     assert "Em roxo (apoios): Engaste." in first.balloons
     assert "Em laranja (cargas): Força (12,00 N)." in first.balloons
     assert "Seta" not in first.balloons  # colors only (owner's choice)

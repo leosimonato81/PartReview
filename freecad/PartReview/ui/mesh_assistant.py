@@ -886,7 +886,6 @@ class MeshAssistantPanel:
             self.details.setPlainText(mt.gmsh_settings(shown, self.tr))
 
     def _show_machine(self):
-        t = self.tr.t
         rows = mt.machine_rows(self.machine, self.model, self.probe_samples,
                                self.machine_samples, self.machine_date, self.tr)
         for (title, value), (label, text) in zip(self.machine_rows, rows):

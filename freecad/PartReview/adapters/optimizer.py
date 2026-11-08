@@ -10,7 +10,6 @@ import tempfile
 
 import FreeCAD as App  # type: ignore
 import numpy as np
-import Part  # type: ignore
 
 from . import fem_reader
 from .error_estimator import estimate

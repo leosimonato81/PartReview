@@ -49,6 +49,22 @@ análise.
 - The report level is no longer printed. / O nível do relatório não aparece
   mais.
 
+**Mesh tools / Ferramentas de malha:**
+- The optimiser shows, after its first solve, which targets (10/5/2 %) fit this
+  computer (nodes from the a priori convergence rate, memory and time measured
+  on the part); a part choice appears when several parts have an assistant
+  mesh. / O otimizador mostra quais metas cabem neste computador e deixa
+  escolher a peça.
+- Fixed: a CalculiX run too short to be sampled (peak 0 MB) broke the memory
+  model and was saved to the machine calibration; very short runs no longer set
+  the computer's speed. / Corrigido: cálculo curto demais para medir quebrava
+  o modelo de memória.
+- Fixed: updating the assistant's mesh kept extra refinement regions from the
+  optimiser, so the created mesh differed from the tested one. / Corrigido:
+  ao atualizar, a malha criada agora é igual à testada.
+- The assistant gives total solve times everywhere and shows "< 1 s · —" for
+  runs too short to measure. / Tempos coerentes e medições curtas legíveis.
+
 **Report dialog / Diálogo do relatório:**
 - Fields of the last report (now also the yield strength) come back only while
   FreeCAD stays open; a logo changed from the default (also "no logo") is

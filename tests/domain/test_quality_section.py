@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 Leonardo Simonato
 
-import pytest
-
 from freecad.PartReview.domain.blocks import BarChart, Figure, Heading, Notice, Table
 from freecad.PartReview.domain.i18n import Translator
 from freecad.PartReview.domain.models import FieldKind, ReportLevel, ResultField, Vec3

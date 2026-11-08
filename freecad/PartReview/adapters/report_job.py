@@ -152,7 +152,7 @@ def _plan(result, surface, max_views, boundary_views):
     boundary = []
     if surface is not None:
         boundary = cp.plan_boundary_views(spots, center, radius, is_visible, boundary_views)
-    # Supports and loads are shown by color and arrows only (no balloons, owner's
+    # Supports and loads are shown by color only (no balloons, owner's
     # request): the numbered points of the report are results only.
     return results, selected, boundary, radius, exclusion
 

@@ -11,7 +11,7 @@ bracket and a 2 m frame:
 Lengths in mm (FreeCAD's internal length unit), areas in mm^2, volumes in mm^3.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 THIN_WALL_RATIO = 0.25  # wall thinner than t/4: very likely a modelling leftover
