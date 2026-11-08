@@ -99,3 +99,12 @@ def gmsh_settings(option: MeshOption, tr) -> str:
         "MeshRegion.CharacteristicLength = %s" % (mm(tr, option.local_size)
                                                   if option.local_size else "—"),
     ])
+
+
+def measured(tr, seconds, peak_mb):
+    """'4 s · 85 MB'; a run shorter than the watchdog's sampling shows '< 1 s · —'
+    instead of a misleading '0 s · 0 MB'."""
+    from .solver_model import format_duration
+    time_text = "< 1 s" if seconds < 1.0 else format_duration(seconds)
+    memory_text = memory(tr, peak_mb) if peak_mb > 0 else "—"
+    return "%s · %s" % (time_text, memory_text)

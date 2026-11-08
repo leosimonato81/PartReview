@@ -36,9 +36,11 @@ def _set_region(doc, mesh, target, elements, size):
     """One assistant mesh region (finer size) on ``elements`` of ``target``."""
     import ObjectsFem  # type: ignore
     regions = [r for r in mesh.MeshRegionList if MARKER in r.PropertiesList]
+    # Extra assistant regions (e.g. left by 'Optimise mesh by the error') would make the
+    # created mesh differ from the one tested and predicted: only one region is kept.
+    for region in regions[1:] if (elements and size > 0) else regions:
+        doc.removeObject(region.Name)
     if not elements or size <= 0:
-        for region in regions:
-            doc.removeObject(region.Name)
         return None
     region = regions[0] if regions else ObjectsFem.makeMeshRegion(doc, mesh, size,
                                                                   "PartReview_Refine")
@@ -353,6 +355,8 @@ def create_or_update_mesh(doc, solid_obj, option, version, refine=()):
         _apply_option(mesh, option)
         setattr(mesh, MARKER, "%s %s" % (version, option.level.value))
         _set_region(doc, mesh, solid_obj, refine, option.local_size)
+        if getattr(mesh, "PartReviewConvergence", ""):  # the old study no longer applies
+            mesh.PartReviewConvergence = ""  # ReadOnly only blocks the property editor
         doc.recompute()
     except Exception:
         doc.abortTransaction()

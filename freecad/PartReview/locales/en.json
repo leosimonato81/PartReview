@@ -314,7 +314,7 @@
   "ma.what.probe": "CalculiX trial {n} on this part",
   "ma.what.auto": "automatic mesh, attempt {attempt} (Gmsh)",
   "ma.what.create": "generating the {level} mesh in your document",
-  "ma.auto_done": "Automatic mesh for \"{objective}\": {size}, {nodes} nodes, solve ~{seconds}. It is selected: click Create mesh.",
+  "ma.auto_done": "Automatic mesh for \"{objective}\": {size}, {nodes} nodes, total solve ~{seconds}. It is selected: click Create mesh.",
   "ma.auto_none": "Not even the coarsest mesh meets \"{objective}\" on this computer. Fix the tiny details of the part, close other programs or pick a larger objective.",
   "ma.status.big_for_gmsh": "not tried (too big)",
   "mesh.reason.objective": "{size}: size computed for the chosen objective.",

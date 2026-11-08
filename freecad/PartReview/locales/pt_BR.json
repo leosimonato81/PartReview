@@ -314,7 +314,7 @@
   "ma.what.probe": "ensaio {n} do CalculiX nesta peça",
   "ma.what.auto": "malha automática, tentativa {attempt} (Gmsh)",
   "ma.what.create": "gerando a malha {level} no seu documento",
-  "ma.auto_done": "Malha automática para \"{objective}\": {size}, {nodes} nós, cálculo ~{seconds}. Ela está selecionada: clique em Criar malha.",
+  "ma.auto_done": "Malha automática para \"{objective}\": {size}, {nodes} nós, cálculo total ~{seconds}. Ela está selecionada: clique em Criar malha.",
   "ma.auto_none": "Nem a malha mais grossa atende \"{objective}\" neste computador. Conserte os detalhes minúsculos da peça, feche outros programas ou escolha um objetivo maior.",
   "ma.status.big_for_gmsh": "não testada (grande demais)",
   "mesh.reason.objective": "{size}: tamanho calculado para o objetivo escolhido.",

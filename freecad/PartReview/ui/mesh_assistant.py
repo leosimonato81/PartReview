@@ -630,7 +630,8 @@ class MeshAssistantPanel:
         self.status_label.setText("%s %s" % (t(
             "ma.auto_done", objective=self.objective_box.currentText(),
             size=mt.mm(self.tr, option.max_size), nodes=self.tr.integer(nodes),
-            seconds=format_duration(self.model.seconds(nodes))), t("ma.limit." + limit)))
+            seconds=format_duration(mp.total_seconds(self.model, nodes, None, self._speed()))),
+            t("ma.limit." + limit)))
         self.tasks = []
 
     def _failed(self, kind, payload, job, state):
@@ -785,8 +786,7 @@ class MeshAssistantPanel:
                 if trial.fixed:
                     text += t("ma.status.fixed")
                 cells += [self.tr.integer(nodes), memory, seconds, text,
-                          "%s · %s" % (format_duration(trial.job.elapsed),
-                                       mt.memory(self.tr, trial.job.peak_mb))]
+                          mt.measured(self.tr, trial.job.elapsed, trial.job.peak_mb)]
                 color = STATUS_COLORS[status]
             elif option.level in self.predicted:  # predicted from the measured law
                 nodes = self.predicted[option.level]
