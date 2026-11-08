@@ -37,11 +37,37 @@ def issue_text(issue: GeometryIssue, summary: GeometrySummary, tr) -> str:
                 + (" …" if len(issue.elements) > 4 else ""))
 
 
-def machine_text(machine: MachineProfile, tr) -> str:
-    return tr.t("ma.machine", total=memory(tr, machine.total_mb),
-                free=memory(tr, machine.available_mb), cores=machine.cores,
-                max_nodes=tr.integer(round(max_nodes_for(FITS_FRACTION * machine.available_mb),
-                                           -3)))
+def machine_rows(machine: MachineProfile, model, probes, history, history_date, tr) -> list:
+    """Step 2, one row per SOURCE of information, so the user sees what was read from
+    the system, what was measured on this computer and what is only estimated.
+
+    ``probes``: CalculiX trials on this part; ``history``: trials on earlier parts."""
+    from .solver_model import format_duration
+    system = tr.t("ma.src.system_value", total=memory(tr, machine.total_mb),
+                  free=memory(tr, machine.available_mb), cores=machine.cores)
+    if probes:
+        nodes = sorted(p.nodes for p in probes)
+        measured = tr.t("ma.src.measured_part", count=len(probes),
+                        low=tr.integer(round(nodes[0], -3) / 1000),
+                        high=tr.integer(round(nodes[-1], -3) / 1000),
+                        memory=memory(tr, max(p.peak_mb for p in probes)),
+                        seconds=format_duration(max(p.seconds for p in probes)),
+                        error=int(round(100 * model.error)))
+    elif history:
+        measured = tr.t("ma.src.measured_history", count=len(history), date=history_date)
+    else:
+        measured = tr.t("ma.src.measured_none")
+    budget = FITS_FRACTION * machine.available_mb
+    if model.measured:
+        estimated = tr.t("ma.src.estimated_part",
+                         nodes=tr.integer(round(model.safe_max_nodes(memory_mb=budget), -3)))
+    else:
+        low = model.memory.inverse(budget)  # compact parts (safe side)
+        high = (model.memory_low.inverse(budget) if model.memory_low is not None else low)
+        estimated = tr.t("ma.src.estimated_band", low=tr.integer(round(low, -3)),
+                         high=tr.integer(round(high, -3)))
+    return [(tr.t("ma.src.system"), system), (tr.t("ma.src.measured"), measured),
+            (tr.t("ma.src.estimated"), estimated)]
 
 
 def option_reason(option: MeshOption, summary: GeometrySummary, tr) -> str:

@@ -256,13 +256,18 @@ def analysis_meshes(analysis):
             and not any(o is r for r in results)]
 
 
+def mesh_label(solid_obj):
+    """Fixed name: updating the mesh never renames it (the chosen size is in MARKER)."""
+    return "%s_Malha_PartReview" % solid_obj.Label
+
+
 def create_mesh_object(doc, solid_obj, option, version, refine=()):
     """New Gmsh mesh object for ``solid_obj`` (undoable). Never touches existing meshes."""
     import ObjectsFem  # type: ignore
     doc.openTransaction("PartReview: mesh assistant")
     try:
         mesh = ObjectsFem.makeMeshGmsh(doc, "PartReview_Mesh")
-        mesh.Label = "%s_Malha_%s" % (solid_obj.Label, option.level.value)
+        mesh.Label = mesh_label(solid_obj)
         mesh.Shape = solid_obj
         _apply_option(mesh, option)
         mesh.addProperty("App::PropertyString", MARKER, "PartReview",
@@ -280,6 +285,40 @@ def create_mesh_object(doc, solid_obj, option, version, refine=()):
         raise
     doc.commitTransaction()
     return mesh
+
+
+def assistant_mesh_for(doc, solid_obj):
+    """The assistant's own mesh of ``solid_obj`` (the one in an analysis first), or None."""
+    mine = [o for o in assistant_objects(doc) if o.isDerivedFrom("Fem::FemMeshObject")
+            and getattr(getattr(o, "Shape", None), "Name", None) == solid_obj.Name]
+    grouped = {o.Name for a in analyses(doc) for o in a.Group}
+    mine.sort(key=lambda o: o.Name not in grouped)
+    return mine[0] if mine else None
+
+
+def create_or_update_mesh(doc, solid_obj, option, version, refine=()):
+    """(mesh, updated). The assistant keeps ONE mesh per part: running it again
+    updates that mesh (undoable) instead of piling up new objects. Meshes made by
+    the user are never touched (then a new one is created next to them)."""
+    mesh = assistant_mesh_for(doc, solid_obj)
+    if mesh is None:
+        return create_mesh_object(doc, solid_obj, option, version, refine), False
+    doc.openTransaction("PartReview: mesh assistant")
+    try:
+        mesh.Label = mesh_label(solid_obj)
+        _apply_option(mesh, option)
+        setattr(mesh, MARKER, "%s %s" % (version, option.level.value))
+        _set_region(doc, mesh, solid_obj, refine, option.local_size)
+        doc.recompute()
+    except Exception:
+        doc.abortTransaction()
+        raise
+    doc.commitTransaction()
+    return mesh, True
+
+
+def has_results(doc):
+    return any(o.isDerivedFrom("Fem::FemResultObject") for o in doc.Objects)
 
 
 def assistant_objects(doc):

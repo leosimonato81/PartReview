@@ -202,16 +202,17 @@ class MeshAssistantPanel:
         layout.addWidget(self.issues_box)
 
         self.machine_box = QGroupBox(t("ma.group.machine"))
-        machine_layout = QVBoxLayout(self.machine_box)
-        self.machine_label = QLabel()
-        self.machine_label.setWordWrap(True)
-        self.model_label = QLabel()
-        self.model_label.setWordWrap(True)
-        small = self.model_label.font()
-        small.setPointSizeF(small.pointSizeF() * 0.9)
-        self.model_label.setFont(small)
-        machine_layout.addWidget(self.machine_label)
-        machine_layout.addWidget(self.model_label)
+        machine_layout = QFormLayout(self.machine_box)  # one row per source of information
+        self.machine_rows = []
+        for _ in range(3):
+            value = QLabel()
+            value.setWordWrap(True)
+            title = QLabel()
+            bold = title.font()
+            bold.setBold(True)
+            title.setFont(bold)
+            machine_layout.addRow(title, value)
+            self.machine_rows.append((title, value))
         layout.addWidget(self.machine_box)
 
         self.options_box = QGroupBox(t("ma.group.options"))
@@ -273,10 +274,7 @@ class MeshAssistantPanel:
         actions = QHBoxLayout()
         self.create_button = _button(t("ma.create"), QStyle.SP_DialogApplyButton,
                                      self.create_mesh, primary=True, tip=t("ma.create_tip"))
-        self.remove_button = _button(t("ma.remove"), QStyle.SP_TrashIcon, self.remove_meshes,
-                                     tip=t("ma.remove_tip"))
-        actions.addWidget(self.create_button, 2)
-        actions.addWidget(self.remove_button, 1)
+        actions.addWidget(self.create_button)
         layout.addLayout(actions)
 
         self.details_box = QGroupBox(t("ma.group.details"))
@@ -493,15 +491,9 @@ class MeshAssistantPanel:
                 answer = QMessageBox.question(self.form, t("ma.title"), t("ma.confirm_too_big"))
                 if answer != QMessageBox.Yes:
                     return
-        mesh = mesh_runner.create_mesh_object(self.doc, self.solid, option, __version__,
-                                              refine=self.refine)
+        mesh, self.updated = mesh_runner.create_or_update_mesh(
+            self.doc, self.solid, option, __version__, refine=self.refine)
         self._run([("create", (option, mesh))])
-
-    def remove_meshes(self):
-        t = self.tr.t
-        count = mesh_runner.remove_assistant_objects(self.doc)
-        self.status_label.setText(t("ma.removed", count=count) if count
-                                  else t("ma.none_to_remove"))
 
     def cancel(self):
         if self.job is not None:
@@ -706,12 +698,15 @@ class MeshAssistantPanel:
                       old=mesh_runner.analysis_meshes(busy[0])[0].Label)
         else:
             where = t("ma.created_at_root")
-        text = "%s %s" % (t("ma.created", label=mesh.Label, nodes=self.tr.integer(nodes),
-                               status=t("ma.status." + status.value)), where)
+        key = "ma.updated" if getattr(self, "updated", False) else "ma.created"
+        text = "%s %s" % (t(key, label=mesh.Label, nodes=self.tr.integer(nodes),
+                            status=t("ma.status." + status.value)), where)
+        if mesh_runner.has_results(self.doc):
+            text += " " + t("ma.results_stale")
         App.Console.PrintMessage("PartReview: %s\n" % text)
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(mesh)  # the new mesh is selected in the tree
-        if inside:  # all set: a short note in the status bar is enough
+        if inside and not mesh_runner.has_results(self.doc):  # all set: status bar note
             Gui.getMainWindow().statusBar().showMessage(text, 20000)
         else:  # something to do (mesh outside the analysis): say it clearly
             QMessageBox.information(Gui.getMainWindow(), t("ma.title"), text)
@@ -892,16 +887,11 @@ class MeshAssistantPanel:
 
     def _show_machine(self):
         t = self.tr.t
-        self.machine_label.setText(mt.machine_text(self.machine, self.tr))
-        probes = self.probe_samples
-        if self.model.measured:
-            text = t("ma.model.measured", count=len(probes),
-                     error=int(round(100 * self.model.error)))
-        elif self.machine_samples:
-            text = t("ma.model.machine", count=len(self.machine_samples), date=self.machine_date)
-        else:
-            text = t("ma.model.prior")
-        self.model_label.setText(text)
+        rows = mt.machine_rows(self.machine, self.model, self.probe_samples,
+                               self.machine_samples, self.machine_date, self.tr)
+        for (title, value), (label, text) in zip(self.machine_rows, rows):
+            title.setText(label)
+            value.setText(text)
 
     def _show_progress(self):
         t = self.tr.t
@@ -964,7 +954,6 @@ class MeshAssistantPanel:
             widget.setEnabled(not busy and analysed)
         self.analyze_button.setEnabled(not busy)
         self.part_combo.setEnabled(not busy)
-        self.remove_button.setEnabled(not busy)
 
     def _enable(self, analysed):
         for widget in (self.issues_box, self.options_box, self.details_box, self.create_title):

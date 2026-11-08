@@ -118,8 +118,9 @@ Use it **before** solving, usually on a model that has no mesh yet.
    que a peça (provável sobra de modelagem), furos e raios pequenos, e apoios ou
    cargas em arestas ou vértices (tensão teoricamente infinita ali). Clique duas
    vezes num aviso para selecionar a face na tela.
-3. **2 · Seu computador:** memória total e livre, núcleos e o que já foi medido
-   neste computador.
+3. **2 · Seu computador:** separa o que foi **lido do sistema** (memória total e
+   livre, núcleos), o que foi **medido neste computador** (ensaios do CalculiX) e
+   o que é **estimado** a partir dos dois.
 4. **3 · Escolha da malha:** se a peça já tem malha, o cartão **Malha atual**
    diz se ela deve caber na memória. Clique em **Testar as opções** (cerca de
    meio minuto a um minuto): o assistente gera as malhas baratas num documento
@@ -133,8 +134,9 @@ Use it **before** solving, usually on a model that has no mesh yet.
    em até ~1, 5 ou 10 minutos) e clique em **Gerar malha automática**.
 5. **4 · Criar a malha:** cria um objeto de malha Gmsh **novo** (nada do que já
    existe é alterado; Ctrl+Z desfaz), com refino local nas faces pequenas de
-   apoio e carga, gera a malha, seleciona-a na árvore e fecha o painel.
-   **Remover malhas do assistente** apaga só o que ele criou.
+   apoio e carga, gera a malha, seleciona-a na árvore e fecha o painel. Rodar o
+   assistente de novo **atualiza** essa mesma malha (não cria outra); malhas
+   feitas por você nunca são alteradas.
 6. Gere a malha (se ainda não estiver gerada) e calcule pelo Workbench FEM.
 
 **Segurança / Safety:** o Gmsh e o CalculiX sempre rodam como processos

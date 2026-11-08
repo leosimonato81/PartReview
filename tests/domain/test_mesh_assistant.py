@@ -131,7 +131,13 @@ def test_panel_texts_in_both_languages():
         assert len(rows) == 4 and "3" in rows[2][1]
         texts = [mt.issue_text(i, SHROUD, tr) for i in find_issues(SHROUD)]
         assert "Face5, Face71" in texts[0] and "10" in texts[0]  # 3.03 / 0.3 ~ 10x
-        assert mt.machine_text(machine, tr)
+        from freecad.PartReview.domain.mesh_plan import part_model
+        from freecad.PartReview.domain.solver_model import SolverSample
+        probes = [SolverSample(21606, 3.3, 344.0), SolverSample(32883, 7.5, 597.0)]
+        for model, p, h in ((part_model([]), [], []), (part_model([]), [], probes),
+                            (part_model(probes), probes, [])):
+            rows = mt.machine_rows(machine, model, p, h, "2026-11-08", tr)
+            assert len(rows) == 3 and all(label and value for label, value in rows)
         for option in mesh_options(SHROUD):
             assert option.max_size and mt.option_reason(option, SHROUD, tr)
             assert mt.nodes_estimate(option, tr) and mt.gmsh_settings(option, tr)
