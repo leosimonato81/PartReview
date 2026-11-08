@@ -8,9 +8,11 @@ do começo ao fim, sem travar o seu computador:
    malha recomendada (ou a melhor para um objetivo de memória ou de tempo).
 2. **Otimizar malha pelo erro** — roda o seu cálculo, mede o erro estimado e
    refina a malha só onde ele é alto, até a meta (ex.: 5 %) ou o limite do PC.
-3. **Relatório FEM** — relatório profissional do resultado: vistas automáticas
-   com balões, resumo executivo, qualidade da malha, checagem de equilíbrio,
-   erro estimado, alertas de singularidade; PDF, HTML e CSV.
+3. **Relatório FEM** — relatório para quem não fez a análise: vistas
+   automáticas que nunca escondem o ponto mais crítico, forma deformada, tensão
+   fora de apoios e cantos vivos com fator de segurança próprio, erro estimado
+   em cada ponto, critério certo para metais e polímeros (PLA, ABS, PETG),
+   reações nos apoios, estudo de convergência; PDF, HTML e CSV.
 
 **EN** — FreeCAD workbench for FEM analyses (CalculiX, linear static) from start
 to finish, without freezing your computer:
@@ -21,9 +23,11 @@ to finish, without freezing your computer:
 2. **Optimise mesh by the error** — solves your analysis, measures the
    estimated error and refines the mesh only where it is high, up to the target
    (e.g. 5 %) or the computer's limit.
-3. **FEM report** — professional report of the result: automatic views with
-   balloons, executive summary, mesh quality, equilibrium check, estimated
-   error, singularity alerts; PDF, HTML and CSV.
+3. **FEM report** — a report for readers who did not run the analysis:
+   automatic views that never hide the most critical point, deformed shape,
+   stress away from supports and sharp corners with its own safety factor,
+   estimated error at each point, the right criterion for metals and polymers
+   (PLA, ABS, PETG), support reactions, convergence study; PDF, HTML and CSV.
 
 ## Instalação / Installation
 
@@ -186,10 +190,11 @@ the computer's limits or stagnation (singularities).
    (ex.: `250 MPa`) para obter o fator de segurança. O logo (SVG, PNG ou JPG)
    aparece centralizado embaixo da capa; o diálogo mostra uma prévia e avisa se
    uma imagem pequena pode sair borrada na impressão (SVG sai sempre nítido). Na
-   primeira vez o campo vem com o logo do FreeCAD; deixe-o vazio para um
-   relatório sem logo. Empresa, autor, logo, aparência, nível, idioma, unidades e
-   exportações do último relatório são lembrados, também depois de fechar o
-   FreeCAD.
+   primeira vez o campo vem com o logo do FreeCAD (o botão **Padrão** volta a
+   ele); deixe-o vazio para um relatório sem logo. Os campos do último
+   relatório (empresa, autor, aparência, nível, idioma, unidades, limite de
+   escoamento, exportações) voltam enquanto o FreeCAD fica aberto; o logo
+   escolhido é lembrado também depois de fechar.
 5. Opcional: em **Aparência e textos fixos**, escolha a cor de destaque (padrão:
    preto) e os textos de abertura e de responsabilidade. Com cores claras, os
    títulos usam automaticamente um tom mais escuro da mesma cor, para manter o
@@ -197,23 +202,33 @@ the computer's limits or stagnation (singularities).
    acontece. Salve tudo como **template**, que
    fica numa pasta própria do PartReview, para reaproveitar depois.
 6. Opcional: marque **HTML** (relatório num arquivo único) e/ou **CSV** (valores
-   por nó).
+   por nó), e a **figura de apoios e cargas (beta)**.
 7. **Gerar relatório.** O PDF abre ao final. O documento volta exatamente como
    estava: visibilidade, câmera, cores e o sinal de "modificado".
 
 O que o relatório traz: capa com logo; sumário; **resumo executivo** com o
-veredito montado a partir dos dados; vistas automáticas com balões numerados
-e legenda (balões no fundo da imagem, sem cobrir o resultado e sem linhas
-cruzadas: preto = resultado, laranja = carga, roxo = apoio; um balão por face ou
-aresta visível); alertas de singularidade (tensão máxima sobre apoio ou carga, e
-apoios ou cargas em arestas e vértices); resumo da análise; resultados com unidade e local; pontos de
-interesse; **qualidade da malha, checagem de equilíbrio e erro estimado**
-(Zienkiewicz–Zhu, com mapa do erro local); premissas e limitações;
-**rastreabilidade** (versões, SHA-256 do arquivo, configurações do solver e
-da malha). A checagem de equilíbrio e o erro estimado foram validados contra a
-solução analítica da viga em balanço do FreeCAD (teoria de vigas): o equilíbrio
-fecha exatamente, e o erro estimado acompanha o erro verdadeiro, subestimando-o
-por um fator de 1,2 a 1,9 nesse caso.
+veredito montado a partir dos dados (quando a tensão máxima cai sobre um apoio,
+uma carga ou um canto vivo, ele mostra os dois fatores de segurança e diz qual
+governa); vistas automáticas (visão geral → aproximações de cada grandeza),
+com balões que nunca escondem o ponto mais crítico, eixos XYZ e barra de
+escala; **forma deformada** ampliada sobre o contorno da peça sem carga;
+resultados com unidade e local, incluindo a **tensão máxima fora de apoios,
+cargas e cantos vivos** (princípio de Saint-Venant; Williams, 1952) e a tensão
+principal máxima; **reações em cada apoio**; parte do volume acima de 50/80/100 %
+do limite do material; pontos de interesse com o **erro estimado em cada
+ponto**; **qualidade da malha, checagem de equilíbrio e erro estimado**
+(Zienkiewicz–Zhu, com mapa do erro local) e, quando a malha veio de "Otimizar
+malha pelo erro", o **estudo de convergência**; premissas e limitações
+conforme o material (metais: von Mises; polímeros como PLA, ABS e PETG: também
+a tensão principal contra a resistência à tração, com notas sobre impressão 3D,
+fluência e temperatura; quando o cartão do material traz resistência à tração
+menor que o escoamento, vale a menor); **rastreabilidade** (versões, SHA-256 do
+arquivo, configurações do solver e da malha). Os valores calculados saem com
+algarismos coerentes com o erro estimado. A checagem de equilíbrio e o erro
+estimado foram validados contra a solução analítica da viga em balanço do
+FreeCAD (teoria de vigas): o equilíbrio fecha exatamente, e o erro estimado
+acompanha o erro verdadeiro, subestimando-o por um fator de 1,2 a 1,9 nesse
+caso.
 
 ## Modelos de exemplo / Example models
 

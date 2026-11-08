@@ -2,47 +2,60 @@
 
 All notable changes to PartReview. / Mudanças importantes do PartReview.
 
-## Próxima versão / Next version (não publicada / unreleased)
+## 1.6.0 — 2026-11-08
 
-- **Optimise mesh by the error / Otimizar malha pelo erro** (new command,
-  decision 008): solves the user's analysis with the FEM workbench's CalculiX,
-  estimates the error per element (ZZ) and refines only the CAD faces where it is
-  high, until the target error, the memory or time limit, or stagnation
-  (singularities); every refined mesh is tried in a hidden document before it is
-  applied; old results stay until the new solve succeeds. / Novo comando: refino
-  adaptativo pelo erro, seguro e com explicação de por que parou.
-- **Report: supports and loads figure (beta) / Relatório: figura de apoios e
-  cargas (beta).** Optional, off by default (check box in the report dialog,
-  remembered; never in the quick summary): the part in gray with the held
-  regions painted purple and the loaded regions orange, colors only; the
-  caption names each support and load with its value. A second view is added
-  only for supports or loads hidden in the first. Result images keep only the
-  result balloons, and the numbered points are results only. / Opcional e
-  desmarcada por padrão: peça em cinza, apoios em roxo, cargas em laranja.
-- Report dialog memory: the fields of the last report (now including the
-  yield strength) come back only while FreeCAD stays open; the logo, when
-  changed from FreeCAD's default (also to no logo), is remembered after a
-  restart. / Os campos do último relatório (agora também o limite de
-  escoamento) voltam só enquanto o FreeCAD fica aberto; o logo alterado é
-  lembrado mesmo depois de fechar.
-- **Report fairness / Relatório imparcial:** the overview always shows the
-  most critical point first (a point outweighs all lesser ones together) and
-  says which points it could not show and in which figure they are; figures
-  read overview → its close-ups, then the next quantity. / A visão geral
-  sempre mostra o ponto mais crítico e avisa os pontos escondidos; as figuras
-  seguem visão geral → aproximações de cada grandeza.
-- **Stress away from supports and loads / Tensão fora de apoios e cargas**
-  (Saint-Venant): new point, row in the summary and results, and its safety
-  factor, next to a maximum that may be a singularity. / Novo ponto, com fator
-  de segurança, ao lado de um máximo que pode ser singularidade.
-- Supports/loads painting follows the CAD edges (each mesh triangle goes to
-  the nearest CAD face): clean on fillets and chamfers. / Pintura de apoios e
-  cargas segue as arestas do CAD.
-- The report no longer prints its level ("Report level") on the cover or in
-  the traceability table. / O relatório não mostra mais o "nível do relatório". / A figura 1 mostra a
-  peça em cinza, apoios em roxo, cargas em laranja e setas na direção das
-  forças, sem balões; as imagens de resultado ficam só com os balões de
-  resultado.
+Improvement release: a report written for professionals who did not run the
+analysis. / Versão de melhoria: relatório para profissionais que não fizeram a
+análise.
+
+**Optimise mesh by the error / Otimizar malha pelo erro** (new command):
+- Solves the analysis with the FEM workbench's CalculiX, estimates the error
+  per element (ZZ) and refines only the CAD faces where it is high, aiming at
+  the error away from supports (Saint-Venant), until the target, the memory or
+  time limit, or stagnation. Every refined mesh is tried in a hidden document
+  first; old results stay until the new solve succeeds. Its passes are kept on
+  the mesh and become the report's convergence study. / Refino adaptativo pelo
+  erro, seguro, com estudo de convergência no relatório.
+
+**Report: honest by design / Relatório imparcial:**
+- The overview never hides the most critical point to show lesser ones, and
+  lists the points it could not show with the figure where they are. Figures
+  read overview → its close-ups → next quantity. / A visão geral nunca esconde
+  o ponto mais crítico; ordem: visão geral → aproximações.
+- **Stress away from supports, loads and sharp inner corners**, with its own
+  safety factor; the summary says which factor governs. Sharp re-entrant
+  corners are flagged as singular (Williams 1952). / Tensão fora de apoios,
+  cargas e cantos vivos, com fator de segurança próprio.
+- **Estimated local error at each point** (ZZ), and computed results printed
+  with significant digits that match the estimated error. / Erro local em cada
+  ponto e algarismos coerentes com o erro.
+- **Materials:** family from Young's modulus (metals, polymers). The lower of
+  yield and tensile strength is used (generic PLA and ABS cards break before
+  they yield). Polymers (PLA, ABS, PETG...) also get the maximum principal
+  stress vs tensile strength (Rankine) and notes on 3D printing, creep and
+  temperature. / Materiais: menor limite; Rankine e notas de impressão 3D para
+  polímeros.
+- **Deformed shape** (magnified, over the unloaded outline) replaces the
+  displacement overview; no redundant displacement close-up, so the standard
+  level spends its figures on stress. / Forma deformada; figuras melhor usadas.
+- **Support reactions** (force per support), **share of the volume above
+  50/80/100 % of the material limit**, **mesh convergence study**. / Reações
+  por apoio, volume acima do limite, estudo de convergência.
+- Every figure has an XYZ axes triad and a scale bar; close-ups fill the frame.
+  / Eixos XYZ e barra de escala; aproximações bem enquadradas.
+- **Supports and loads figure (beta)**, optional and off by default: gray part,
+  supports purple, loads orange, painted up to the real CAD edges. / Figura de
+  apoios e cargas (beta), desmarcada por padrão.
+- The report level is no longer printed. / O nível do relatório não aparece
+  mais.
+
+**Report dialog / Diálogo do relatório:**
+- Fields of the last report (now also the yield strength) come back only while
+  FreeCAD stays open; a logo changed from the default (also "no logo") is
+  remembered after a restart. "Default" button restores FreeCAD's logo, read
+  from FreeCAD itself on every system; an empty field makes a report without a
+  logo. / Campos lembrados durante a sessão; logo lembrado sempre; botão
+  "Padrão"; campo vazio = sem logo.
 
 ## 1.5.1 — 2026-11-08
 
