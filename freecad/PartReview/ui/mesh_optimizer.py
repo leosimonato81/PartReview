@@ -1,0 +1,366 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: 2026 Leonardo Simonato
+"""'Optimise the mesh by the error' task panel (decision 008). Thin: rules in domain/.
+
+Loop: solve the user's analysis (FreeCAD's CalculiX tools, watched process) ->
+estimated error per element -> finer size on the CAD faces where it is too high ->
+try the refined mesh in a hidden document -> apply only if memory and time fit ->
+solve again. Stops at the target error, the computer's limits, stagnation
+(singularities) or after a few passes. Uses results by design, only on click.
+"""
+
+import time
+
+import FreeCAD as App  # type: ignore
+import FreeCADGui as Gui  # type: ignore
+from PySide6.QtCore import QTimer  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
+    QAbstractItemView,
+    QApplication,
+    QComboBox,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QProgressBar,
+    QStyle,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..adapters import machine_calibration, mesh_runner, optimizer
+from ..adapters.machine import machine_profile
+from ..domain import adaptive as ad
+from ..domain import mesh_plan as mp
+from ..domain import mesh_texts as mt
+from ..domain.i18n import Translator
+from ..domain.mesh_budget import TIGHT_FRACTION
+from ..domain.solver_model import SolverSample, format_duration, speed_factor
+from .mesh_assistant import _button
+from .report_dialog import ui_language
+
+TARGETS = (0.10, 0.05, 0.02)
+TIME_LIMITS = (300.0, 600.0, 1200.0)
+SOLVE_TIME_LIMIT_S = 1800  # hard stop of one CalculiX run
+SOLVE_MEMORY_SHARE = 0.8  # hard stop (the plan keeps each run within 60 %)
+GMSH_TIME_LIMIT_S = 300
+GMSH_MEMORY_SHARE = 0.7
+COLUMNS = ("mo.col.pass", "mo.col.nodes", "mo.col.error", "mo.col.stress", "mo.col.disp",
+           "mo.col.time", "mo.col.memory")
+
+
+class MeshOptimizerPanel:
+    def __init__(self, doc):
+        self.doc = doc
+        self.tr = Translator(ui_language())
+        t = self.tr.t
+        self.machine = machine_profile()
+        self.history_samples, _ = machine_calibration.load(self.machine)
+        self.mesh, self.solid, self.analysis = self._find_setup()
+        self.singular = set()
+        self.stress_excluded = set()
+        self.passes = []  # adaptive.Pass
+        self.samples = []  # SolverSample of each real solve
+        self.job = None
+        self.stage = ""
+        self.trial = None
+        self.pending_groups = None
+        self.started = 0.0
+        self.pass_started = 0.0
+        self.stop_key = ""
+
+        self.form = QWidget()
+        self.form.setWindowTitle(t("mo.title"))
+        layout = QVBoxLayout(self.form)
+        intro = QLabel(t("mo.intro"))
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        setup = QGroupBox(t("mo.group.setup"))
+        form = QFormLayout(setup)
+        self.setup_labels = {}
+        for key in ("mo.analysis", "mo.part", "mo.mesh"):
+            label = QLabel()
+            label.setWordWrap(True)
+            form.addRow("<b>%s</b>" % t(key), label)
+            self.setup_labels[key] = label
+        self.notes = QListWidget()
+        self.notes.setWordWrap(True)
+        self.notes.setMaximumHeight(110)
+        form.addRow(self.notes)
+        layout.addWidget(setup)
+
+        goal = QGroupBox(t("mo.group.goal"))
+        goal_form = QFormLayout(goal)
+        self.target_box = QComboBox()
+        for target in TARGETS:
+            self.target_box.addItem(t("mo.target_value", value=int(round(100 * target))), target)
+        self.target_box.setCurrentIndex(1)  # 5 %
+        self.time_box = QComboBox()
+        for seconds in TIME_LIMITS:
+            self.time_box.addItem(t("mo.time_value", minutes=int(seconds // 60)), seconds)
+        self.time_box.setCurrentIndex(1)  # 10 min
+        goal_form.addRow(t("mo.target"), self.target_box)
+        goal_form.addRow(t("mo.time_limit"), self.time_box)
+        goal_note = QLabel(t("mo.goal_note"))
+        goal_note.setWordWrap(True)
+        goal_form.addRow(goal_note)
+        layout.addWidget(goal)
+
+        run = QGroupBox(t("mo.group.run"))
+        run_layout = QVBoxLayout(run)
+        self.start_button = _button(t("mo.start"), QStyle.SP_MediaPlay, self.start, primary=True,
+                                    tip=t("mo.start_tip"))
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.cancel_button = _button(t("ma.cancel"), QStyle.SP_DialogCancelButton, self.cancel)
+        row = QHBoxLayout()
+        row.addWidget(self.progress, 1)
+        row.addWidget(self.cancel_button)
+        self.table = QTableWidget(0, len(COLUMNS))
+        self.table.setHorizontalHeaderLabels([t(c) for c in COLUMNS])
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.setMinimumHeight(140)
+        run_layout.addWidget(self.start_button)
+        run_layout.addWidget(self.status)
+        run_layout.addLayout(row)
+        run_layout.addWidget(self.table)
+        layout.addWidget(run)
+        layout.addStretch(1)
+
+        self.timer = QTimer()
+        self.timer.setInterval(200)
+        self.timer.timeout.connect(self._tick)
+        self._fill_setup()
+        self._set_busy(False)
+
+    # --- FreeCAD task panel protocol ------------------------------------------------
+
+    def getStandardButtons(self):
+        return QDialogButtonBox.StandardButton.Close
+
+    def reject(self):
+        self._cleanup()
+        Gui.Control.closeDialog()
+        return True
+
+    def accept(self):
+        return self.reject()
+
+    # --- setup ------------------------------------------------------------------------
+
+    def _find_setup(self):
+        """(assistant mesh, solid, analysis): the optimiser refines the assistant's own
+        mesh (user meshes are never changed)."""
+        for obj in mesh_runner.assistant_objects(self.doc):
+            if obj.isDerivedFrom("Fem::FemMeshObject"):
+                analysis = optimizer.analysis_of(self.doc, obj)
+                if analysis is not None:
+                    return obj, obj.Shape, analysis
+        return None, None, None
+
+    def _fill_setup(self):
+        t = self.tr.t
+        labels = self.setup_labels
+        if self.mesh is None:
+            for label in labels.values():
+                label.setText("—")
+            self.notes.addItem(QListWidgetItem("⚠ " + t("mo.need_assistant_mesh")))
+            self.start_button.setEnabled(False)
+            return
+        labels["mo.analysis"].setText(self.analysis.Label)
+        labels["mo.part"].setText(self.solid.Label)
+        labels["mo.mesh"].setText(t("mo.mesh_value", label=self.mesh.Label,
+                                    nodes=self.tr.integer(self.mesh.FemMesh.NodeCount)))
+        self.singular = optimizer.singular_faces(self.doc, self.solid)
+        self.stress_excluded = optimizer.support_faces(self.doc, self.solid)
+        if self.singular:
+            self.notes.addItem(QListWidgetItem("⚠ " + t(
+                "mo.singular", faces=", ".join(sorted(self.singular, key=lambda f: int(f[4:]))))))
+        if self.stress_excluded:
+            self.notes.addItem(QListWidgetItem("ℹ " + t("mo.corners")))
+        self.notes.addItem(QListWidgetItem("ℹ " + t("mo.uses_results")))
+
+    # --- actions ----------------------------------------------------------------------
+
+    def start(self):
+        if self.mesh is None or self.job is not None:
+            return
+        self.machine = machine_profile()
+        self.passes, self.samples = [], []
+        self.table.setRowCount(0)
+        self.stop_key = ""
+        self.started = time.monotonic()
+        if self.mesh.FemMesh.NodeCount == 0:  # mesh object not generated yet
+            self._start_job("mesh", mesh_runner.GmshJob(
+                self.mesh, GMSH_TIME_LIMIT_S, GMSH_MEMORY_SHARE * self.machine.available_mb,
+                load_into_object=True))
+        else:
+            self._start_solve()
+
+    def cancel(self):
+        if self.job is not None:
+            self.job.cancel()
+
+    # --- loop -------------------------------------------------------------------------
+
+    def _start_job(self, stage, job):
+        self.stage, self.job = stage, job
+        job.start()
+        self._set_busy(True)
+        self._show_progress()
+        self.timer.start()
+
+    def _start_solve(self):
+        t = self.tr.t
+        self.pass_started = time.monotonic()
+        self.status.setText(t("mo.writing"))
+        QApplication.processEvents()
+        job = optimizer.SolveJob(self.analysis, SOLVE_TIME_LIMIT_S,
+                                 SOLVE_MEMORY_SHARE * self.machine.available_mb)
+        try:
+            self._start_job("solve", job)
+        except optimizer.PrerequisiteError as err:
+            self._finish("prerequisite", str(err))
+
+    def _tick(self):
+        job = self.job
+        if job is None:
+            self.timer.stop()
+            return
+        state = job.poll()
+        if state in ("running", "mesh", "solve"):
+            self._show_progress()
+            return
+        self.timer.stop()
+        self.job = None
+        if state != job.DONE:
+            self._finish("cancelled" if state == job.CANCELLED else "failed",
+                         getattr(job, "log_tail", lambda: "")())
+            return
+        if self.stage == "mesh":
+            self._start_solve()
+        elif self.stage == "solve":
+            self._solved(job)
+        elif self.stage == "trial":
+            self._tried(job)
+
+    def _solved(self, job):
+        t = self.tr.t
+        self.status.setText(t("mo.reading"))
+        QApplication.processEvents()
+        info = optimizer.error_by_element(self.analysis, self.mesh, self.singular,
+                                          self.stress_excluded)
+        sample = SolverSample(info["nodes"], job.seconds, job.peak_mb)
+        self.samples.append(sample)
+        machine_calibration.save(self.machine, [sample])  # real solves teach the computer
+        self.passes.append(ad.Pass(info["nodes"], info["error"], info["max_stress"],
+                                   info["max_stress_regular"], info["max_displacement"],
+                                   time.monotonic() - self.pass_started, job.peak_mb))
+        self._add_row(self.passes[-1])
+        target = self.target_box.currentData()
+        reason = ad.stop_reason(self.passes, target)
+        if reason:
+            return self._finish(reason)
+        ratios = ad.element_ratios(info["error_sq"], info["energy_sq"], target)
+        current = dict(mesh_runner.region_sizes(self.mesh))
+        global_size = self.mesh.CharacteristicLengthMax.getValueAs("mm").Value
+        for faces in info["faces"]:
+            for face in faces:
+                current.setdefault(face, global_size)
+        refined = ad.face_sizes(info["faces"], info["sizes"], ratios, current, self.singular)
+        if not refined:
+            return self._finish("nothing")
+        merged = dict(mesh_runner.region_sizes(self.mesh))
+        merged.update(refined)
+        self.pending_groups = ad.group_by_size(merged)
+        if self.trial is None:
+            self.trial = mesh_runner.TrialDocument(self.solid.Shape.copy())
+        self._start_job("trial", self.trial.job_like(
+            self.mesh, self.pending_groups, GMSH_TIME_LIMIT_S,
+            GMSH_MEMORY_SHARE * self.machine.available_mb))
+
+    def _tried(self, job):
+        """The refined mesh was generated in the hidden document: does it fit?"""
+        nodes = job.run.nodes
+        self.machine = machine_profile()
+        model = mp.part_model(self.samples, mp.machine_time_law(self.history_samples)
+                              if self.history_samples else None)
+        # A failed pass costs nothing here (old results stay until the new solve
+        # succeeds; the watchdog stops CalculiX at 80 % of free memory), so the plan
+        # uses the probes' planning margin and the 'tight' limit.
+        margin = 1 + min(model.error, mp.PROBE_PLANNING_ERROR)
+        if model.memory_mb(nodes) * margin > TIGHT_FRACTION * self.machine.available_mb:
+            return self._finish("memory", nodes=nodes)
+        speed = speed_factor(self.samples or self.history_samples)
+        predicted = mp.total_seconds(model, nodes, None, speed) + job.elapsed
+        if time.monotonic() - self.started + predicted > self.time_box.currentData():
+            return self._finish("time", nodes=nodes)
+        self.doc.openTransaction("PartReview: optimise mesh")  # undoable
+        mesh_runner.set_regions(self.doc, self.mesh, self.solid, self.pending_groups)
+        self.doc.recompute()
+        self.doc.commitTransaction()
+        self._start_job("mesh", mesh_runner.GmshJob(
+            self.mesh, GMSH_TIME_LIMIT_S, GMSH_MEMORY_SHARE * self.machine.available_mb,
+            load_into_object=True))
+
+    def _finish(self, reason, detail="", nodes=0):
+        t = self.tr.t
+        self._set_busy(False)
+        self.stop_key = reason
+        last = self.passes[-1] if self.passes else None
+        text = t("mo.stop." + reason, target=int(round(100 * self.target_box.currentData())),
+                 nodes=self.tr.integer(nodes))
+        if last is not None:
+            text += " " + t("mo.final", error=self.tr.number(100 * last.error, 3),
+                            nodes=self.tr.integer(last.nodes),
+                            elapsed=format_duration(time.monotonic() - self.started))
+        if detail:
+            text += "\n" + detail[-600:]
+        self.status.setText(text)
+        App.Console.PrintMessage("PartReview: %s\n" % text.split("\n")[0])
+
+    # --- view -------------------------------------------------------------------------
+
+    def _add_row(self, p):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        cells = [str(row), self.tr.integer(p.nodes), self.tr.number(100 * p.error, 3) + " %",
+                 "%s MPa" % self.tr.number(p.max_stress_regular, 3),
+                 "%s mm" % self.tr.number(p.max_displacement, 4), format_duration(p.seconds),
+                 mt.memory(self.tr, p.peak_mb)]
+        for col, value in enumerate(cells):
+            self.table.setItem(row, col, QTableWidgetItem(value))
+
+    def _show_progress(self):
+        t = self.tr.t
+        what = t("mo.stage." + self.stage, n=len(self.passes))
+        elapsed = time.monotonic() - self.started
+        self.status.setText(t("mo.progress", what=what, elapsed=format_duration(elapsed),
+                              limit=format_duration(self.time_box.currentData())))
+
+    def _set_busy(self, busy):
+        self.progress.setVisible(busy)
+        self.cancel_button.setVisible(busy)
+        self.start_button.setEnabled(not busy and self.mesh is not None)
+        self.target_box.setEnabled(not busy)
+        self.time_box.setEnabled(not busy)
+
+    def _cleanup(self):
+        if self.job is not None:
+            self.job.cancel()
+            self.job = None
+        self.timer.stop()
+        if self.trial is not None:
+            self.trial.close()
+            self.trial = None

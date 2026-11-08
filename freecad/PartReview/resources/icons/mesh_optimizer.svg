@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- SPDX-FileCopyrightText: 2026 Leonardo Simonato -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- part with a mesh that is finer on one corner -->
+  <path d="M6 54 L30 8 L58 54 Z" fill="#e8eef6" stroke="#2c3e50" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M18 31 L42 31 L30 54 Z M18 31 L6 54 M42 31 L58 54" fill="none" stroke="#2c3e50" stroke-width="1.6"/>
+  <path d="M42 31 L50 31 L46 39 Z M46 39 L54 39 L50 47 Z M42 31 L46 39 M50 31 L54 39" fill="none" stroke="#c0392b" stroke-width="1.4"/>
+  <!-- target -->
+  <circle cx="50" cy="13" r="10" fill="#fff" stroke="#c0392b" stroke-width="3"/>
+  <circle cx="50" cy="13" r="4" fill="#c0392b"/>
+</svg>

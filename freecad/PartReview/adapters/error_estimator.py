@@ -81,6 +81,7 @@ class ZZEstimate:
     node_von_mises: np.ndarray  # von Mises of the recovered stress (MPa), for checking
     invalid_elements: int  # Jacobian determinant of the wrong sign or zero
     element_count: int
+    element_error_sq: np.ndarray = None  # ||e||^2 per element (adaptive refinement)
 
 
 def _compliance_energy(s, lam, mu):
@@ -163,4 +164,4 @@ def estimate(positions, elements, displacements, youngs_modulus, poisson_ratio):
         relative_error=float(eta), energy_norm_sq=total_norm, error_norm_sq=total_err,
         element_relative=local, node_ids=node_ids, node_indicator=indicator,
         node_von_mises=_von_mises(nodal), invalid_elements=invalid,
-        element_count=len(elements))
+        element_count=len(elements), element_error_sq=err_sq)

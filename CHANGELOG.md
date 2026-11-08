@@ -2,6 +2,16 @@
 
 All notable changes to PartReview. / Mudanças importantes do PartReview.
 
+## Próxima versão / Next version (não publicada / unreleased)
+
+- **Optimise mesh by the error / Otimizar malha pelo erro** (new command,
+  decision 008): solves the user's analysis with the FEM workbench's CalculiX,
+  estimates the error per element (ZZ) and refines only the CAD faces where it is
+  high, until the target error, the memory or time limit, or stagnation
+  (singularities); every refined mesh is tried in a hidden document before it is
+  applied; old results stay until the new solve succeeds. / Novo comando: refino
+  adaptativo pelo erro, seguro e com explicação de por que parou.
+
 ## 1.5.1 — 2026-11-08
 
 - Running the assistant again updates its own mesh of the part instead of

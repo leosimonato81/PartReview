@@ -51,6 +51,39 @@ def _set_region(doc, mesh, target, elements, size):
     return region
 
 
+def set_regions(doc, mesh, target, groups):
+    """Replace the assistant's refinement regions of ``mesh`` with one region per size.
+
+    ``groups``: {size (mm): [face names of ``target``]}. User regions are kept."""
+    import ObjectsFem  # type: ignore
+    for region in [r for r in mesh.MeshRegionList if MARKER in r.PropertiesList]:
+        doc.removeObject(region.Name)
+    created = []
+    for size, faces in groups.items():
+        if not faces or size <= 0:
+            continue
+        region = ObjectsFem.makeMeshRegion(doc, mesh, size, "PartReview_Refine")
+        region.addProperty("App::PropertyString", MARKER, "PartReview",
+                           "Created by the PartReview mesh assistant")
+        setattr(region, MARKER, "refinement")
+        region.References = [(target, tuple(faces))]
+        created.append(region)
+    return created
+
+
+def region_sizes(mesh):
+    """{face: size} of the assistant's refinement regions of ``mesh``."""
+    sizes = {}
+    for region in mesh.MeshRegionList:
+        if MARKER not in region.PropertiesList:
+            continue
+        size = region.CharacteristicLength.getValueAs("mm").Value
+        for _target, faces in region.References:
+            for face in faces:
+                sizes[face] = min(size, sizes.get(face, size))
+    return sizes
+
+
 def _apply_option(mesh, option):
     mesh.CharacteristicLengthMax = option.max_size
     mesh.CharacteristicLengthMin = option.min_size
@@ -237,6 +270,17 @@ class TrialDocument:
     def job(self, option, time_limit_s, memory_limit_mb, refine=()):
         _apply_option(self.mesh, option)
         _set_region(self.doc, self.mesh, self.doc.getObject("Solid"), refine, option.local_size)
+        self.doc.recompute()
+        return GmshJob(self.mesh, time_limit_s, memory_limit_mb, load_into_object=False)
+
+    def job_like(self, source_mesh, groups, time_limit_s, memory_limit_mb):
+        """Try ``source_mesh``'s settings plus refinement ``groups`` ({size: faces})
+        here first: a refined mesh reaches the user's document only if it fits."""
+        for name in ("CharacteristicLengthMax", "CharacteristicLengthMin",
+                     "MeshSizeFromCurvature", "ElementOrder", "SecondOrderLinear"):
+            setattr(self.mesh, name, getattr(source_mesh, name))
+        self.mesh.HighOrderOptimize = "None"
+        set_regions(self.doc, self.mesh, self.doc.getObject("Solid"), groups)
         self.doc.recompute()
         return GmshJob(self.mesh, time_limit_s, memory_limit_mb, load_into_object=False)
 
