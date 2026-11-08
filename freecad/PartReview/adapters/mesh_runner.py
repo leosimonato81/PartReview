@@ -140,6 +140,14 @@ def analyses(doc):
     return [o for o in doc.Objects if o.TypeId == "Fem::FemAnalysis"]
 
 
+def analysis_meshes(analysis):
+    """Solver meshes of an analysis (result meshes excluded)."""
+    results = [getattr(o, "Mesh", None) for o in analysis.Group if hasattr(o, "Mesh")
+               and o.isDerivedFrom("Fem::FemResultObject")]
+    return [o for o in analysis.Group if o.isDerivedFrom("Fem::FemMeshObject")
+            and not any(o is r for r in results)]
+
+
 def create_mesh_object(doc, solid_obj, option, version):
     """New Gmsh mesh object for ``solid_obj`` (undoable). Never touches existing meshes."""
     import ObjectsFem  # type: ignore
@@ -153,7 +161,9 @@ def create_mesh_object(doc, solid_obj, option, version):
                          "Created by the PartReview mesh assistant")
         setattr(mesh, MARKER, "%s %s" % (version, option.level.value))
         found = analyses(doc)
-        if len(found) == 1:  # one analysis: the mesh goes there; otherwise at the root
+        # Into the analysis only when it is the only one and has no mesh yet: FreeCAD's
+        # CalculiX refuses an analysis with two meshes, and the user's mesh is never touched.
+        if len(found) == 1 and not analysis_meshes(found[0]):
             found[0].addObject(mesh)
         doc.recompute()
     except Exception:

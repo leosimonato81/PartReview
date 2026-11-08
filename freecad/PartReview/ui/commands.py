@@ -14,6 +14,7 @@ from ..domain.i18n import Translator
 _ICONS = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "icons")
 ICON = os.path.join(_ICONS, "partreview.svg")
 CHECK_ICON = os.path.join(_ICONS, "check_mesh.svg")
+ASSISTANT_ICON = os.path.join(_ICONS, "mesh_assistant.svg")
 
 
 class FemReportCommand:
@@ -75,8 +76,26 @@ class CheckMeshCommand:
         box(parent, title, text)
 
 
-COMMANDS = {"PartReview_FemReport": FemReportCommand(),
-            "PartReview_CheckMesh": CheckMeshCommand()}
+class MeshAssistantCommand:
+    """Mesh assistant task panel (v1.5.0, decision 007)."""
+
+    def GetResources(self):
+        from .report_dialog import ui_language
+        t = Translator(ui_language()).t
+        return {"MenuText": t("ma.command"), "ToolTip": t("ma.command_tip"),
+                "Pixmap": ASSISTANT_ICON}
+
+    def IsActive(self):
+        return App.ActiveDocument is not None and not Gui.Control.activeDialog()
+
+    def Activated(self):
+        from .mesh_assistant import MeshAssistantPanel
+        Gui.Control.showDialog(MeshAssistantPanel(App.ActiveDocument))
+
+
+COMMANDS = {"PartReview_MeshAssistant": MeshAssistantCommand(),
+            "PartReview_CheckMesh": CheckMeshCommand(),
+            "PartReview_FemReport": FemReportCommand()}
 
 
 def register():

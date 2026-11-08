@@ -115,3 +115,26 @@ def test_straight_edges_fallback_keeps_the_size():
     fixed = with_straight_edges(coarse)
     assert fixed.straight_edges and not coarse.straight_edges
     assert fixed.max_size == coarse.max_size and fixed.level is coarse.level
+
+
+def test_panel_texts_in_both_languages():
+    from freecad.PartReview.domain import mesh_texts as mt
+    from freecad.PartReview.domain.i18n import Translator
+    from freecad.PartReview.domain.mesh_budget import MachineProfile, check_budget, BudgetStatus
+    machine = MachineProfile(7274, 3575, 8)
+    for lang in ("pt_BR", "en"):
+        tr = Translator(lang, strict=True)
+        rows = mt.part_rows(SHROUD, tr)
+        assert len(rows) == 4 and "3" in rows[2][1]
+        texts = [mt.issue_text(i, SHROUD, tr) for i in find_issues(SHROUD)]
+        assert "Face5, Face71" in texts[0] and "10" in texts[0]  # 3.03 / 0.3 ~ 10x
+        assert mt.machine_text(machine, tr)
+        for option in mesh_options(SHROUD):
+            assert option.max_size and mt.option_reason(option, SHROUD, tr)
+            assert mt.nodes_estimate(option, tr) and mt.gmsh_settings(option, tr)
+        for status in BudgetStatus:
+            assert mt.status_text(check_budget({"fits": 1000, "tight": 100000,
+                                                "too_big": 900000}[status.value], machine), tr)
+    pt = Translator("pt_BR", strict=True)
+    assert mt.issue_text(find_issues(SHROUD)[0], SHROUD, pt).startswith(
+        "Parede de 0,300 mm entre Face5, Face71: 10× mais fina")
