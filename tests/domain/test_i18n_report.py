@@ -124,7 +124,7 @@ def test_report_tables_contain_values_and_user_labels():
     report = build_report(make_inputs(), Translator("pt_BR", strict=True))
     text = "\n".join(cell for b in report.blocks if isinstance(b, Table)
                      for row in b.rows for cell in row)
-    assert "10,00 MPa" in text  # max von Mises, 4 significant digits
+    assert "10,0 MPa" in text  # max von Mises: 3 digits when the error is unknown
     assert "Engaste" in text and "Força: 12,00 N" in text
     assert "Aço" in text
     notices = [b.text for b in report.blocks if isinstance(b, Notice)]

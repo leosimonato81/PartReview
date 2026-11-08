@@ -424,5 +424,11 @@
   "ui.logo_reset": "Padrão",
   "ui.logo_reset_tip": "Volta ao logo do FreeCAD. Para gerar sem logo, deixe o campo em branco.",
   "ui.logo_empty": "em branco = relatório sem logo",
-  "fig.deformed": "Forma deformada, cor = {field} (deslocamentos ampliados {scale}×; linhas cinza = peça sem carga)"
+  "fig.deformed": "Forma deformada, cor = {field} (deslocamentos ampliados {scale}×; linhas cinza = peça sem carga)",
+  "points.local_error": "Erro local est.",
+  "points.criteria": "Pontos de tensão: o máximo, o máximo fora de apoios e cargas e até 2 outras regiões acima de 60 % da faixa de valores, em ordem de valor. A coluna “Erro local est.” é o indicador ZZ no ponto: quanto a malha limita a precisão daquele valor.",
+  "exec.fs_regular_ok": "Pela análise linear, longe de apoios e cargas o fator de segurança ao escoamento é {fs_regular}: é ele que governa o projeto. No ponto mais solicitado, sobre um apoio ou carga, o fator é {fs}, mas esse valor depende de como o apoio ou a carga foram modelados e pode ser uma singularidade.",
+  "exec.fs_regular_low": "Pela análise linear, mesmo longe de apoios e cargas a tensão ultrapassa o escoamento (fator de segurança {fs_regular}; no ponto mais solicitado, {fs}): o material escoaria, e acima do escoamento a análise linear deixa de valer.",
+  "assume.regular": "“Fora de apoios e cargas” significa a mais de {distance} deles (2 vezes a tolerância de proximidade: 1,5 elemento ou 1 % da peça). É uma regra prática: o efeito numérico de uma singularidade se espalha por alguns elementos.",
+  "assume.digits": "Os resultados calculados são mostrados com {n} algarismos significativos, de acordo com o erro estimado da análise; mais algarismos sugeririam uma precisão que o modelo não tem."
 }

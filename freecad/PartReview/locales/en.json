@@ -424,5 +424,11 @@
   "ui.logo_reset": "Default",
   "ui.logo_reset_tip": "Back to FreeCAD's logo. To make the report without a logo, leave the field empty.",
   "ui.logo_empty": "empty = report without a logo",
-  "fig.deformed": "Deformed shape, color = {field} (displacements magnified {scale}×; gray lines = unloaded part)"
+  "fig.deformed": "Deformed shape, color = {field} (displacements magnified {scale}×; gray lines = unloaded part)",
+  "points.local_error": "Est. local error",
+  "points.criteria": "Stress points: the maximum, the maximum away from supports and loads, and up to 2 more regions above 60 % of the value range, by value. “Est. local error” is the ZZ indicator at the point: how much the mesh limits the accuracy of that value.",
+  "exec.fs_regular_ok": "By the linear analysis, away from supports and loads the safety factor against yield is {fs_regular}: this one governs the design. At the most stressed point, on a support or load, the factor is {fs}, but that value depends on how the support or load was modelled and may be a singularity.",
+  "exec.fs_regular_low": "By the linear analysis, even away from supports and loads the stress exceeds yield (safety factor {fs_regular}; at the most stressed point, {fs}): the material would yield, and above yield the linear analysis no longer holds.",
+  "assume.regular": "“Away from supports and loads” means farther than {distance} from them (2 times the proximity tolerance: 1.5 elements or 1 % of the part). It is a practical rule: the numerical effect of a singularity spreads over a few elements.",
+  "assume.digits": "Computed results are shown with {n} significant digits, according to the estimated error of the analysis; more digits would suggest a precision the model does not have."
 }

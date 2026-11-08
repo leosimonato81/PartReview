@@ -78,3 +78,16 @@ def test_displacement_close_up_dropped_when_the_overview_shows_it():
     assert cp.drop_redundant_closeups([over, close_d, close_s]) == [over, close_s]
     hidden = cp.PlannedView(cam, FieldKind.DISPLACEMENT, (), is_overview=True)
     assert cp.drop_redundant_closeups([hidden, close_d]) == [hidden, close_d]
+
+
+def test_significant_digits_follow_the_estimated_error():
+    from types import SimpleNamespace
+    from freecad.PartReview.domain.quality import ErrorEstimate
+    from freecad.PartReview.domain.report import result_digits
+
+    def digits(err):
+        return result_digits(SimpleNamespace(error_estimate=ErrorEstimate(True, err, 0, 0, 0)))
+
+    assert digits(0.195) == 2 and digits(0.05) == 3 and digits(0.005) == 4
+    assert digits(0.0001) == 4 and digits(0.9) == 2
+    assert result_digits(SimpleNamespace(error_estimate=None)) == 3

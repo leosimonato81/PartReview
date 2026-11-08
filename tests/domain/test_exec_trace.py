@@ -50,7 +50,7 @@ def test_executive_summary_states_verdict_from_data():
     inputs = make_inputs(Quantity(5.0, "MPa"))  # max 10 MPa -> FS 0.5
     doc = build_report(inputs, Translator("pt_BR", strict=True))
     text = text_of(section(doc, "fem.executive"))
-    assert "10,00 MPa — ponto 1" in text
+    assert "10,0 MPa — ponto 1" in text
     assert "0,500" in text and "o material escoaria" in text
     assert "singularidade" in text  # the max sits on a load face in this model
 

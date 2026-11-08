@@ -8,6 +8,7 @@ labels) are copied as they are.
 """
 
 import datetime
+import math
 from dataclasses import dataclass, field, replace
 
 from . import colormap
@@ -95,6 +96,17 @@ def views_for_level(config: ReportConfig) -> int:
     return config.max_views if limit is None else min(limit, config.max_views)
 
 
+def result_digits(inputs) -> int:
+    """Significant digits of computed results, tied to the estimated error:
+    2 + floor(-log10(error)), between 2 and 4 (error 20 % -> 2, 5 % -> 3,
+    0,5 % -> 4). Printing 0,8908 MPa from a model with 20 % error suggests a
+    precision that does not exist. Unknown error: 3."""
+    zz = getattr(inputs, "error_estimate", None)
+    if zz is None or not zz.available or zz.relative_error <= 0:
+        return 3
+    return max(2, min(4, 2 + int(math.floor(-math.log10(zz.relative_error)))))
+
+
 def safety_factor(yield_strength: Quantity, max_stress: Quantity) -> float:
     if yield_strength.unit != max_stress.unit:
         raise ValueError("units differ: %s vs %s" % (yield_strength.unit, max_stress.unit))
@@ -158,6 +170,7 @@ def _summary(inputs: ReportInputs, tr: Translator) -> Table:
 def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
              fs_regular: float | None = None) -> Table:
     res, m = inputs.result, inputs.result.mesh
+    d = result_digits(inputs)
     rows = []
     regular = next((h for h in inputs.hotspots if h.kind is HotspotKind.STRESS_REGULAR), None)
     for kind, max_key, min_key in ((FieldKind.VON_MISES, "results.vm_max", "results.vm_min"),
@@ -166,25 +179,29 @@ def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
         if f is None:
             continue
         for key, nv in ((max_key, f.maximum(m)), (min_key, f.minimum(m))):
-            rows.append((tr.t(key), tr.quantity(nv.value, 4), tr.point(nv.position, m.length_unit),
+            rows.append((tr.t(key), tr.quantity(nv.value, d), tr.point(nv.position, m.length_unit),
                          str(nv.node_id)))
             if key == "results.vm_max" and regular is not None:
-                rows.append((tr.t("results.vm_regular"), tr.quantity(regular.peak_value, 4),
+                rows.append((tr.t("results.vm_regular"), tr.quantity(regular.peak_value, d),
                              tr.point(regular.center, m.length_unit), str(regular.peak_node)))
     if inputs.yield_strength is not None:
         source = tr.t("results.yield_source." + inputs.yield_source) if inputs.yield_source else ""
         rows.append((tr.t("results.yield"), tr.quantity(inputs.yield_strength, 4), source, ""))
     if fs is not None:
-        rows.append((tr.t("results.safety"), tr.number(fs, 3), "", ""))
+        rows.append((tr.t("results.safety"), tr.number(fs, d), "", ""))
     if fs_regular is not None:
-        rows.append((tr.t("results.safety_regular"), tr.number(fs_regular, 3), "", ""))
+        rows.append((tr.t("results.safety_regular"), tr.number(fs_regular, d), "", ""))
     header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"),
               tr.t("results.node"))
     return Table(header=header, rows=tuple(rows), widths=(0.36, 0.2, 0.32, 0.12))
 
 
-def _points(hotspots, tr: Translator, length_unit: str, figures) -> Table:
-    """Points table; the numbers are the balloons drawn on the figures."""
+def _points(hotspots, tr: Translator, length_unit: str, figures, digits: int = 4,
+            local_error=None) -> Table:
+    """Points table; the numbers are the balloons drawn on the figures.
+
+    ``local_error``: {node: estimated local error in %} (ZZ): each value comes
+    with its own confidence, not only the global one."""
     shown_in = {}
     for fig in figures:
         for m in fig.markers:
@@ -193,27 +210,32 @@ def _points(hotspots, tr: Translator, length_unit: str, figures) -> Table:
     with_alerts = any(spot.singularity_near for spot in hotspots)
     rows = []
     for n, spot in enumerate(hotspots, start=1):
-        row = (str(n), hotspot_name(spot, tr), tr.quantity(spot.peak_value, 4),
+        row = (str(n), hotspot_name(spot, tr), tr.quantity(spot.peak_value, digits),
                tr.point(spot.center, length_unit),
                tr.list_sep.join(shown_in.get(n, [])) or "—")
+        if local_error:
+            e = local_error.get(spot.peak_node)
+            row += (tr.number(e, 2) + " %" if e is not None else "—",)
         if with_alerts:
             row += (tr.t("points.singularity", label=spot.singularity_near)
                     if spot.singularity_near else "",)
         rows.append(row)
     header = (tr.t("points.number"), tr.t("points.type"), tr.t("points.value"),
               tr.t("points.location"), tr.t("points.figures"))
+    widths = [0.07, 0.31, 0.2, 0.29, 0.13]
+    if local_error:
+        header += (tr.t("points.local_error"),)
+        widths = [0.06, 0.27, 0.15, 0.25, 0.1, 0.17]
     if with_alerts:
         header += (tr.t("points.alert"),)
-        widths = (0.06, 0.25, 0.16, 0.25, 0.1, 0.18)
-    else:
-        widths = (0.07, 0.31, 0.2, 0.29, 0.13)
-    return Table(header=header, rows=tuple(rows), widths=widths)
+        widths = [w * 0.82 for w in widths] + [0.18]
+    return Table(header=header, rows=tuple(rows), widths=tuple(widths))
 
 
-def _balloon_text(spot: Hotspot, number: int, tr: Translator) -> str:
+def _balloon_text(spot: Hotspot, number: int, tr: Translator, digits: int = 4) -> str:
     name = hotspot_name(spot, tr)
     if spot.peak_value is not None:
-        name = "%s (%s)" % (name, tr.quantity(spot.peak_value, 4))
+        name = "%s (%s)" % (name, tr.quantity(spot.peak_value, digits))
     return "%d = %s" % (number, name)
 
 
@@ -258,7 +280,7 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
     balloons = ""
     if shown:
         balloons = tr.t("fig.marker_list", items=tr.list_sep.join(
-            _balloon_text(s, numbers[s], tr) for s in shown))
+            _balloon_text(s, numbers[s], tr, result_digits(inputs)) for s in shown))
         if any(m.style != "result" for m in markers):
             balloons += " " + tr.t("fig.marker_colors")
     return Figure(view_index=index, caption=caption,
@@ -369,7 +391,7 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
     stress = res.get_field(FieldKind.VON_MISES)
     blocks = [_results(inputs, tr, fs, ctx.fs_regular)]
     if fs is not None and fs < 1.0:
-        blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, 3))))
+        blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, result_digits(inputs)))))
     if fs is None and stress is not None:
         blocks.append(Notice(tr.t("warn.no_yield"), level="info"))
     if inputs.max_on_surface is False and stress is not None:
@@ -384,8 +406,13 @@ def _section_points(ctx: FemContext, tr: Translator, level) -> list:
     hotspots = list(ctx.inputs.hotspots)
     if not hotspots:
         return []
-    blocks = [Paragraph(tr.t("points.intro")),
-              _points(hotspots, tr, ctx.inputs.result.mesh.length_unit, ctx.figures)]
+    inputs = ctx.inputs
+    local = None
+    if inputs.error_field is not None:
+        local = dict(zip(inputs.error_field.node_ids, inputs.error_field.values))
+    blocks = [Paragraph(tr.t("points.intro") + " " + tr.t("points.criteria")),
+              _points(hotspots, tr, inputs.result.mesh.length_unit, ctx.figures,
+                      result_digits(inputs), local)]
     for c in ctx.inputs.result.constraints:
         if c.on_edges_or_vertices and c.kind in (ConstraintKind.FIXED, ConstraintKind.FORCE):
             blocks.append(Notice(tr.t("warn.line_constraint", label=c.label)))
@@ -436,28 +463,34 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     stress = res.get_field(FieldKind.VON_MISES)
     disp = res.get_field(FieldKind.DISPLACEMENT)
     rows, sentences = [], []
+    d = result_digits(inputs)
     smax = _first(ctx, HotspotKind.STRESS_MAX)
     if stress is not None:
-        value = tr.quantity(stress.maximum(res.mesh).value, 4)
+        value = tr.quantity(stress.maximum(res.mesh).value, d)
         rows.append((tr.t("results.vm_max"), " ".join(p for p in (value, _where(ctx, tr, smax)) if p)))
     regular = _first(ctx, HotspotKind.STRESS_REGULAR)
     if regular is not None:
-        value = tr.quantity(regular.peak_value, 4)
+        value = tr.quantity(regular.peak_value, d)
         rows.append((tr.t("results.vm_regular"),
                      " ".join(p for p in (value, _where(ctx, tr, regular)) if p)))
     if disp is not None:
         dmax = _first(ctx, HotspotKind.DISPLACEMENT_MAX)
-        value = tr.quantity(disp.maximum(res.mesh).value, 4)
+        value = tr.quantity(disp.maximum(res.mesh).value, d)
         rows.append((tr.t("results.disp_max"), " ".join(p for p in (value, _where(ctx, tr, dmax)) if p)))
     if ctx.fs is not None:
         source = tr.t("results.yield_source." + inputs.yield_source) if inputs.yield_source else ""
-        rows.append((tr.t("exec.safety"), tr.t("exec.safety_value", fs=tr.number(ctx.fs, 3),
+        rows.append((tr.t("exec.safety"), tr.t("exec.safety_value", fs=tr.number(ctx.fs, d),
                                                  limit=tr.quantity(inputs.yield_strength, 4),
                                                  source=source)))
-        key = "exec.fs_ok" if ctx.fs >= 1.0 else "exec.fs_low"
-        sentences.append(tr.t(key, fs=tr.number(ctx.fs, 3)))
         if ctx.fs_regular is not None:
-            rows.append((tr.t("exec.safety_regular"), tr.number(ctx.fs_regular, 3)))
+            # The maximum may be a singularity: both factors, and which one governs.
+            rows.append((tr.t("exec.safety_regular"), tr.number(ctx.fs_regular, d)))
+            key = "exec.fs_regular_ok" if ctx.fs_regular >= 1.0 else "exec.fs_regular_low"
+            sentences.append(tr.t(key, fs_regular=tr.number(ctx.fs_regular, d),
+                                  fs=tr.number(ctx.fs, d)))
+        else:
+            key = "exec.fs_ok" if ctx.fs >= 1.0 else "exec.fs_low"
+            sentences.append(tr.t(key, fs=tr.number(ctx.fs, d)))
     elif stress is not None:
         rows.append((tr.t("exec.safety"), tr.t("exec.safety_none")))
         sentences.append(tr.t("exec.no_yield"))
@@ -465,7 +498,7 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
         sentences.append(tr.t("exec.singular", n=ctx.numbers[smax], label=smax.singularity_near))
     if regular is not None and inputs.regular_exclusion is not None:
         sentences.append(tr.t("exec.regular", n=ctx.numbers[regular],
-                              value=tr.quantity(regular.peak_value, 4),
+                              value=tr.quantity(regular.peak_value, d),
                               distance=tr.quantity(inputs.regular_exclusion, 2)))
     eq = inputs.equilibrium
     if eq is not None:
@@ -522,6 +555,10 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
     singular = sum(1 for h in inputs.hotspots if h.singularity_near)
     if singular:
         dependence.append(tr.t("assume.singular", n=singular))
+    if inputs.regular_exclusion is not None:
+        dependence.append(tr.t("assume.regular",
+                               distance=tr.quantity(inputs.regular_exclusion, 2)))
+    dependence.append(tr.t("assume.digits", n=result_digits(inputs)))
     dependence.append(tr.t("assume.surface"))
     blocks.append(BulletList(tuple(dependence)))
     if inputs.config.disclaimer_text:
