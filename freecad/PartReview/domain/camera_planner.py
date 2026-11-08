@@ -187,7 +187,8 @@ def select_views(views, max_views: int = 8, angle_tolerance: float = 25.0) -> li
             if other.camera.height > 2.5 * view.camera.height:
                 continue
             if all(_inside_frame(other.camera, t.center) for t in view.targets):
-                kept[i] = replace(other, targets=other.targets + view.targets)
+                merged = other.targets + tuple(t for t in view.targets if t not in other.targets)
+                kept[i] = replace(other, targets=merged)  # no repeated target (no twin balloons)
                 merged = True
                 break
         if not merged and len(kept) < max_views:

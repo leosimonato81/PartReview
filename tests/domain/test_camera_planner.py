@@ -112,3 +112,15 @@ def test_select_views_merges_neighbors_and_limits_count():
     many = [cp.plan_target_view(spot(center=Vec3(0, 0, 1), normal=n), ORIGIN, 10.0,
                                 always_visible) for n in cp.AXES]
     assert len(cp.select_views(many, max_views=4)) == 4
+
+
+def test_merged_views_do_not_repeat_a_target():
+    # An overview that already shows a load, plus the load's own close-up: merging
+    # them must not list the load twice (it drew two identical balloons).
+    load = spot(kind=HotspotKind.LOAD, center=Vec3(0, 0, 1))
+    stress = spot(center=Vec3(0.2, 0, 1))
+    first = cp.plan_target_view(stress, ORIGIN, 10.0, always_visible)
+    first = cp.PlannedView(first.camera, first.color_field, (stress, load))
+    second = cp.PlannedView(first.camera, first.color_field, (load,))
+    for view in cp.select_views([first, second]):
+        assert len(view.targets) == len(set(view.targets))

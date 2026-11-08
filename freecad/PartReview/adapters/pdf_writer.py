@@ -187,7 +187,11 @@ def draw_markers(image, markers):
     callouts = []  # (style, number, tip, balloon center)
     placed, leaders = [], []
     for m in sorted(markers, key=lambda m: _DRAW_ORDER.get(m.style, 0)):
-        for tip in ((m.u, m.v),) + tuple(m.more):
+        tips = []
+        for tip in ((m.u, m.v),) + tuple(m.more):  # nearby tips of one spot: one balloon
+            if all((tip[0] - u) ** 2 + (tip[1] - v) ** 2 > (3 * radius) ** 2 for u, v in tips):
+                tips.append(tip)
+        for tip in tips:
             c = place_balloon(tip, radius, (image.width(), image.height()), is_background,
                               placed, center_of_part, leaders)
             placed.append(c)

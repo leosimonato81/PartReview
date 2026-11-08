@@ -218,7 +218,7 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
     w, h = inputs.image_size
     markers, shown = [], []
     leaders = dict(zip(view.targets, view.leaders)) if view.leaders else {}
-    for spot in sorted(view.targets, key=numbers.__getitem__):
+    for spot in sorted(dict.fromkeys(view.targets), key=numbers.__getitem__):  # each spot once
         points = leaders.get(spot, spot.leader_points)
         pixels = [project(view.camera, p, w, h) for p in points]
         pixels = [(u, v) for u, v in pixels if 0 <= u <= w and 0 <= v <= h]
