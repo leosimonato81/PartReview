@@ -18,6 +18,39 @@ from ..domain.gmsh_log import GmshRun, parse_gmsh_log
 MARKER = "PartReviewAssistant"  # property on every object the assistant creates
 
 
+def constraint_targets(doc, solid):
+    """[(label, kind, sub-element names)] of FEM supports/loads acting on ``solid``."""
+    found = []
+    for obj in doc.Objects:
+        if not obj.TypeId.startswith("Fem::Constraint") or getattr(obj, "Suppressed", False):
+            continue
+        subs = [s for target, names in (getattr(obj, "References", None) or [])
+                if target is solid for s in names]
+        if subs:
+            found.append((obj.Label, obj.TypeId.replace("Fem::Constraint", "").lower(),
+                          tuple(subs)))
+    return found
+
+
+def _set_region(doc, mesh, target, elements, size):
+    """One assistant mesh region (finer size) on ``elements`` of ``target``."""
+    import ObjectsFem  # type: ignore
+    regions = [r for r in mesh.MeshRegionList if MARKER in r.PropertiesList]
+    if not elements or size <= 0:
+        for region in regions:
+            doc.removeObject(region.Name)
+        return None
+    region = regions[0] if regions else ObjectsFem.makeMeshRegion(doc, mesh, size,
+                                                                  "PartReview_Refine")
+    if not regions:
+        region.addProperty("App::PropertyString", MARKER, "PartReview",
+                           "Created by the PartReview mesh assistant")
+        setattr(region, MARKER, "refinement")
+    region.CharacteristicLength = size
+    region.References = [(target, tuple(elements))]
+    return region
+
+
 def _apply_option(mesh, option):
     mesh.CharacteristicLengthMax = option.max_size
     mesh.CharacteristicLengthMin = option.min_size
@@ -201,8 +234,9 @@ class TrialDocument:
         if active is not None:
             App.setActiveDocument(active.Name)
 
-    def job(self, option, time_limit_s, memory_limit_mb):
+    def job(self, option, time_limit_s, memory_limit_mb, refine=()):
         _apply_option(self.mesh, option)
+        _set_region(self.doc, self.mesh, self.doc.getObject("Solid"), refine, option.local_size)
         self.doc.recompute()
         return GmshJob(self.mesh, time_limit_s, memory_limit_mb, load_into_object=False)
 
@@ -222,7 +256,7 @@ def analysis_meshes(analysis):
             and not any(o is r for r in results)]
 
 
-def create_mesh_object(doc, solid_obj, option, version):
+def create_mesh_object(doc, solid_obj, option, version, refine=()):
     """New Gmsh mesh object for ``solid_obj`` (undoable). Never touches existing meshes."""
     import ObjectsFem  # type: ignore
     doc.openTransaction("PartReview: mesh assistant")
@@ -234,6 +268,7 @@ def create_mesh_object(doc, solid_obj, option, version):
         mesh.addProperty("App::PropertyString", MARKER, "PartReview",
                          "Created by the PartReview mesh assistant")
         setattr(mesh, MARKER, "%s %s" % (version, option.level.value))
+        _set_region(doc, mesh, solid_obj, refine, option.local_size)
         found = analyses(doc)
         # Into the analysis only when it is the only one and has no mesh yet: FreeCAD's
         # CalculiX refuses an analysis with two meshes, and the user's mesh is never touched.

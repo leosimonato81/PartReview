@@ -17,7 +17,7 @@ from .solver_model import REFERENCE, PowerLaw, SolverModel, fit_model, fit_power
 
 PROBE_MIN_NODES = 15000  # below this the solver's fixed memory dominates the fit
 PROBE_MAX_SECONDS = 60.0  # a probe may be predicted up to 60 s (with margin)
-PROBE_MEMORY_SHARE = 0.5  # ... and up to 50 % of the free memory
+PROBE_MEMORY_SHARE = 0.6  # ... and up to 60 % of the free memory (watchdog kills at 65 %)
 GMSH_MAX_NODES = 3_000_000  # never ask Gmsh for more (it would take minutes and GBs)
 ONE_POINT_ERROR = 0.4  # reference law rescaled through a single measured point
 
@@ -107,3 +107,36 @@ def classify(model: SolverModel, nodes: int, free_mb: float, measured_mb=None):
     if memory <= TIGHT_FRACTION * free_mb:
         return BudgetStatus.TIGHT
     return BudgetStatus.TOO_BIG
+
+
+# FreeCAD around CalculiX: write the input (constraint node search) and load the
+# result. Measured on the owner's model, 57 299 nodes, reference PC: 2.9 s + 6.8 s.
+FREECAD_OVERHEAD_S_PER_NODE = (2.9 + 6.8) / 57299.0
+RECOMMEND_FINE_SECONDS = 120.0  # recommend "fine" when it fits and solves within 2 min
+
+
+def total_seconds(model: SolverModel, nodes: int, solver_seconds: float | None = None) -> float:
+    """What the user waits for after clicking solve in FreeCAD (order of magnitude)."""
+    solver = model.seconds(nodes) if solver_seconds is None else solver_seconds
+    return solver + FREECAD_OVERHEAD_S_PER_NODE * nodes
+
+
+def recommend(statuses: dict, seconds: dict):
+    """Recommended level from fit status and total time per tried level.
+
+    Quadratic tetrahedra need about 2 elements across a wall for bending stresses
+    (medium); one element (coarse) gave 24 % estimated error on the owner's part.
+    Fine is preferred when it fits and solves quickly; coarse only when medium does
+    not fit (the panel then warns that the error tends to be high).
+    Returns (level, reason key).
+    """
+    from .mesh_budget import BudgetStatus
+    from .mesh_sizing import MeshLevel
+    fits = {lv for lv, st in statuses.items() if st is BudgetStatus.FITS}
+    if MeshLevel.FINE in fits and seconds.get(MeshLevel.FINE, 1e9) <= RECOMMEND_FINE_SECONDS:
+        return MeshLevel.FINE, "ma.recommend.fine"
+    if MeshLevel.MEDIUM in fits:
+        return MeshLevel.MEDIUM, "ma.recommend.medium"
+    if MeshLevel.COARSE in fits:
+        return MeshLevel.COARSE, "ma.recommend.coarse"
+    return MeshLevel.VERY_COARSE, "ma.recommend.very_coarse"

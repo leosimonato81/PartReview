@@ -109,3 +109,30 @@ def test_probe_planning_margin_is_capped():
     # 56 445 nodes measured 1.0 GB: a probe up to 50 % of 2.9 GB free is allowed
     # with the 25 % planning margin (the 65 % watchdog is the hard stop)
     assert probe_allowed(one_point, 56445, 2900.0)
+
+
+def test_recommendation_prefers_two_elements_across_the_wall():
+    from freecad.PartReview.domain.mesh_budget import BudgetStatus as B
+    from freecad.PartReview.domain.mesh_plan import recommend
+    from freecad.PartReview.domain.mesh_sizing import MeshLevel as L
+    fits = {L.VERY_COARSE: B.FITS, L.COARSE: B.FITS, L.MEDIUM: B.FITS, L.FINE: B.TOO_BIG}
+    assert recommend(fits, {})[0] is L.MEDIUM
+    all_fit = {**fits, L.FINE: B.FITS}
+    assert recommend(all_fit, {L.FINE: 60.0})[0] is L.FINE
+    assert recommend(all_fit, {L.FINE: 600.0})[0] is L.MEDIUM  # too slow for the default
+    tight = {L.VERY_COARSE: B.FITS, L.COARSE: B.FITS, L.MEDIUM: B.TIGHT}
+    assert recommend(tight, {}) == (L.COARSE, "ma.recommend.coarse")
+
+
+def test_total_time_includes_freecad_overhead():
+    from freecad.PartReview.domain.mesh_plan import total_seconds
+    model = part_model(OWNER)
+    # owner's model, 57 299 nodes: CalculiX 11.4 s measured, total ~21 s measured
+    assert total_seconds(model, 57299, solver_seconds=11.4) == pytest.approx(21.1, abs=0.2)
+
+
+def test_options_carry_a_local_refinement_size():
+    from test_mesh_assistant import SHROUD
+    from freecad.PartReview.domain.mesh_sizing import mesh_options
+    for option in mesh_options(SHROUD):
+        assert option.local_size == pytest.approx(option.max_size / 2, rel=0.1)

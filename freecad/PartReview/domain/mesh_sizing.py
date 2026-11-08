@@ -40,8 +40,9 @@ class MeshLevel(Enum):
 
 _DIVISOR = {MeshLevel.VERY_COARSE: 2.0 / 3.0, MeshLevel.COARSE: 1, MeshLevel.MEDIUM: 2,
             MeshLevel.FINE: 3, MeshLevel.VERY_FINE: 4}
-DEFAULT_LEVEL = MeshLevel.COARSE  # owner's choice
+DEFAULT_LEVEL = MeshLevel.MEDIUM  # ~2 elements across the wall (coarse gave 24 % error)
 _DIAGONAL_RATIO = 10.0
+LOCAL_FACTOR = 0.5  # refined regions use half the global size
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,11 @@ class MeshOption:
     reason_key: str  # i18n key explaining max_size
     nodes_low: int  # rough range before meshing (the real count comes from Gmsh)
     nodes_high: int
-    straight_edges: bool = False  # -> SecondOrderLinear (fallback for inverted elements)
+    # -> SecondOrderLinear. Default True: curved 2nd-order elements folded near small
+    # details and refinement regions on every size of the owner's part (each fold cost a
+    # second Gmsh run); straight sides never fold, same node count, half the trial time.
+    straight_edges: bool = True
+    local_size: float = 0.0  # mm, mesh region on supports/loads/small radii (0 = none)
 
 
 def auto_option(summary: GeometrySummary, size: float, objective_key: str) -> MeshOption:
@@ -62,7 +67,8 @@ def auto_option(summary: GeometrySummary, size: float, objective_key: str) -> Me
     size = _round_size(size, 3)  # 3 digits: the search needs finer steps than the levels
     n = estimate_nodes(summary.volume, size, 1.0)
     return MeshOption(MeshLevel.AUTO, size, 0.0, CURVATURE, "2nd", objective_key,
-                      int(n * TET_FACTOR_LOW), int(n * TET_FACTOR_HIGH))
+                      int(n * TET_FACTOR_LOW), int(n * TET_FACTOR_HIGH),
+                      local_size=_round_size(LOCAL_FACTOR * size, 3))
 
 
 def with_straight_edges(option: MeshOption) -> MeshOption:
@@ -101,5 +107,6 @@ def mesh_options(summary: GeometrySummary) -> list:
         options.append(MeshOption(
             level, size, 0.0, CURVATURE, "2nd", key,
             estimate_nodes(summary.volume, size, TET_FACTOR_LOW),
-            estimate_nodes(summary.volume, size, TET_FACTOR_HIGH)))
+            estimate_nodes(summary.volume, size, TET_FACTOR_HIGH),
+            local_size=_round_size(LOCAL_FACTOR * size)))
     return options

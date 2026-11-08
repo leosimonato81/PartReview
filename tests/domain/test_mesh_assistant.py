@@ -114,8 +114,9 @@ def test_real_node_counts_fall_in_the_estimated_range(summary, level, nodes):
 
 def test_straight_edges_fallback_keeps_the_size():
     coarse = mesh_options(SHROUD)[1]
+    assert coarse.straight_edges  # default: never folds (owner's part folded at every size)
     fixed = with_straight_edges(coarse)
-    assert fixed.straight_edges and not coarse.straight_edges
+    assert fixed.straight_edges
     assert fixed.max_size == coarse.max_size and fixed.level is coarse.level
 
 
