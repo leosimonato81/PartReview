@@ -403,5 +403,8 @@
   "mo.stop.cancelled": "Cancelled. The mesh and results of the last complete pass stay in the document.",
   "mo.stop.failed": "A process failed (CalculiX or Gmsh). Details:",
   "mo.stop.prerequisite": "FreeCAD cannot solve the analysis as it is:",
-  "mo.final": "Result: estimated error {error} % with {nodes} nodes, in {elapsed}. Generate the report to see the details."
+  "mo.final": "Result: estimated error {error} % with {nodes} nodes, in {elapsed}. Generate the report to see the details.",
+  "mo.stop.first_too_big": "Not started: the current mesh ({nodes} nodes) needs at least ~{memory} in CalculiX, and that much memory is not free. Create a coarser mesh in the Mesh assistant or close other programs.",
+  "mo.stop.killed_memory": "CalculiX exceeded the memory limit (it reached {memory}; {free} were free) and was stopped before freezing the computer. The previous results stay in the document. Use a coarser mesh in the Mesh assistant or close other programs.",
+  "mo.stop.killed_timeout": "CalculiX exceeded the time limit and was stopped. The previous results stay in the document."
 }

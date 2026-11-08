@@ -205,8 +205,20 @@ class MeshOptimizerPanel:
             self._start_job("mesh", mesh_runner.GmshJob(
                 self.mesh, GMSH_TIME_LIMIT_S, GMSH_MEMORY_SHARE * self.machine.available_mb,
                 load_into_object=True))
-        else:
+        elif self._first_solve_fits():
             self._start_solve()
+
+    def _first_solve_fits(self):
+        """Pass 0 is checked too: memory depends on the mesh, not on the computer;
+        before any solve of this part it is a band (thin-walled .. compact parts)."""
+        nodes = self.mesh.FemMesh.NodeCount
+        model = mp.part_model(self.samples)
+        free = self.machine.available_mb
+        if mp.is_hopeless(model, nodes, free, TIGHT_FRACTION):  # even the optimistic side
+            self._finish("first_too_big", nodes=nodes,
+                         memory=mt.memory(self.tr, model.memory_low(nodes)))
+            return False
+        return True
 
     def cancel(self):
         if self.job is not None:
@@ -245,8 +257,16 @@ class MeshOptimizerPanel:
         self.timer.stop()
         self.job = None
         if state != job.DONE:
-            self._finish("cancelled" if state == job.CANCELLED else "failed",
-                         getattr(job, "log_tail", lambda: "")())
+            reason = getattr(job, "reason", "") or state
+            process = getattr(job, "process", None)
+            peak = mt.memory(self.tr, process.peak_mb) if process is not None else ""
+            if reason in ("memory", "timeout"):  # the watchdog protected the computer
+                self._finish("killed_" + reason, memory=peak,
+                             free=mt.memory(self.tr, self.machine.available_mb))
+            elif state == job.CANCELLED:
+                self._finish("cancelled")
+            else:
+                self._finish("failed", getattr(job, "log_tail", lambda: "")())
             return
         if self.stage == "mesh":
             self._start_solve()
@@ -314,13 +334,13 @@ class MeshOptimizerPanel:
             self.mesh, GMSH_TIME_LIMIT_S, GMSH_MEMORY_SHARE * self.machine.available_mb,
             load_into_object=True))
 
-    def _finish(self, reason, detail="", nodes=0):
+    def _finish(self, reason, detail="", nodes=0, memory="", free=""):
         t = self.tr.t
         self._set_busy(False)
         self.stop_key = reason
         last = self.passes[-1] if self.passes else None
         text = t("mo.stop." + reason, target=int(round(100 * self.target_box.currentData())),
-                 nodes=self.tr.integer(nodes))
+                 nodes=self.tr.integer(nodes), memory=memory, free=free)
         if last is not None:
             text += " " + t("mo.final", error=self.tr.number(100 * last.error, 3),
                             nodes=self.tr.integer(last.nodes),
