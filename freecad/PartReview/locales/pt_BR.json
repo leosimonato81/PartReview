@@ -190,7 +190,7 @@
   "assume.not.manufacturing": "defeitos e tolerâncias de fabricação e detalhes não modelados (roscas, soldas, rebarbas);",
   "assume.not.boundary": "se os apoios, as cargas e o material representam a situação real.",
   "assume.mesh": "Os resultados dependem da malha. O erro estimado é uma estimativa; o erro real só pode ser medido refazendo a análise com malhas mais finas.",
-  "assume.singular": "{n} ponto(s) de interesse estão sobre apoios ou cargas e foram marcados como possível singularidade.",
+  "assume.singular": "{n} ponto(s) de interesse estão sobre apoios, cargas ou cantos vivos internos e foram marcados como possível singularidade.",
   "assume.surface": "As figuras mostram apenas a superfície da peça; valores internos aparecem só nas tabelas.",
   "trace.tool": "Ferramenta",
   "trace.freecad": "FreeCAD",
@@ -445,5 +445,10 @@
   "assume.criterion_polymer": "Material polimérico (módulo de elasticidade abaixo de 10 GPa): além de von Mises, a tensão principal máxima é comparada com a resistência à tração (critério de Rankine), porque polímeros como o PLA rompem por tração com pouca deformação.",
   "assume.printed": "Se a peça for impressa em 3D (PLA, ABS, PETG...), o modelo a trata como maciça (100 % de preenchimento) e igual em todas as direções. Peças impressas são anisotrópicas: entre camadas a resistência pode ser bem menor; paredes e preenchimento mudam rigidez e resistência. Os valores do cartão são genéricos: prefira os do seu filamento, na direção de impressão da peça.",
   "assume.polymer_time": "Polímeros sofrem fluência (a deformação cresce com a carga mantida) e perdem rigidez com o calor (o PLA amolece perto de 55–60 °C): a análise vale para carga de curta duração, à temperatura ambiente.",
-  "assume.uts_used": "No cartão do material a resistência à tração é menor que o limite de escoamento: o fator de segurança usa o menor dos dois, pois o material rompe antes de escoar."
+  "assume.uts_used": "No cartão do material a resistência à tração é menor que o limite de escoamento: o fator de segurança usa o menor dos dois, pois o material rompe antes de escoar.",
+  "points.sharp_corner": "possível singularidade (canto vivo)",
+  "warn.sharp_corner": "O ponto {n} está num canto vivo interno (quina reentrante sem arredondamento). Pela teoria da elasticidade (Williams, 1952), ali a tensão é teoricamente infinita: o valor cresce com o refino da malha. Na peça real, o raio de arredondamento da quina define a tensão; modele o raio para obter um valor confiável.",
+  "exec.sharp_corner": "A tensão máxima (ponto {n}) está num canto vivo interno: pode ser uma singularidade, que cresce com o refino da malha. Modele o raio real da quina para obter um valor confiável.",
+  "warn.singularity_many": "Os pontos {n} estão sobre {label} (apoio ou carga). Tensões concentradas em apoios e cargas costumam crescer quando a malha é refinada (singularidade numérica) e não devem ser usadas sozinhas para dimensionar a peça.",
+  "warn.sharp_corner_many": "Os pontos {n} estão em cantos vivos internos (quinas reentrantes sem arredondamento). Pela teoria da elasticidade (Williams, 1952), ali a tensão é teoricamente infinita: o valor cresce com o refino da malha. Na peça real, o raio de arredondamento da quina define a tensão; modele o raio para obter um valor confiável."
 }

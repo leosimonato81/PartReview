@@ -223,3 +223,38 @@ def nearest_faces(triangles, positions: Mapping[int, Vec3], faces, wanted,
         if best in near[t]:
             result[t] = best
     return result
+
+
+def reentrant_edges(triangles, positions: Mapping[int, Vec3],
+                    min_angle_deg: float = 60.0) -> list[tuple[int, int]]:
+    """Sharp concave (re-entrant) edges: where the outer surface folds INTO the
+    part by more than ``min_angle_deg`` without a fillet.
+
+    Linear elasticity (Williams 1952): at a re-entrant corner the stress is
+    theoretically infinite, so the FE value there grows with refinement, like
+    at a support on an edge. A convex edge (an outer corner) is harmless.
+    Concave test: across the edge, the neighbor triangle's far corner lies on
+    the outer side of this triangle (``triangles`` must be outward-oriented,
+    as built by ``build_surface``).
+    """
+    by_edge = {}
+    for tri in triangles:
+        for k in range(3):
+            u, v, w = tri[k], tri[(k + 1) % 3], tri[(k + 2) % 3]
+            by_edge.setdefault((min(u, v), max(u, v)), []).append((tri, w))
+    edges = []
+    for (u, v), pair in by_edge.items():
+        if len(pair) != 2:
+            continue
+        (t1, _), (t2, far2) = pair
+        p = [positions[i] for i in t1]
+        n1 = g.cross(g.sub(p[1], p[0]), g.sub(p[2], p[0]))
+        q = [positions[i] for i in t2]
+        n2 = g.cross(g.sub(q[1], q[0]), g.sub(q[2], q[0]))
+        if g.length(n1) == 0 or g.length(n2) == 0:
+            continue
+        if g.angle_deg(n1, n2) <= min_angle_deg:
+            continue
+        if g.dot(n1, g.sub(positions[far2], positions[u])) > 0:  # folds inward
+            edges.append((u, v))
+    return edges

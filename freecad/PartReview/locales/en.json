@@ -190,7 +190,7 @@
   "assume.not.manufacturing": "manufacturing defects and tolerances, and details not modelled (threads, welds, burrs);",
   "assume.not.boundary": "whether supports, loads and material represent the real situation.",
   "assume.mesh": "Results depend on the mesh. The estimated error is an estimate; the real error can only be measured by repeating the analysis with finer meshes.",
-  "assume.singular": "{n} point(s) of interest lie on supports or loads and were marked as a possible singularity.",
+  "assume.singular": "{n} point(s) of interest lie on supports, loads or sharp inner corners and were marked as a possible singularity.",
   "assume.surface": "The figures only show the surface of the part; internal values appear only in the tables.",
   "trace.tool": "Tool",
   "trace.freecad": "FreeCAD",
@@ -445,5 +445,10 @@
   "assume.criterion_polymer": "Polymer material (Young's modulus below 10 GPa): besides von Mises, the maximum principal stress is compared with the tensile strength (Rankine criterion), because polymers such as PLA break in tension with little deformation.",
   "assume.printed": "If the part is 3D printed (PLA, ABS, PETG...), the model treats it as solid (100 % infill) and the same in every direction. Printed parts are anisotropic: between layers the strength can be much lower; walls and infill change stiffness and strength. Card values are generic: prefer those of your filament, in the part's print direction.",
   "assume.polymer_time": "Polymers creep (deformation grows under sustained load) and lose stiffness when warm (PLA softens near 55–60 °C): the analysis holds for short-term loads at room temperature.",
-  "assume.uts_used": "On the material card the tensile strength is lower than the yield strength: the safety factor uses the lower of the two, because the material breaks before it yields."
+  "assume.uts_used": "On the material card the tensile strength is lower than the yield strength: the safety factor uses the lower of the two, because the material breaks before it yields.",
+  "points.sharp_corner": "possible singularity (sharp corner)",
+  "warn.sharp_corner": "Point {n} sits on a sharp inner corner (a re-entrant edge without a fillet). By elasticity theory (Williams, 1952), the stress there is theoretically infinite: the value grows as the mesh is refined. On the real part, the corner's fillet radius sets the stress; model the radius to get a reliable value.",
+  "exec.sharp_corner": "The maximum stress (point {n}) sits on a sharp inner corner: it may be a singularity that grows as the mesh is refined. Model the real corner radius to get a reliable value.",
+  "warn.singularity_many": "Points {n} lie on {label} (a support or load). Stresses concentrated at supports and loads usually keep growing as the mesh is refined (numerical singularity) and should not be used alone to size the part.",
+  "warn.sharp_corner_many": "Points {n} sit on sharp inner corners (re-entrant edges without a fillet). By elasticity theory (Williams, 1952), the stress there is theoretically infinite: the value grows as the mesh is refined. On the real part, the corner's fillet radius sets the stress; model the radius to get a reliable value."
 }

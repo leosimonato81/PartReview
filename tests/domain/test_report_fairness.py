@@ -91,3 +91,18 @@ def test_significant_digits_follow_the_estimated_error():
     assert digits(0.195) == 2 and digits(0.05) == 3 and digits(0.005) == 4
     assert digits(0.0001) == 4 and digits(0.9) == 2
     assert result_digits(SimpleNamespace(error_estimate=None)) == 3
+
+
+def test_reentrant_edges_finds_the_inner_corner_of_an_l_and_not_the_outer():
+    from freecad.PartReview.domain.surface import reentrant_edges
+    # floor: z = 0, x in [0, 1]; wall: x = 0, z in [0, 1]
+    pos = {0: Vec3(0, 0, 0), 1: Vec3(0, 1, 0), 2: Vec3(1, 0, 0), 3: Vec3(1, 1, 0),
+           4: Vec3(0, 0, 1), 5: Vec3(0, 1, 1)}
+    # material below the floor and behind the wall (x < 0): the corner is re-entrant.
+    # Outward normals: floor +z, wall +x.
+    floor = [(0, 2, 3), (0, 3, 1)]  # normal +z
+    wall = [(0, 1, 5), (0, 5, 4)]  # normal +x
+    assert set(reentrant_edges(floor + wall, pos)) == {(0, 1)}
+    # Same faces with the material on the other side (normals -z, -x): convex edge.
+    flipped = [(a, c, b) for a, b, c in floor + wall]
+    assert reentrant_edges(flipped, pos) == []

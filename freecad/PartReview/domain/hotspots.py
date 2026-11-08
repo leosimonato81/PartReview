@@ -46,6 +46,7 @@ class Hotspot:
     peak_value: Quantity | None = None
     label: str = ""  # user label for supports/loads: never translated
     singularity_near: str = ""  # label of the constraint it touches, if any
+    sharp_corner: bool = False  # on a sharp re-entrant edge (Williams): likely singular
     # Points ON the part where the balloon leaders point (one per face/edge group of a
     # support or load). Empty: the leader points at ``center``.
     anchors: tuple[Vec3, ...] = ()
@@ -148,21 +149,25 @@ def field_hotspots(field: ResultField, mesh: MeshInfo, surface: Surface,
 
 
 def regular_stress_hotspot(field: ResultField, mesh: MeshInfo, surface: Surface,
-                           constraints, exclusion: float) -> Hotspot | None:
+                           constraints, exclusion: float, corners=()) -> Hotspot | None:
     """Highest von Mises on the surface farther than ``exclusion`` from every
     support and load (Saint-Venant: an idealised support or load disturbs the
     stress only near it; there the stress may be a singularity that grows with
-    refinement). None when the global maximum is already that far, or no node is.
+    refinement). Sharp re-entrant edges (``corners``: segments) are kept away
+    from as well (Williams). None when the global maximum is already that far,
+    or no node is.
 
     Walks the nodes from the highest value down and stops at the first one far
     enough, so only a few distances are computed on usual models.
     """
-    if not constraints or exclusion <= 0:
+    if not (constraints or corners) or exclusion <= 0:
         return None
     values = {n: v for n, v in zip(field.node_ids, field.values) if n in surface.nodes}
     positions = mesh.node_positions
     for rank, node in enumerate(sorted(values, key=values.__getitem__, reverse=True)):
-        if all(distance_to_constraint(positions[node], c) > exclusion for c in constraints):
+        p = positions[node]
+        if all(distance_to_constraint(p, c) > exclusion for c in constraints) \
+                and not near_segments(p, corners, exclusion):
             if rank == 0:
                 return None  # the maximum itself is regular: nothing to add
             spot = _make_hotspot(HotspotKind.STRESS_REGULAR, {node}, values, field.unit,
@@ -328,8 +333,13 @@ def drop_redundant(hotspots) -> list[Hotspot]:
     return kept
 
 
-def mark_singularities(hotspots, constraints, tolerance: float) -> list[Hotspot]:
-    """Flag stress hotspots that sit on a support or load (likely singular)."""
+def near_segments(point: Vec3, segments, distance: float) -> bool:
+    return any(g.point_segment_distance(point, a, b) <= distance for a, b in segments)
+
+
+def mark_singularities(hotspots, constraints, tolerance: float, corners=()) -> list[Hotspot]:
+    """Flag stress hotspots that sit on a support or load, or on a sharp
+    re-entrant edge (``corners``: segments), as likely singular."""
     marked = []
     for spot in hotspots:
         if spot.kind in (HotspotKind.STRESS_MAX, HotspotKind.STRESS) and spot.peak_node is not None:
@@ -337,5 +347,7 @@ def mark_singularities(hotspots, constraints, tolerance: float) -> list[Hotspot]
                 if distance_to_constraint(spot.center, c) <= tolerance:
                     spot = replace(spot, singularity_near=c.label)
                     break
+            if not spot.singularity_near and near_segments(spot.center, corners, tolerance):
+                spot = replace(spot, sharp_corner=True)
         marked.append(spot)
     return marked

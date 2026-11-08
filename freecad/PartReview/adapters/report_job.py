@@ -41,7 +41,7 @@ from ..domain.quality import (
 )
 from ..domain.exporters import nodal_csv
 from ..domain.report import ReportInputs, build_report, order_hotspots, views_for_level
-from ..domain.surface import build_surface
+from ..domain.surface import build_surface, reentrant_edges
 from ..domain.units import Quantity
 from . import boundary_scene, fem_reader, trace_reader
 from .error_estimator import estimate
@@ -124,14 +124,16 @@ def _plan(result, surface, max_views, boundary_views):
             spots += field_hotspots(disp, mesh, surface)
         tolerance = max(1.5 * surface.mean_edge_length, 0.01 * radius)
         exclusion = REGULAR_EXCLUSION * tolerance
+        corners = [(mesh.node_positions[a], mesh.node_positions[b])
+                   for a, b in reentrant_edges(surface.triangles, mesh.node_positions)]
         if stress is not None:
             regular = regular_stress_hotspot(stress, mesh, surface, result.constraints,
-                                             exclusion)
+                                             exclusion, corners)
             if regular is not None:
                 spots.append(regular)
         spots += [h for h in (constraint_hotspot(c) for c in result.constraints) if h]
         spots = order_hotspots(drop_redundant(
-            mark_singularities(spots, result.constraints, tolerance)))
+            mark_singularities(spots, result.constraints, tolerance, corners)))
 
     results = [s for s in spots if s.kind not in cp.BOUNDARY_KINDS]
     views = []

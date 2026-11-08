@@ -219,7 +219,7 @@ def _points(hotspots, tr: Translator, length_unit: str, figures, digits: int = 4
         for m in fig.markers:
             shown_in.setdefault(m.number, []).append(str(fig.view_index + 1))
     # The "Alert" column only exists when at least one point has an alert.
-    with_alerts = any(spot.singularity_near for spot in hotspots)
+    with_alerts = any(spot.singularity_near or spot.sharp_corner for spot in hotspots)
     rows = []
     for n, spot in enumerate(hotspots, start=1):
         row = (str(n), hotspot_name(spot, tr), tr.quantity(spot.peak_value, digits),
@@ -230,17 +230,20 @@ def _points(hotspots, tr: Translator, length_unit: str, figures, digits: int = 4
             row += (tr.number(e, 2) + " %" if e is not None else "—",)
         if with_alerts:
             row += (tr.t("points.singularity", label=spot.singularity_near)
-                    if spot.singularity_near else "",)
+                    if spot.singularity_near
+                    else tr.t("points.sharp_corner") if spot.sharp_corner else "",)
         rows.append(row)
     header = (tr.t("points.number"), tr.t("points.type"), tr.t("points.value"),
               tr.t("points.location"), tr.t("points.figures"))
-    widths = [0.07, 0.31, 0.2, 0.29, 0.13]
     if local_error:
         header += (tr.t("points.local_error"),)
-        widths = [0.06, 0.27, 0.15, 0.25, 0.1, 0.17]
     if with_alerts:
         header += (tr.t("points.alert"),)
-        widths = [w * 0.82 for w in widths] + [0.18]
+    widths = {(False, False): (0.07, 0.31, 0.2, 0.29, 0.13),
+              (True, False): (0.06, 0.27, 0.15, 0.25, 0.11, 0.16),
+              (False, True): (0.06, 0.25, 0.16, 0.25, 0.1, 0.18),
+              (True, True): (0.05, 0.2, 0.12, 0.21, 0.1, 0.11, 0.21)}[
+                  (bool(local_error), with_alerts)]
     return Table(header=header, rows=tuple(rows), widths=tuple(widths))
 
 
@@ -448,9 +451,18 @@ def _section_points(ctx: FemContext, tr: Translator, level) -> list:
     for c in ctx.inputs.result.constraints:
         if c.on_edges_or_vertices and c.kind in (ConstraintKind.FIXED, ConstraintKind.FORCE):
             blocks.append(Notice(tr.t("warn.line_constraint", label=c.label)))
+    # One notice per support/load (not one per point), then the sharp corners.
+    by_label = {}
     for n, spot in enumerate(hotspots, start=1):
         if spot.singularity_near:
-            blocks.append(Notice(tr.t("warn.singularity", n=n, label=spot.singularity_near)))
+            by_label.setdefault(spot.singularity_near, []).append(str(n))
+    for label, ns in by_label.items():
+        key = "warn.singularity" if len(ns) == 1 else "warn.singularity_many"
+        blocks.append(Notice(tr.t(key, n=tr.list_sep.join(ns), label=label)))
+    corners = [str(n) for n, spot in enumerate(hotspots, start=1) if spot.sharp_corner]
+    if corners:
+        key = "warn.sharp_corner" if len(corners) == 1 else "warn.sharp_corner_many"
+        blocks.append(Notice(tr.t(key, n=tr.list_sep.join(corners))))
     return blocks
 
 
@@ -477,7 +489,7 @@ def _where(ctx: FemContext, tr: Translator, spot: Hotspot | None) -> str:
 
 def _alerts(ctx: FemContext) -> int:
     inputs = ctx.inputs
-    count = sum(1 for h in inputs.hotspots if h.singularity_near)
+    count = sum(1 for h in inputs.hotspots if h.singularity_near or h.sharp_corner)
     count += sum(1 for c in inputs.result.constraints if c.on_edges_or_vertices)
     if ctx.fs is not None and ctx.fs < 1.0:
         count += 1
@@ -534,6 +546,8 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
         sentences.append(tr.t(key, fs=tr.number(ctx.fs_tension, d)))
     if smax is not None and smax.singularity_near:
         sentences.append(tr.t("exec.singular", n=ctx.numbers[smax], label=smax.singularity_near))
+    elif smax is not None and smax.sharp_corner:
+        sentences.append(tr.t("exec.sharp_corner", n=ctx.numbers[smax]))
     if regular is not None and inputs.regular_exclusion is not None:
         sentences.append(tr.t("exec.regular", n=ctx.numbers[regular],
                               value=tr.quantity(regular.peak_value, d),
@@ -599,7 +613,7 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
                      "manufacturing", "boundary")]
     blocks += [Paragraph(tr.t("assume.not_intro")), BulletList(tuple(not_assessed))]
     dependence = [tr.t("assume.mesh")]
-    singular = sum(1 for h in inputs.hotspots if h.singularity_near)
+    singular = sum(1 for h in inputs.hotspots if h.singularity_near or h.sharp_corner)
     if singular:
         dependence.append(tr.t("assume.singular", n=singular))
     if inputs.regular_exclusion is not None:
