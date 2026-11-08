@@ -99,3 +99,10 @@ def readable_on(background: RGB) -> RGB:
     black, white = (0.0, 0.0, 0.0), WHITE
     return black if contrast_ratio(black, background) >= contrast_ratio(white, background) \
         else white
+
+
+# Supports and loads (report balloons and the supports/loads figure), 0..255.
+# Outside the result color map (blue-cyan-green-yellow-red) on purpose.
+SUPPORT_RGB = (106, 27, 154)  # purple
+LOAD_RGB = (230, 81, 0)  # deep orange
+PART_RGB = (200, 200, 200)  # neutral gray part under them

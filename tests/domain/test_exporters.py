@@ -37,7 +37,7 @@ def test_html_is_self_contained_and_escapes_user_text():
     inputs = make_inputs()
     inputs.config.company = "<Oficina & Cia>"
     doc = build_report(inputs, Translator("pt_BR", strict=True))
-    uris = ["data:image/png;base64,AAA%d" % i for i in range(len(inputs.views))]
+    uris = ["data:image/png;base64,AAA%d" % i for i in range(len(inputs.boundary_views) + len(inputs.views))]
     page = render_html(doc, uris, logo_uri="data:image/png;base64,LOGO")
     assert page.startswith("<!DOCTYPE html>") and 'lang="pt-BR"' in page
     assert "&lt;Oficina &amp; Cia&gt;" in page and "<Oficina" not in page
@@ -55,7 +55,7 @@ def test_html_logo_is_centered_at_the_bottom_of_the_full_cover_only():
                              (ReportLevel.QUICK, False)):
         inputs = make_inputs()
         inputs.config.level = level
-        uris = ["data:image/png;base64,A%d" % i for i in range(len(inputs.views))]
+        uris = ["data:image/png;base64,A%d" % i for i in range(len(inputs.boundary_views) + len(inputs.views))]
         page = render_html(build_report(inputs, Translator("pt_BR", strict=True)), uris,
                            logo_uri="data:image/png;base64,LOGO")
         assert page.count(logo) == 1
@@ -66,7 +66,7 @@ def test_html_logo_is_centered_at_the_bottom_of_the_full_cover_only():
 def test_html_uses_legible_shades_of_a_light_accent():
     inputs = make_inputs()
     inputs.config.accent_color = "#ffff00"
-    uris = ["data:image/png;base64,A%d" % i for i in range(len(inputs.views))]
+    uris = ["data:image/png;base64,A%d" % i for i in range(len(inputs.boundary_views) + len(inputs.views))]
     page = render_html(build_report(inputs, Translator("pt_BR", strict=True)), uris)
     assert "h1{color:#7a7a00" in page  # titles: darker shade, 4.5:1 on white
     assert "border-top:10px solid #ffff00" in page  # decorative band: exact color

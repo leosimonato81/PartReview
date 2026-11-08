@@ -52,7 +52,8 @@ def test_full_level_has_table_alert_map_and_histogram():
     assert "16,0 %" in text and "Não fecha" in text and "= 8,7 %" in text
     assert any(isinstance(b, Notice) and "não equilibram" in b.text for b in blocks)
     figure = next(b for b in blocks if isinstance(b, Figure))
-    assert figure.view_index == len(inputs.views)  # captured right after the regular views
+    # captured right after the supports/loads views and the regular views
+    assert figure.view_index == len(inputs.boundary_views) + len(inputs.views)
     assert figure.legend.title.startswith("Erro local estimado")
     assert any(isinstance(b, BarChart) and sum(b.values) == 36 for b in blocks)  # 6 cubes x 6
 

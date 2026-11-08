@@ -28,7 +28,7 @@ from PySide6.QtGui import (  # type: ignore
 
 from .. import __version__
 from ..domain import colormap
-from ..domain.colors import accent_palette
+from ..domain.colors import LOAD_RGB, SUPPORT_RGB, accent_palette
 from ..domain.logo import COMPACT_COVER_BOX_MM, FULL_COVER_BOX_MM
 from ..domain.blocks import BarChart, BulletList, Figure, Heading, Notice, Paragraph, Table
 from ..domain.balloons import place_balloon, untangle
@@ -143,8 +143,8 @@ def _line_op(x1, y1, x2, y2, color, width_mm):
 # results black (white balloon), loads dark orange and supports purple (filled
 # balloons, white number). Tips are white with a colored border, so they stand out
 # on any color of the map: round for results and loads, square for supports.
-MARKER_COLORS = {"result": QColor(20, 20, 20), "load": QColor(230, 81, 0),
-                 "support": QColor(106, 27, 154)}
+MARKER_COLORS = {"result": QColor(20, 20, 20), "load": QColor(*LOAD_RGB),
+                 "support": QColor(*SUPPORT_RGB)}
 _DRAW_ORDER = {"result": 0, "load": 1, "support": 2}
 
 
@@ -240,6 +240,16 @@ def _legend_op(legend, x, y, height, style):
         p.setPen(INK)
         p.drawText(QRectF(x, y, mm(LEGEND_MM - 2), title_h), int(Qt.TextWordWrap), legend.title)
         top = y + title_h + mm(3)
+        if legend.swatches:  # category legend: colored squares with labels
+            fm = QFontMetricsF(style.small, p.device())
+            for i, ((r, g, b), label) in enumerate(legend.swatches):
+                sy = top + i * mm(7)
+                p.setPen(QPen(MUTED, mm(0.2)))
+                p.setBrush(QColor(r, g, b))
+                p.drawRect(QRectF(x, sy, mm(4), mm(4)))
+                p.setPen(INK)
+                p.drawText(QPointF(x + mm(5.5), sy + mm(2) + fm.ascent() / 2.5), label)
+            return
         bar_h = max(mm(20), height - title_h - mm(8))
         grad = QLinearGradient(0, top + bar_h, 0, top)  # bottom = min, top = max
         for pos, (r, g, b) in colormap.STOPS:

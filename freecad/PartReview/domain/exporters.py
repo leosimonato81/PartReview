@@ -76,7 +76,7 @@ th{background:%(l)s}.kv td:first-child{color:#555;width:34%%}
 .notice.info{border-color:#286ebe;background:#f1f6fc}
 figure{margin:1.2em 0}.fig{display:flex;gap:1em;align-items:stretch}
 .fig img{width:80%%;border:1px solid #ccc}.legend{display:flex;flex-direction:column;font-size:.8em}
-.legend .bar{display:flex;flex:1;gap:.4em;min-height:200px}.legend .grad{width:16px;
+.legend .sw{display:inline-block;width:14px;height:14px;border:1px solid #888;vertical-align:middle}.legend .bar{display:flex;flex:1;gap:.4em;min-height:200px}.legend .grad{width:16px;
 background:linear-gradient(to top,%(s)s);border:1px solid #888}.legend .ticks{display:flex;
 flex-direction:column-reverse;justify-content:space-between}
 figcaption{color:#6e6e6e;font-style:italic;font-size:.9em;white-space:pre-line}
@@ -101,12 +101,17 @@ def _table(block: Table) -> str:
 
 
 def _figure(block: Figure, image_uris) -> str:
-    ticks = "".join("<span>%s</span>" % _e(label) for _, label in block.legend.ticks)
     caption = _e(block.caption) + ("\n" + _e(block.balloons) if block.balloons else "")
+    if block.legend.swatches:  # category legend: one colored square per entry
+        key = "".join('<div><span class="sw" style="background:rgb(%d,%d,%d)"></span> %s</div>'
+                      % (r, g, b, _e(label)) for (r, g, b), label in block.legend.swatches)
+    else:
+        ticks = "".join("<span>%s</span>" % _e(label) for _, label in block.legend.ticks)
+        key = ('<div class="bar"><div class="grad"></div><div class="ticks">%s</div></div>'
+               % ticks)
     return ('<figure><div class="fig"><img src="%s" alt="%s"><div class="legend"><b>%s</b>'
-            '<div class="bar"><div class="grad"></div><div class="ticks">%s</div></div></div>'
-            '</div><figcaption>%s</figcaption></figure>'
-            % (image_uris[block.view_index], _e(block.caption), _e(block.legend.title), ticks,
+            '%s</div></div><figcaption>%s</figcaption></figure>'
+            % (image_uris[block.view_index], _e(block.caption), _e(block.legend.title), key,
                caption))
 
 

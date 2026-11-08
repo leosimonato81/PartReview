@@ -49,6 +49,7 @@ class ViewState:
         self._switches = {}  # object name -> original SoSwitch.whichChild
         self._written = set()  # objects whose Visibility property we had to write
         self._touched_before = set()  # objects already touched (e.g. needing recompute)
+        self._overlays = []  # Coin nodes added to the scene for a capture
 
     # --- enter / exit ---------------------------------------------------------
 
@@ -66,6 +67,7 @@ class ViewState:
         return self
 
     def __exit__(self, exc_type, exc, tb):
+        self._restore("overlays", self._remove_overlays)
         self._restore("node colors", self._restore_colors)
         self._restore("backface culling", self._restore_culling)
         self._restore("scene switches", self._restore_switches)
@@ -81,6 +83,11 @@ class ViewState:
         except Exception as err:  # rule 5: report with context, keep restoring the rest
             App.Console.PrintError("PartReview ViewState: could not restore %s: %s\n"
                                    % (what, err))
+
+    def _remove_overlays(self):
+        root = self.view.getSceneGraph()
+        while self._overlays:  # ends: one node removed per pass
+            root.removeChild(self._overlays.pop())
 
     def _restore_colors(self):
         for name, (mode, colors) in self._colors.items():
@@ -180,6 +187,16 @@ class ViewState:
         if mesh_obj.Name not in self._colors:
             self._colors[mesh_obj.Name] = (vo.ColorMode, list(vo.NodeColorArray))
         vo.setNodeColorByScalars(list(node_ids), list(scalars))
+
+    def add_overlay(self, node):
+        """Draw an extra Coin node (not a document object) until the context exits."""
+        self.view.getSceneGraph().addChild(node)
+        self._overlays.append(node)
+        Gui.updateGui()
+
+    def remove_overlays(self):
+        self._remove_overlays()
+        Gui.updateGui()
 
     def apply_camera(self, spec):
         """Set an orthographic camera from a domain CameraSpec (decision 001)."""

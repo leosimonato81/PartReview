@@ -87,16 +87,19 @@ def make_inputs(yield_strength=None):
     def visible(p, d):
         return True
 
-    views = [cp.plan_overview(FieldKind.VON_MISES, spots, center, radius, visible)]
-    views += [cp.plan_target_view(s, center, radius, visible) for s in spots]
+    results = [s for s in spots if s.kind not in cp.BOUNDARY_KINDS]  # as report_job
+    views = [cp.plan_overview(FieldKind.VON_MISES, results, center, radius, visible)]
+    views += [cp.plan_target_view(s, center, radius, visible) for s in results]
     views = cp.select_views(views)
+    boundary = cp.plan_boundary_views(spots, center, radius, visible)
     config = ReportConfig(result_name="CCX_Results", title="Suporte do motor",
                           author="Leo", output_path="r.pdf")
     return ReportInputs(result=result, config=config, hotspots=spots, views=views,
                         image_size=(1600, 1200), document_name="a.FCStd",
                         date=datetime.date(2026, 11, 6), yield_strength=yield_strength,
                         yield_source="user" if yield_strength else "", max_on_surface=True,
-                        tool_version="0.1.0", freecad_version="1.1.4")
+                        tool_version="0.1.0", freecad_version="1.1.4",
+                        boundary_views=boundary)
 
 
 @pytest.mark.parametrize("language", ["pt_BR", "en"])
@@ -107,6 +110,8 @@ def test_report_builds_with_every_text_translated(language):
     assert 2 <= len(figures) <= 8
     assert figures[0].caption.startswith("Fig")
     for fig in figures:
+        if fig.legend.swatches:  # supports and loads figure: category legend
+            continue
         assert fig.legend.ticks[0][0] == 0.0 and fig.legend.ticks[-1][0] == 1.0
         for m in fig.markers:
             assert 0 <= m.u <= 1600 and 0 <= m.v <= 1200
@@ -151,6 +156,7 @@ def test_section_numbers_have_no_gap_without_points():
     from freecad.PartReview.domain.report import Heading
     inputs = make_inputs()
     inputs.hotspots = []
+    inputs.boundary_views = []
     inputs.views = [v for v in inputs.views if v.is_overview]
     inputs.views = [type(v)(v.camera, v.color_field, (), True) for v in inputs.views]
     titles = [b.text for b in build_report(inputs, Translator("en", strict=True)).blocks

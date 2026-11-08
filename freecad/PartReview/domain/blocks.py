@@ -42,6 +42,8 @@ class Table:
 class Legend:
     title: str
     ticks: tuple[tuple[float, str], ...]  # (position 0 = min .. 1 = max, label)
+    # Category legend instead of a color bar: ((r, g, b) 0..255, label) per entry.
+    swatches: tuple[tuple[tuple[int, int, int], str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -49,7 +51,7 @@ class Marker:
     number: int
     u: float  # pixel position in the captured image (first leader)
     v: float
-    style: str = "result"  # "result" (black), "load" (orange) or "support" (blue)
+    style: str = "result"  # "result" (black), "load" (orange) or "support" (purple)
     more: tuple[tuple[float, float], ...] = ()  # extra leaders: other faces/edges
 
 

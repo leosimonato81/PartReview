@@ -48,7 +48,7 @@ class CameraSpec:
 @dataclass(frozen=True)
 class PlannedView:
     camera: CameraSpec
-    color_field: FieldKind
+    color_field: FieldKind | None  # None: supports and loads view (no result colors)
     targets: tuple[Hotspot, ...]  # hotspots shown (marked) in this view
     is_overview: bool = False
     score: float = 0.0
@@ -147,6 +147,45 @@ def plan_overview(color_field: FieldKind, targets, model_center: Vec3, model_rad
     camera = frame(best, model_center, 1.05 * model_radius, model_center, model_radius)
     shown = tuple(t for t in targets if is_visible(t.center, best))
     return PlannedView(camera, color_field, shown, is_overview=True, score=score(best))
+
+
+BOUNDARY_KINDS = (HotspotKind.SUPPORT, HotspotKind.LOAD)
+
+
+def plan_boundary_views(targets, model_center: Vec3, model_radius: float,
+                        is_visible: VisibilityFn, max_views: int = 2) -> list[PlannedView]:
+    """Whole-model views of the supports and loads (``color_field`` None: no result).
+
+    The first view shows as many supports/loads as possible (one visible anchor
+    is enough to point at it); a further view is added only for the ones still
+    hidden, up to ``max_views``. Isometric directions are preferred because they
+    keep the 3D context; the axes are a fallback (e.g. faces inside a slot).
+    """
+    targets = [t for t in targets if t.kind in BOUNDARY_KINDS]
+    if not targets or max_views < 1:
+        return []
+    directions = list(ISO) + list(AXES)
+
+    def seen(t, d):
+        return any(is_visible(p, d) for p in t.anchors or (t.center,))
+
+    def score(d, wanted):
+        shown = sum(1 for t in wanted if seen(t, d))
+        anchors = sum(1 for t in wanted for p in t.anchors or (t.center,) if is_visible(p, d))
+        bonus = (0.3 if d in ISO else 0.0) + (0.2 if d.z < 0 else 0.0)  # iso, from above
+        return 10.0 * shown + 0.1 * anchors + bonus
+
+    views, missing = [], list(targets)
+    while missing and len(views) < max_views:  # ends: max_views bounds it
+        best = max(directions, key=lambda d: score(d, missing))
+        shown = tuple(t for t in targets if seen(t, best))
+        if not any(t in shown for t in missing):
+            break  # nothing more can be shown from outside
+        camera = frame(best, model_center, 1.05 * model_radius, model_center, model_radius)
+        views.append(PlannedView(camera, None, shown, is_overview=True,
+                                 score=score(best, targets)))
+        missing = [t for t in missing if t not in shown]
+    return views
 
 
 def project(camera: CameraSpec, point: Vec3, width: int, height: int) -> tuple[float, float]:

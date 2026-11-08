@@ -40,7 +40,7 @@ from ..domain.quality import (
 from ..domain.exporters import nodal_csv
 from ..domain.report import ReportInputs, build_report, order_hotspots, views_for_level
 from ..domain.surface import build_surface
-from . import fem_reader, trace_reader
+from . import boundary_scene, fem_reader, trace_reader
 from .error_estimator import estimate
 from .html_writer import write_html
 from .logo_loader import inspect_logo
@@ -77,8 +77,22 @@ def _yield_strength(config, result, stress_unit):
     return None, ""
 
 
-def _plan(result, surface, max_views):
-    """Hotspots (numbered order) and selected views."""
+def _visible_leaders(views, is_visible):
+    """Supports and loads: a leader only to faces/edges really visible in that view (a
+    leader to a hidden face misleads). Result points keep the planner's choice: they
+    were already chosen visible, and a peak on a sharp corner can fail a strict ray."""
+    return [replace(v, leaders=tuple(
+        tuple(p for p in t.leader_points if is_visible(p, v.camera.direction))
+        if t.anchors else t.leader_points for t in v.targets)) for v in views]
+
+
+def _plan(result, surface, max_views, boundary_views):
+    """Hotspots (numbered order), result views and supports/loads views.
+
+    Result images carry only result balloons; supports and loads get their own
+    figure on a gray part (owner's request: colored balloons over the stress
+    colors were hard to read).
+    """
     mesh = result.mesh
     low, high = mesh.bounding_box()
     center = g.scale(g.add(low, high), 0.5)
@@ -106,19 +120,17 @@ def _plan(result, surface, max_views):
         spots = order_hotspots(drop_redundant(
             mark_singularities(spots, result.constraints, tolerance)))
 
+    results = [s for s in spots if s.kind not in cp.BOUNDARY_KINDS]
     views = []
     for kind in (FieldKind.VON_MISES, FieldKind.DISPLACEMENT):
         if result.get_field(kind) is not None:
-            views.append(cp.plan_overview(kind, spots, center, radius, is_visible))
-    views += [cp.plan_target_view(s, center, radius, is_visible) for s in spots]
+            views.append(cp.plan_overview(kind, results, center, radius, is_visible))
+    views += [cp.plan_target_view(s, center, radius, is_visible) for s in results]
     selected = cp.select_views(views, max_views=max_views)
-    # Supports and loads: a leader only to faces/edges really visible in that view (a
-    # leader to a hidden face misleads). Result points keep the planner's choice: they
-    # were already chosen visible, and a peak on a sharp corner can fail a strict ray.
-    selected = [replace(v, leaders=tuple(
-        tuple(p for p in t.leader_points if is_visible(p, v.camera.direction))
-        if t.anchors else t.leader_points for t in v.targets)) for v in selected]
-    return spots, selected
+    boundary = []
+    if surface is not None:
+        boundary = cp.plan_boundary_views(spots, center, radius, is_visible, boundary_views)
+    return spots, selected, _visible_leaders(boundary, is_visible), radius
 
 
 def _equilibrium(analysis, result):
@@ -197,7 +209,9 @@ def generate_fem_report(doc, config, progress=_no_progress):
     zz, error_field = _error_estimate(analysis, result_obj, result, tets)
 
     progress(tr.t("progress.hotspots"), 0.3)
-    spots, views = _plan(result, surface, views_for_level(config))
+    spots, views, boundary_views, radius = _plan(
+        result, surface, views_for_level(config),
+        1 if config.level is ReportLevel.QUICK else 2)
     progress(tr.t("progress.planning"), 0.4)
     error_view = None
     if error_field is not None and views and config.level is not ReportLevel.QUICK:
@@ -208,15 +222,17 @@ def generate_fem_report(doc, config, progress=_no_progress):
 
     workdir = tempfile.mkdtemp(prefix="partreview_")
     try:
-        image_paths = []
+        # Image order = figure order: supports/loads, result views, error map.
         shots = views + ([error_view] if error_view is not None else [])
+        total = len(shots) + len(boundary_views)
+        image_paths = [os.path.join(workdir, "view_%02d.png" % i) for i in range(total)]
         with ViewState(doc) as vs:
             vs.show_only([mesh_obj])
             vs.set_backface_culling(mesh_obj, False)
             colored = None
             for i, view in enumerate(shots):
-                progress(tr.t("progress.capture", n=i + 1, total=len(shots)),
-                         0.4 + 0.5 * i / max(1, len(shots)))
+                progress(tr.t("progress.capture", n=i + 1, total=total),
+                         0.4 + 0.5 * i / max(1, total))
                 if view.color_field is not colored:
                     f = fields[view.color_field]
                     vs.color_nodes(mesh_obj, f.node_ids,
@@ -224,9 +240,16 @@ def generate_fem_report(doc, config, progress=_no_progress):
                                                                 max(f.values)))
                     colored = view.color_field
                 vs.apply_camera(view.camera)
-                path = os.path.join(workdir, "view_%02d.png" % i)
-                vs.save_image(path, *IMAGE_SIZE)
-                image_paths.append(path)
+                vs.save_image(image_paths[len(boundary_views) + i], *IMAGE_SIZE)
+            if boundary_views:  # last, because the mesh is hidden for them
+                vs.show_only([])
+                vs.add_overlay(boundary_scene.build(result, surface, spots, radius))
+                for i, view in enumerate(boundary_views):
+                    progress(tr.t("progress.capture", n=len(shots) + i + 1, total=total),
+                             0.4 + 0.5 * (len(shots) + i) / total)
+                    vs.apply_camera(view.camera)
+                    vs.save_image(image_paths[i], *IMAGE_SIZE)
+                vs.remove_overlays()
 
         progress(tr.t("progress.pdf"), 0.95)
         max_on_surface = None
@@ -239,7 +262,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
             max_on_surface=max_on_surface, surface_available=surface is not None,
             tool_version=__version__, freecad_version=".".join(App.Version()[:3]),
             equilibrium=equilibrium, mesh_quality=quality, error_estimate=zz,
-            error_field=error_field, error_view=error_view,
+            error_field=error_field, error_view=error_view, boundary_views=boundary_views,
             trace=trace_reader.collect(doc, result_obj, analysis, result.solver,
                                        result.analysis_type, __version__, unsaved))
         document = build_report(inputs, tr)

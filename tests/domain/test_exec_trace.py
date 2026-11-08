@@ -99,4 +99,5 @@ def test_single_figure_reference_is_singular():
     inputs.config.level = ReportLevel.QUICK
     inputs.views = [v for v in inputs.views if v.is_overview]
     text = text_of(section(build_report(inputs, Translator("pt_BR", strict=True)), "fem.executive"))
-    assert "(figura 1)" in text and "(figuras 1)" not in text
+    # figure 1 = supports and loads; the stress overview is figure 2
+    assert "(figura 2)" in text and "(figuras 2)" not in text

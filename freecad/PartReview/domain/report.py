@@ -8,7 +8,7 @@ labels) are copied as they are.
 """
 
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import colormap
 from . import geometry as g
@@ -40,6 +40,7 @@ from .models import (
 )
 from .hotspots import HotspotKind
 from .quality import EquilibriumCheck, EquilibriumStatus, ErrorEstimate, MeshQuality
+from .colors import LOAD_RGB, SUPPORT_RGB
 from .templates import accent_rgb
 from .trace import Traceability
 from .sections import ALL_LEVELS, DETAILED_LEVELS, Section, SectionRegistry, compose
@@ -71,6 +72,8 @@ class ReportInputs:
     error_estimate: ErrorEstimate | None = None
     error_field: ResultField | None = None  # nodal ZZ indicator in %
     error_view: PlannedView | None = None  # its image is the one after the views
+    # Supports and loads on a gray part; their images come FIRST (figure 1...).
+    boundary_views: list = field(default_factory=list)
     trace: Traceability | None = None  # step e
 
     def field(self, kind: FieldKind) -> ResultField | None:
@@ -214,7 +217,8 @@ def _legend(inputs: ReportInputs, kind: FieldKind, tr: Translator) -> Legend:
     return Legend(title="%s [%s]" % (_field_name(kind, tr), pretty_unit(f.unit)), ticks=labels)
 
 
-def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Translator) -> Figure:
+def _markers(view: PlannedView, inputs: ReportInputs, numbers):
+    """Balloons of one view (each spot once) and the spots that got one."""
     w, h = inputs.image_size
     markers, shown = [], []
     leaders = dict(zip(view.targets, view.leaders)) if view.leaders else {}
@@ -228,6 +232,13 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
             markers.append(Marker(numbers[spot], pixels[0][0], pixels[0][1], style,
                                   tuple(pixels[1:])))
             shown.append(spot)
+    return markers, shown
+
+
+def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Translator) -> Figure:
+    if view.color_field is None:
+        return _boundary_figure(index, view, inputs, numbers, tr)
+    markers, shown = _markers(view, inputs, numbers)
     field_name = _field_name(view.color_field, tr)
     key = "fig.overview" if view.is_overview else "fig.closeup"
     caption = tr.t("fig.caption", n=index + 1, text=tr.t(key, field=field_name))
@@ -239,6 +250,25 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
             balloons += " " + tr.t("fig.marker_colors")
     return Figure(view_index=index, caption=caption,
                   legend=_legend(inputs, view.color_field, tr), markers=tuple(markers),
+                  image_size=inputs.image_size, balloons=balloons)
+
+
+def _boundary_figure(index, view: PlannedView, inputs: ReportInputs, numbers,
+                     tr: Translator) -> Figure:
+    """Supports (purple) and loads (orange) on the gray part, with their balloons."""
+    markers, shown = _markers(view, inputs, numbers)
+    caption = tr.t("fig.caption", n=index + 1, text=tr.t("fig.boundary"))
+    balloons = ""
+    if shown:
+        balloons = tr.t("fig.marker_list", items=tr.list_sep.join(
+            _balloon_text(s, numbers[s], tr) for s in shown))
+    arrows = any(t.kind is HotspotKind.LOAD for t in view.targets)
+    balloons = (balloons + " " + tr.t("fig.boundary_arrows" if arrows
+                                      else "fig.boundary_note")).strip()
+    legend = Legend(title=tr.t("fig.boundary_legend"), ticks=(),
+                    swatches=((SUPPORT_RGB, tr.t("summary.supports")),
+                              (LOAD_RGB, tr.t("summary.loads"))))
+    return Figure(view_index=index, caption=caption, legend=legend, markers=tuple(markers),
                   image_size=inputs.image_size, balloons=balloons)
 
 
@@ -260,8 +290,8 @@ def prepare_fem(inputs: ReportInputs, tr: Translator) -> FemContext:
     fs = None
     if inputs.yield_strength is not None and stress is not None:
         fs = safety_factor(inputs.yield_strength, stress.maximum(res.mesh).value)
-    figures = [_figure(index, view, inputs, numbers, tr)
-               for index, view in enumerate(inputs.views)]
+    figures = [_figure(index, view, inputs, numbers, tr)  # capture order = figure order
+               for index, view in enumerate(list(inputs.boundary_views) + list(inputs.views))]
     return FemContext(inputs, numbers, figures, fs)
 
 
@@ -539,7 +569,7 @@ def _section_quality(ctx: FemContext, tr: Translator, level) -> list:
 
 def _error_figure(ctx: FemContext, tr: Translator) -> Figure:
     inputs = ctx.inputs
-    index = len(inputs.views)  # the error map is captured after the regular views
+    index = len(inputs.boundary_views) + len(inputs.views)  # captured after the views
     caption = tr.t("fig.caption", n=index + 1, text=tr.t("fig.error_map"))
     return Figure(view_index=index, caption=caption,
                   legend=_legend(inputs, FieldKind.ESTIMATED_ERROR, tr), markers=(),

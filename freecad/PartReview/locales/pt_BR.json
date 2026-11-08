@@ -407,5 +407,9 @@
   "mo.stop.first_too_big": "Não comecei: a malha atual ({nodes} nós) precisa de pelo menos ~{memory} no CalculiX, e não há memória livre para isso. Crie uma malha mais grossa no Assistente de malha ou feche outros programas.",
   "mo.stop.killed_memory": "O CalculiX passou do limite de memória (chegou a {memory}; havia {free} livres) e foi interrompido antes de travar o computador. Os resultados anteriores continuam no documento. Use uma malha mais grossa no Assistente de malha ou feche outros programas.",
   "mo.stop.killed_timeout": "O CalculiX passou do tempo limite e foi interrompido. Os resultados anteriores continuam no documento.",
-  "mo.col.global": "Erro global"
+  "mo.col.global": "Erro global",
+  "fig.boundary": "Apoios e cargas: regiões presas em roxo, regiões carregadas em laranja",
+  "fig.boundary_legend": "Condições de contorno",
+  "fig.boundary_arrows": "Setas = direção da força. Apoio ou carga em várias faces ou arestas repete o número, um balão para cada uma visível.",
+  "fig.boundary_note": "Apoio ou carga em várias faces ou arestas repete o número, um balão para cada uma visível."
 }

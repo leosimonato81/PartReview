@@ -407,5 +407,9 @@
   "mo.stop.first_too_big": "Not started: the current mesh ({nodes} nodes) needs at least ~{memory} in CalculiX, and that much memory is not free. Create a coarser mesh in the Mesh assistant or close other programs.",
   "mo.stop.killed_memory": "CalculiX exceeded the memory limit (it reached {memory}; {free} were free) and was stopped before freezing the computer. The previous results stay in the document. Use a coarser mesh in the Mesh assistant or close other programs.",
   "mo.stop.killed_timeout": "CalculiX exceeded the time limit and was stopped. The previous results stay in the document.",
-  "mo.col.global": "Global error"
+  "mo.col.global": "Global error",
+  "fig.boundary": "Supports and loads: held regions in purple, loaded regions in orange",
+  "fig.boundary_legend": "Boundary conditions",
+  "fig.boundary_arrows": "Arrows = force direction. A support or load on several faces or edges repeats its number, one balloon per visible one.",
+  "fig.boundary_note": "A support or load on several faces or edges repeats its number, one balloon per visible one."
 }
