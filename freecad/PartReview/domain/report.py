@@ -459,7 +459,16 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
     res = inputs.result
     stress = res.get_field(FieldKind.VON_MISES)
     blocks = [_results(inputs, tr, fs, ctx.fs_regular, ctx.fs_tension)]
-    if inputs.reactions:
+    detailed = level is not ReportLevel.QUICK  # the quick summary keeps the main table
+    mat = _material(inputs)
+    if inputs.yield_source == "user" and mat is not None and mat.ultimate_strength is not None \
+            and inputs.yield_strength is not None \
+            and mat.ultimate_strength.unit == inputs.yield_strength.unit \
+            and inputs.yield_strength.value > mat.ultimate_strength.value:
+        blocks.append(Notice(tr.t("warn.yield_above_uts",
+                                  limit=tr.quantity(inputs.yield_strength, 4),
+                                  uts=tr.quantity(mat.ultimate_strength, 4))))
+    if inputs.reactions and detailed:
         blocks.append(Paragraph(tr.t("reactions.intro")))
         blocks.append(_reactions(inputs.reactions, tr))
         eq = inputs.equilibrium
@@ -468,12 +477,17 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
             blocks.append(Notice(tr.t("reactions.load_on_supports"), level="info"))
     if fs is not None and fs < 1.0:
         blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, result_digits(inputs)))))
-    if inputs.yield_strength is not None and stress is not None and res.elements \
+    if detailed and inputs.yield_strength is not None and stress is not None and res.elements \
             and stress.unit == inputs.yield_strength.unit:
         shares = volume_above(res.elements, res.mesh.node_positions,
                               dict(zip(stress.node_ids, stress.values)),
                               inputs.yield_strength.value)
-        if shares:
+        if shares and shares[0][1] == 0:  # nothing reaches the first fraction: one sentence
+            blocks.append(Paragraph(tr.t("volume.none", pct=tr.integer(100 * shares[0][0]),
+                                         limit=tr.quantity(Quantity(
+                                             shares[0][0] * inputs.yield_strength.value,
+                                             inputs.yield_strength.unit), 3))))
+        elif shares:
             rows = tuple((tr.t("volume.row", pct=tr.integer(100 * f),
                                limit=tr.quantity(Quantity(f * inputs.yield_strength.value,
                                                           inputs.yield_strength.unit), 3)),
@@ -614,7 +628,8 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     zz = inputs.error_estimate
     if zz is not None and zz.available:
         rows.append((tr.t("quality.error"), tr.number(100 * zz.relative_error, 3) + " %"))
-        sentences.append(tr.t("exec.error", eta=tr.number(100 * zz.relative_error, 3)))
+        key = "exec.error" if level is not ReportLevel.QUICK else "exec.error_quick"
+        sentences.append(tr.t(key, eta=tr.number(100 * zz.relative_error, 3)))
     q = inputs.mesh_quality
     if q is not None and q.invalid_elements:
         sentences.append(tr.t("exec.invalid", n=q.invalid_elements))
@@ -635,7 +650,13 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
     system = inputs.config.unit_system.value
     units = Paragraph(tr.t("note.units", system=tr.t("note.units." + system)))
     if level is ReportLevel.QUICK:
-        return [Paragraph(tr.t("assume.short")), units]
+        blocks = [Paragraph(tr.t("assume.short"))]
+        mat = _material(inputs)
+        if mat is not None and mat.family == "polymer":
+            blocks.append(Paragraph(tr.t("assume.short_polymer")))
+        if inputs.yield_source == "material_uts":
+            blocks.append(Paragraph(tr.t("assume.uts_used")))
+        return blocks + [units]
     trace = inputs.trace
     assumed = []
     if res.analysis_type == "static":
