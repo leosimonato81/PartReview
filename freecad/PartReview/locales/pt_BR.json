@@ -240,5 +240,19 @@
   "ui.level_desc.standard": "Intermediário: capa, sumário, até 4 vistas com pontos de interesse, qualidade da malha com mapa de erro, premissas e rastreabilidade.",
   "ui.level_desc.full": "Completo: tudo do intermediário, com até 8 vistas e o histograma da forma dos elementos. Para documentação técnica.",
   "fem.error.not_static": "Esta versão gera relatórios só de análise estática linear. O resultado escolhido é de outro tipo de análise (por exemplo, vibração, flambagem ou térmica) e não foi processado.",
-  "exec.figure": "(figura {figures})"
+  "exec.figure": "(figura {figures})",
+  "ui.check_command": "Conferir antes de calcular",
+  "ui.check_command_tip": "Estima se o CalculiX vai caber na memória livre deste computador com a malha atual, antes de rodar o cálculo.",
+  "ui.check_title": "Conferir antes de calcular",
+  "ui.check_no_mesh": "Nenhuma malha FEM com nós foi encontrada no documento ativo. Gere a malha primeiro (ou selecione o objeto de malha).",
+  "ui.check_many_meshes": "Há mais de uma malha FEM no documento. Selecione na árvore a malha que você vai calcular e rode de novo.",
+  "budget.status.fits": "✔ Deve caber na memória.",
+  "budget.status.tight": "⚠ No limite da memória.",
+  "budget.status.too_big": "✖ Não deve caber na memória.",
+  "budget.numbers": "Malha: {nodes} nós. Memória estimada do CalculiX: ~{memory}. Memória livre agora: {free} (de {total}).",
+  "budget.advice.fits": "Pode calcular. Para ter folga, mantenha a malha até cerca de {max_nodes} nós neste computador.",
+  "budget.advice.tight": "Feche outros programas antes de calcular. Se o computador ficar lento, use uma malha um pouco mais grossa (até cerca de {max_nodes} nós cabe com folga).",
+  "budget.advice.too_big": "Calcular assim pode deixar o computador muito lento ou fechar o FreeCAD. Use uma malha mais grossa (até cerca de {max_nodes} nós): aumente o tamanho máximo do elemento e refine só as regiões importantes.",
+  "budget.free_estimated": "Não foi possível ler a memória livre deste sistema; foi usado um valor cauteloso.",
+  "budget.basis": "Estimativa (ordem de grandeza) calibrada com o CalculiX e o resolvedor padrão do FreeCAD (spooles), tetraedros de 2ª ordem. Geometria e configurações do solver mudam o valor real."
 }

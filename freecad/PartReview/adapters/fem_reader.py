@@ -310,6 +310,22 @@ def elastic_constants(analysis):
         return None
 
 
+def solver_meshes(doc, selection=()):
+    """FEM meshes that a solver would use (not result meshes), with at least one node.
+
+    Selected meshes win; otherwise every such mesh of the document is returned.
+    """
+    result_meshes = [getattr(o, "Mesh", None) for o in doc.Objects if is_mechanical_result(o)]
+
+    def usable(obj):
+        return (obj.isDerivedFrom("Fem::FemMeshObject")
+                and not any(obj is r for r in result_meshes)
+                and getattr(obj, "FemMesh", None) is not None and obj.FemMesh.NodeCount > 0)
+
+    selected = [o for o in selection if usable(o)]
+    return selected or [o for o in doc.Objects if usable(o)]
+
+
 def nodal_loads_and_fixed_nodes(analysis):
     """({node: Vec3 load in N}, {fixed node ids}) as FreeCAD writes them for CalculiX.
 

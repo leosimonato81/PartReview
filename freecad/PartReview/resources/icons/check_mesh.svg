@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- SPDX-FileCopyrightText: 2026 Leonardo Simonato -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- memory chip -->
+  <rect x="10" y="14" width="34" height="34" rx="3" fill="#e8eef6" stroke="#2c3e50" stroke-width="3"/>
+  <g stroke="#2c3e50" stroke-width="3" stroke-linecap="round">
+    <line x1="18" y1="8" x2="18" y2="14"/><line x1="27" y1="8" x2="27" y2="14"/><line x1="36" y1="8" x2="36" y2="14"/>
+    <line x1="18" y1="48" x2="18" y2="54"/><line x1="27" y1="48" x2="27" y2="54"/><line x1="36" y1="48" x2="36" y2="54"/>
+  </g>
+  <!-- mesh triangles inside -->
+  <path d="M16 42 L27 20 L38 42 Z M21.5 31 L32.5 31 L27 42 Z" fill="none" stroke="#2c3e50" stroke-width="2"/>
+  <!-- check mark badge -->
+  <circle cx="47" cy="47" r="13" fill="#2e8b57"/>
+  <path d="M40 47 L45 52 L54 42" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

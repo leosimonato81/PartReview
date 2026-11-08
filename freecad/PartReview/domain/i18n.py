@@ -52,6 +52,10 @@ class Translator:
     def number(self, value: float, significant: int = 3) -> str:
         return format_number(value, significant, self.decimal_sep)
 
+    def integer(self, value: int) -> str:
+        """Whole number with a space as thousands separator (SI style, both languages)."""
+        return "{:,}".format(int(round(value))).replace(",", " ")
+
     def quantity(self, q: Quantity | None, significant: int = 3) -> str:
         return format_quantity(q, significant, self.decimal_sep) if q is not None else "—"
 

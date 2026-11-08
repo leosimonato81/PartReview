@@ -240,5 +240,19 @@
   "ui.level_desc.standard": "Intermediate: cover, contents, up to 4 views with points of interest, mesh quality with error map, assumptions and traceability.",
   "ui.level_desc.full": "Complete: everything in intermediate, with up to 8 views and the element-shape histogram. For technical documentation.",
   "fem.error.not_static": "This version only reports linear static analyses. The chosen result comes from another analysis type (for example frequency, buckling or thermal) and was not processed.",
-  "exec.figure": "(figure {figures})"
+  "exec.figure": "(figure {figures})",
+  "ui.check_command": "Check before solving",
+  "ui.check_command_tip": "Estimates whether CalculiX will fit in this computer's free memory with the current mesh, before running the analysis.",
+  "ui.check_title": "Check before solving",
+  "ui.check_no_mesh": "No FEM mesh with nodes was found in the active document. Generate the mesh first (or select the mesh object).",
+  "ui.check_many_meshes": "There is more than one FEM mesh in the document. Select in the tree the mesh you will solve and run again.",
+  "budget.status.fits": "✔ Should fit in memory.",
+  "budget.status.tight": "⚠ Close to the memory limit.",
+  "budget.status.too_big": "✖ Should not fit in memory.",
+  "budget.numbers": "Mesh: {nodes} nodes. Estimated CalculiX memory: ~{memory}. Free memory now: {free} (of {total}).",
+  "budget.advice.fits": "You can solve. To keep a margin, keep the mesh up to about {max_nodes} nodes on this computer.",
+  "budget.advice.tight": "Close other programs before solving. If the computer slows down, use a slightly coarser mesh (up to about {max_nodes} nodes fits with margin).",
+  "budget.advice.too_big": "Solving like this may make the computer very slow or close FreeCAD. Use a coarser mesh (up to about {max_nodes} nodes): increase the maximum element size and refine only the important regions.",
+  "budget.free_estimated": "The free memory of this system could not be read; a cautious value was used.",
+  "budget.basis": "Estimate (order of magnitude) calibrated with CalculiX and FreeCAD's default solver (spooles), 2nd-order tetrahedra. Geometry and solver settings change the real value."
 }
