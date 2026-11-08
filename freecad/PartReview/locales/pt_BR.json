@@ -453,5 +453,9 @@
   "warn.sharp_corner_many": "Os pontos {n} estão em cantos vivos internos (quinas reentrantes sem arredondamento). Pela teoria da elasticidade (Williams, 1952), ali a tensão é teoricamente infinita: o valor cresce com o refino da malha. Na peça real, o raio de arredondamento da quina define a tensão; modele o raio para obter um valor confiável.",
   "reactions.intro": "Reações nos apoios: a força que cada apoio exerce sobre a peça, calculada pelo solver. É a carga que parafusos, pinos e fixações precisam suportar (com sinal oposto).",
   "reactions.support": "Apoio",
-  "reactions.load_on_supports": "Parte da carga foi aplicada em nós que também estão presos: o solver não a conta nas reações acima (ela vai direto ao apoio). O equilíbrio da seção de qualidade já a inclui."
+  "reactions.load_on_supports": "Parte da carga foi aplicada em nós que também estão presos: o solver não a conta nas reações acima (ela vai direto ao apoio). O equilíbrio da seção de qualidade já a inclui.",
+  "volume.intro": "Quanto da peça está carregado: parte do volume com tensão de von Mises acima de frações do limite do material. Um pico em poucos elementos e uma região grande carregada podem ter o mesmo máximo; esta tabela os distingue.",
+  "volume.stress": "Tensão de von Mises",
+  "volume.share": "Parte do volume da peça",
+  "volume.row": "≥ {pct} % do limite ({limit})"
 }

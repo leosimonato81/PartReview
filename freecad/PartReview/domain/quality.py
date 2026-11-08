@@ -180,3 +180,32 @@ class ErrorEstimate:
     p95_local: float = 0.0
     invalid_jacobian: int = 0
     reason_key: str = ""
+
+
+STRESS_FRACTIONS = (0.5, 0.8, 1.0)
+
+
+def volume_above(elements, positions, stress_by_node, limit: float,
+                 fractions=STRESS_FRACTIONS) -> list[tuple[float, float]]:
+    """[(fraction, share of the part's volume whose stress >= fraction x limit)].
+
+    Element stress = mean of its nodal values; element volume from its 4 corner
+    nodes (exact for straight-sided tetrahedra). A peak on a few elements and a
+    large loaded region can have the same maximum: this tells them apart.
+    """
+    total = 0.0
+    above = [0.0] * len(fractions)
+    for element in elements:
+        a, b, c, d = (positions[n] for n in element[:4])
+        volume = abs(g.dot(g.sub(b, a), g.cross(g.sub(c, a), g.sub(d, a)))) / 6.0
+        values = [stress_by_node[n] for n in element if n in stress_by_node]
+        if not values:
+            continue
+        mean = sum(values) / len(values)
+        total += volume
+        for i, f in enumerate(fractions):
+            if mean >= f * limit:
+                above[i] += volume
+    if total <= 0 or limit <= 0:
+        return []
+    return [(f, v / total) for f, v in zip(fractions, above)]

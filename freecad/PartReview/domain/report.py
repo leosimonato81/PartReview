@@ -40,7 +40,8 @@ from .models import (
     Vec3,
 )
 from .hotspots import HotspotKind
-from .quality import EquilibriumCheck, EquilibriumStatus, ErrorEstimate, MeshQuality
+from .quality import (EquilibriumCheck, EquilibriumStatus, ErrorEstimate, MeshQuality,
+                      volume_above)
 from .colors import LOAD_RGB, SUPPORT_RGB
 from .templates import accent_rgb
 from .trace import Traceability
@@ -208,6 +209,15 @@ def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
     header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"),
               tr.t("results.node"))
     return Table(header=header, rows=tuple(rows), widths=(0.36, 0.2, 0.32, 0.12))
+
+
+def _share(tr: Translator, value: float) -> str:
+    """Share of the volume in %, readable when tiny (never a misleading 0 %)."""
+    if value <= 0:
+        return "0 %"
+    if value < 0.0001:
+        return "< 0,01 %" if tr.decimal_sep == "," else "< 0.01 %"
+    return tr.number(100 * value, 2) + " %"
 
 
 def _reactions(reactions, tr: Translator) -> Table:
@@ -446,6 +456,19 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
             blocks.append(Notice(tr.t("reactions.load_on_supports"), level="info"))
     if fs is not None and fs < 1.0:
         blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, result_digits(inputs)))))
+    if inputs.yield_strength is not None and stress is not None and res.elements \
+            and stress.unit == inputs.yield_strength.unit:
+        shares = volume_above(res.elements, res.mesh.node_positions,
+                              dict(zip(stress.node_ids, stress.values)),
+                              inputs.yield_strength.value)
+        if shares:
+            rows = tuple((tr.t("volume.row", pct=tr.integer(100 * f),
+                               limit=tr.quantity(Quantity(f * inputs.yield_strength.value,
+                                                          inputs.yield_strength.unit), 3)),
+                          _share(tr, v)) for f, v in shares)
+            blocks.append(Paragraph(tr.t("volume.intro")))
+            blocks.append(Table(header=(tr.t("volume.stress"), tr.t("volume.share")),
+                                rows=rows, widths=(0.6, 0.4)))
     if fs is None and stress is not None:
         blocks.append(Notice(tr.t("warn.no_yield"), level="info"))
     if inputs.max_on_surface is False and stress is not None:

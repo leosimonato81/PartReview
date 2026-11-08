@@ -69,3 +69,28 @@ def test_support_reactions_table():
                  and b.header[0] == "Apoio")
     assert table.rows[0][0] == "Engaste" and table.rows[0][3] == "12,0 N"
     assert table.rows[0][4] == "12,0 N"
+
+
+def test_volume_above_fractions_of_the_limit():
+    from freecad.PartReview.domain.models import Vec3
+    from freecad.PartReview.domain.quality import volume_above
+    pos = {1: Vec3(0, 0, 0), 2: Vec3(1, 0, 0), 3: Vec3(0, 1, 0), 4: Vec3(0, 0, 1),
+           5: Vec3(1, 1, 1)}
+    # two tetrahedra of volume 1/6 and 1/3; the small one is highly stressed
+    elements = [(1, 2, 3, 4), (2, 3, 4, 5)]
+    stress = {1: 100.0, 2: 100.0, 3: 100.0, 4: 100.0, 5: -260.0}
+    shares = dict(volume_above(elements, pos, stress, 100.0))
+    # element 1 mean 100 (>= all fractions), element 2 mean (300-260)/4 = 10 (none)
+    v1, v2 = 1 / 6, 1 / 3
+    assert shares[1.0] == pytest.approx(v1 / (v1 + v2))
+    assert shares[0.5] == shares[1.0]
+
+
+def test_volume_table_appears_with_a_yield_strength():
+    from test_surface_hotspots import bar_mesh
+    inputs = make_inputs(Quantity(12.0, "MPa"))
+    inputs.result = replace(inputs.result, elements=tuple(bar_mesh(6)[1]))
+    report = build_report(inputs, Translator("pt_BR", strict=True))
+    table = next(b for b in report.blocks if isinstance(b, Table) and b.header
+                 and b.header[0] == "Tensão de von Mises")
+    assert [r[0] for r in table.rows][0].startswith("≥ 50 % do limite")

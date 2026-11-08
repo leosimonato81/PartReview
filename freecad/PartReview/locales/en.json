@@ -453,5 +453,9 @@
   "warn.sharp_corner_many": "Points {n} sit on sharp inner corners (re-entrant edges without a fillet). By elasticity theory (Williams, 1952), the stress there is theoretically infinite: the value grows as the mesh is refined. On the real part, the corner's fillet radius sets the stress; model the radius to get a reliable value.",
   "reactions.intro": "Support reactions: the force each support exerts on the part, computed by the solver. It is the load that bolts, pins and fixtures must carry (with opposite sign).",
   "reactions.support": "Support",
-  "reactions.load_on_supports": "Part of the load was applied on nodes that are also fixed: the solver does not count it in the reactions above (it goes straight into the support). The equilibrium check in the quality section already includes it."
+  "reactions.load_on_supports": "Part of the load was applied on nodes that are also fixed: the solver does not count it in the reactions above (it goes straight into the support). The equilibrium check in the quality section already includes it.",
+  "volume.intro": "How much of the part is loaded: share of the volume with von Mises stress above fractions of the material limit. A peak on a few elements and a large loaded region can have the same maximum; this table tells them apart.",
+  "volume.stress": "Von Mises stress",
+  "volume.share": "Share of the part's volume",
+  "volume.row": "≥ {pct} % of the limit ({limit})"
 }
