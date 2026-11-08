@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (  # type: ignore
     QButtonGroup,
     QGridLayout,
     QSizePolicy,
+    QStyle,
     QToolButton,
     QComboBox,
     QDialogButtonBox,
@@ -74,7 +75,7 @@ COLUMNS = ("ma.col.option", "ma.col.size", "ma.col.nodes", "ma.col.memory", "ma.
 # Same card look as the report dialog's level cards (any FreeCAD theme).
 CARD_STYLE = ("QToolButton{border:1px solid palette(mid);border-radius:6px;padding:6px}"
               "QToolButton:checked{border:3px solid palette(highlight);"
-              "background:palette(highlight);color:palette(highlighted-text);font-weight:bold}")
+              "background:palette(highlight);color:palette(highlighted-text)}")  # no bold: fits
 DENSITY = {MeshLevel.VERY_COARSE: 1, MeshLevel.COARSE: 2, MeshLevel.MEDIUM: 3,
            MeshLevel.FINE: 4, MeshLevel.VERY_FINE: 5, MeshLevel.AUTO: 3}
 
@@ -98,6 +99,25 @@ def mesh_icon(divisions, size=48):
         p.drawLine(b + (a - b) * f, b + (a - b) * f + (c - b) * (1 - f))  # parallel to b-c
     p.end()
     return QIcon(pixmap)
+
+
+# Button hierarchy: one primary action per step (theme highlight color), the
+# rest secondary. Icons come from the platform style, so they follow the theme.
+PRIMARY_STYLE = ("QPushButton{font-weight:bold;padding:6px 14px;border-radius:4px;"
+                 "background:palette(highlight);color:palette(highlighted-text);}"
+                 "QPushButton:disabled{background:palette(button);color:palette(mid);}")
+
+
+def _button(text, icon, slot, primary=False, tip=""):
+    button = QPushButton(QApplication.style().standardIcon(icon), text)
+    button.clicked.connect(slot)
+    button.setMinimumHeight(34 if primary else 28)
+    button.setIconSize(QSize(18, 18) if primary else QSize(16, 16))
+    if primary:
+        button.setStyleSheet(PRIMARY_STYLE)
+    if tip:
+        button.setToolTip(tip)
+    return button
 
 
 class _Trial:
@@ -149,8 +169,8 @@ class MeshAssistantPanel:
 
         intro = QLabel(t("ma.intro"))
         intro.setWordWrap(True)
-        self.analyze_button = QPushButton(t("ma.analyze"))
-        self.analyze_button.clicked.connect(self.analyze)
+        self.analyze_button = _button(t("ma.analyze"), QStyle.SP_FileDialogContentsView,
+                                      self.analyze, primary=True)
         layout.addWidget(intro)
         layout.addWidget(self.analyze_button)
 
@@ -189,17 +209,15 @@ class MeshAssistantPanel:
         self.table.itemSelectionChanged.connect(self._show_selected)
         self.reason_label = QLabel()
         self.reason_label.setWordWrap(True)
-        self.test_button = QPushButton(t("ma.test"))
-        self.test_button.setToolTip(t("ma.test_tip"))
-        self.test_button.clicked.connect(self.test_options)
-        objective_row = QHBoxLayout()
+        self.test_button = _button(t("ma.test"), QStyle.SP_MediaPlay, self.test_options,
+                                   primary=True, tip=t("ma.test_tip"))
         self.objective_box = QComboBox()
         for objective in mp.Objective:
             self.objective_box.addItem(t("ma.objective." + objective.value), objective)
-        self.auto_button = QPushButton(t("ma.auto"))
-        self.auto_button.setToolTip(t("ma.auto_tip"))
-        self.auto_button.clicked.connect(self.auto_mesh)
-        objective_row.addWidget(QLabel(t("ma.objective")))
+        self.auto_button = _button(t("ma.auto"), QStyle.SP_ArrowForward, self.auto_mesh,
+                                   tip=t("ma.auto_tip"))
+        auto_box = QGroupBox(t("ma.group.auto"))
+        objective_row = QHBoxLayout(auto_box)
         objective_row.addWidget(self.objective_box, 1)
         objective_row.addWidget(self.auto_button)
         self.recommend_label = QLabel()
@@ -219,6 +237,7 @@ class MeshAssistantPanel:
         self.numbers_box = QGroupBox(t("ma.group.numbers"))
         self.numbers_box.setCheckable(True)
         self.numbers_box.setChecked(False)
+        self.numbers_box.setFlat(True)
         numbers_layout = QVBoxLayout(self.numbers_box)
         numbers_layout.addWidget(self.table)
         self.table.setVisible(False)
@@ -229,14 +248,13 @@ class MeshAssistantPanel:
         options_layout.addWidget(self.refine_label)
         options_layout.addWidget(self.numbers_box)
         options_layout.addWidget(self.test_button)
-        options_layout.addLayout(objective_row)
+        options_layout.addWidget(auto_box)
         layout.addWidget(self.options_box)
 
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
         self.progress = QProgressBar()
-        self.cancel_button = QPushButton(t("ma.cancel"))
-        self.cancel_button.clicked.connect(self.cancel)
+        self.cancel_button = _button(t("ma.cancel"), QStyle.SP_DialogCancelButton, self.cancel)
         progress_row = QHBoxLayout()
         progress_row.addWidget(self.progress, 1)
         progress_row.addWidget(self.cancel_button)
@@ -246,18 +264,18 @@ class MeshAssistantPanel:
         self.create_title = QLabel("<b>%s</b>" % t("ma.group.create"))
         layout.addWidget(self.create_title)
         actions = QHBoxLayout()
-        self.create_button = QPushButton(t("ma.create"))
-        self.create_button.setToolTip(t("ma.create_tip"))
-        self.create_button.clicked.connect(self.create_mesh)
-        self.remove_button = QPushButton(t("ma.remove"))
-        self.remove_button.clicked.connect(self.remove_meshes)
-        actions.addWidget(self.create_button)
-        actions.addWidget(self.remove_button)
+        self.create_button = _button(t("ma.create"), QStyle.SP_DialogApplyButton,
+                                     self.create_mesh, primary=True, tip=t("ma.create_tip"))
+        self.remove_button = _button(t("ma.remove"), QStyle.SP_TrashIcon, self.remove_meshes,
+                                     tip=t("ma.remove_tip"))
+        actions.addWidget(self.create_button, 2)
+        actions.addWidget(self.remove_button, 1)
         layout.addLayout(actions)
 
         self.details_box = QGroupBox(t("ma.group.details"))
         self.details_box.setCheckable(True)
         self.details_box.setChecked(False)
+        self.details_box.setFlat(True)
         details_layout = QVBoxLayout(self.details_box)
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)

@@ -361,5 +361,7 @@
   "ma.model.prior": "Este computador ainda não foi medido: a memória aparece como faixa (de peças de paredes finas a peças maciças) e o tempo como \"a medir\". Clique em Testar as opções: o CalculiX roda na sua peça, neste computador.",
   "ma.model.machine": "Tempo estimado pelas medições anteriores deste computador ({count} ensaio(s), {date}); a memória desta peça ainda é uma faixa. Testar as opções mede esta peça.",
   "ma.need_time": "O tempo de cálculo deste computador ainda não foi medido: clique em Testar as opções antes de usar um objetivo de tempo.",
-  "ma.what.probe_gmsh": "malha de ensaio {n} (Gmsh)"
+  "ma.what.probe_gmsh": "malha de ensaio {n} (Gmsh)",
+  "ma.group.auto": "Ou deixe o assistente escolher",
+  "ma.remove_tip": "Apaga só as malhas e regiões de refino criadas pelo assistente neste documento. Ctrl+Z desfaz."
 }

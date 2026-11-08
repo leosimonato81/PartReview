@@ -361,5 +361,7 @@
   "ma.model.prior": "This computer has not been measured yet: memory is shown as a band (from thin-walled to compact parts) and time as \"to be measured\". Click Try the options: CalculiX runs on your part, on this computer.",
   "ma.model.machine": "Time estimated from this computer's earlier measurements ({count} trial(s), {date}); this part's memory is still a band. Try the options to measure this part.",
   "ma.need_time": "This computer's solve time has not been measured yet: click Try the options before using a time objective.",
-  "ma.what.probe_gmsh": "trial mesh {n} (Gmsh)"
+  "ma.what.probe_gmsh": "trial mesh {n} (Gmsh)",
+  "ma.group.auto": "Or let the assistant choose",
+  "ma.remove_tip": "Deletes only the meshes and refinement regions created by the assistant in this document. Ctrl+Z undoes."
 }
