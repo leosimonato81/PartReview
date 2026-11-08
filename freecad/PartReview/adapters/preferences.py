@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 Leonardo Simonato
-"""What the report dialog remembers between sessions.
+"""What the report dialog remembers (owner's rules, 2026-11-08).
 
-Kept in PartReview's own file, written at once when a report is generated, and
-NOT in FreeCAD's user.cfg: FreeCAD writes user.cfg only when it closes, as a
-whole copy of what it holds in memory, so another FreeCAD window (or a crash)
-could overwrite or lose the remembered fields.
+- The fields of the last report (company, author, look, level, language, units,
+  exports, supports/loads figure, yield strength) are remembered only while
+  FreeCAD stays open: kept in memory, forgotten when FreeCAD closes.
+- The logo is the exception: when the user changes it from the default
+  (FreeCAD's logo), including to no logo, it is remembered across sessions,
+  in PartReview's own file written at once (never in FreeCAD's user.cfg, which
+  is written only when FreeCAD closes and the last window to close wins).
 """
 
 import json
@@ -33,36 +36,55 @@ def freecad_logo_path() -> str:
     return ""
 
 
+# Fields of the last report in this FreeCAD session (module memory: gone on exit).
+_session = None
+
+
 def last_report_fields():
-    """(template with the fields of the last report, csv, html), or None the first time."""
+    """(template with the fields of the last report, csv, html, boundary, yield
+    strength) of this FreeCAD session, or None when no report was made yet."""
+    return _session
+
+
+def remembered_logo():
+    """Logo chosen by the user in an earlier session ("" = no logo), or None for
+    the default (FreeCAD's logo)."""
     path = _file()
     if not os.path.isfile(path):
         return None
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
-        return (ReportTemplate.from_dict(data["fields"]), bool(data.get("csv")),
-                bool(data.get("html")), bool(data.get("boundary", False)))
+        if "logo" in data:
+            logo = str(data["logo"])
+        else:  # file of v1.5 (all fields): only its logo is still used
+            logo = ReportTemplate.from_dict(data["fields"]).logo_path
     except (OSError, ValueError, KeyError, TypeError) as err:
-        App.Console.PrintWarning("PartReview: last report settings ignored (%s): %s\n"
+        App.Console.PrintWarning("PartReview: remembered logo ignored (%s): %s\n"
                                  % (path, err))
         return None
+    return None if logo == freecad_logo_path() else logo
 
 
 def remember_report_fields(config) -> None:
-    """Called after a report is generated: company, author, logo (also an empty one),
-    look, level, language, units, exports and the supports/loads figure come back next time (title, result,
-    output and yield do not). Written atomically, right away."""
+    """Called after a report is generated: keeps the fields for this session and,
+    when the logo differs from the default, writes it to disk atomically, at once
+    (back to the default: the file is removed). Title, result and output are
+    never remembered."""
+    global _session
+    _session = (ReportTemplate.from_config("last", config), config.export_csv,
+                config.export_html, config.show_boundary, config.yield_strength)
     path = _file()
-    data = {"fields": ReportTemplate.from_config("last", config).to_dict(),
-            "csv": config.export_csv, "html": config.export_html,
-            "boundary": config.show_boundary}
     try:
+        if config.logo_path == freecad_logo_path():
+            if os.path.isfile(path):
+                os.remove(path)
+            return
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, ensure_ascii=False, indent=1)
+            json.dump({"logo": config.logo_path}, fh, ensure_ascii=False, indent=1)
         os.replace(tmp, path)
-    except OSError as err:  # report was generated; only the memory of fields is lost
-        App.Console.PrintWarning("PartReview: could not remember the report fields (%s): %s\n"
+    except OSError as err:  # report was generated; only the memory of the logo is lost
+        App.Console.PrintWarning("PartReview: could not remember the logo (%s): %s\n"
                                  % (path, err))

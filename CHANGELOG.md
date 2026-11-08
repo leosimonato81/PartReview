@@ -19,6 +19,12 @@ All notable changes to PartReview. / Mudanças importantes do PartReview.
   only for supports or loads hidden in the first. Result images keep only the
   result balloons, and the numbered points are results only. / Opcional e
   desmarcada por padrão: peça em cinza, apoios em roxo, cargas em laranja.
+- Report dialog memory: the fields of the last report (now including the
+  yield strength) come back only while FreeCAD stays open; the logo, when
+  changed from FreeCAD's default (also to no logo), is remembered after a
+  restart. / Os campos do último relatório (agora também o limite de
+  escoamento) voltam só enquanto o FreeCAD fica aberto; o logo alterado é
+  lembrado mesmo depois de fechar.
 - The report no longer prints its level ("Report level") on the cover or in
   the traceability table. / O relatório não mostra mais o "nível do relatório". / A figura 1 mostra a
   peça em cinza, apoios em roxo, cargas em laranja e setas na direção das

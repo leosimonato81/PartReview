@@ -268,22 +268,23 @@ class ReportDialog(QDialog):
         buttons.rejected.connect(self.reject)
         main.addWidget(buttons)
 
-        # Remember the logo of the last report (repetitive analyses); a template
-        # chosen afterwards still replaces it.
-        # Fields of the last report come back (repetitive analyses); the first time,
-        # FreeCAD's own logo is the default. A template chosen afterwards still wins.
+        # Fields of the last report come back while FreeCAD stays open; the logo
+        # also after a restart when the user changed it (adapters/preferences.py).
+        # The first time, FreeCAD's own logo is the default. A template chosen
+        # afterwards still wins.
         self._last_logo_missing = ""
         last = preferences.last_report_fields()
-        if last is None:
-            self.config.logo_path = preferences.freecad_logo_path()
-        else:
-            fields, csv, html, boundary = last
+        if last is not None:
+            fields, csv, html, boundary, yield_strength = last
             fields.apply_to(self.config)
             self.config.export_csv, self.config.export_html = csv, html
             self.config.show_boundary = boundary
-            if self.config.logo_path and not os.path.isfile(self.config.logo_path):
-                self._last_logo_missing = self.config.logo_path
-                self.config.logo_path = ""
+            self.config.yield_strength = yield_strength
+        logo = preferences.remembered_logo()
+        self.config.logo_path = preferences.freecad_logo_path() if logo is None else logo
+        if self.config.logo_path and not os.path.isfile(self.config.logo_path):
+            self._last_logo_missing = self.config.logo_path
+            self.config.logo_path = ""
 
         self._load_widgets_from_config()
         self._reload_templates()
@@ -360,6 +361,7 @@ class ReportDialog(QDialog):
             self.csv_check.setChecked(c.export_csv)
             self.html_check.setChecked(c.export_html)
             self.boundary_check.setChecked(c.show_boundary)
+            self.yield_edit.setText(c.yield_strength)
             self.disclaimer_edit.setPlainText(c.disclaimer_text)
         finally:
             self._loading = False
