@@ -14,6 +14,7 @@ from .units import Quantity
 
 class HotspotKind(Enum):
     STRESS_MAX = "stress_max"
+    STRESS_REGULAR = "stress_regular"  # max von Mises away from supports and loads
     STRESS = "stress"
     DISPLACEMENT_MAX = "displacement_max"
     GRADIENT = "gradient"
@@ -24,11 +25,12 @@ class HotspotKind(Enum):
 # Lower number = more important when views must be dropped.
 PRIORITY = {
     HotspotKind.STRESS_MAX: 1,
-    HotspotKind.DISPLACEMENT_MAX: 2,
-    HotspotKind.STRESS: 3,
-    HotspotKind.GRADIENT: 4,
-    HotspotKind.SUPPORT: 5,
-    HotspotKind.LOAD: 6,
+    HotspotKind.STRESS_REGULAR: 2,
+    HotspotKind.DISPLACEMENT_MAX: 3,
+    HotspotKind.STRESS: 4,
+    HotspotKind.GRADIENT: 5,
+    HotspotKind.SUPPORT: 6,
+    HotspotKind.LOAD: 7,
 }
 
 
@@ -143,6 +145,30 @@ def field_hotspots(field: ResultField, mesh: MeshInfo, surface: Surface,
         kinds = [HotspotKind.STRESS_MAX] + [HotspotKind.STRESS] * (max_count - 1)
     return [_make_hotspot(kind, cluster, values, field.unit, mesh, surface, field.kind)
             for kind, cluster in zip(kinds, clusters)]
+
+
+def regular_stress_hotspot(field: ResultField, mesh: MeshInfo, surface: Surface,
+                           constraints, exclusion: float) -> Hotspot | None:
+    """Highest von Mises on the surface farther than ``exclusion`` from every
+    support and load (Saint-Venant: an idealised support or load disturbs the
+    stress only near it; there the stress may be a singularity that grows with
+    refinement). None when the global maximum is already that far, or no node is.
+
+    Walks the nodes from the highest value down and stops at the first one far
+    enough, so only a few distances are computed on usual models.
+    """
+    if not constraints or exclusion <= 0:
+        return None
+    values = {n: v for n, v in zip(field.node_ids, field.values) if n in surface.nodes}
+    positions = mesh.node_positions
+    for rank, node in enumerate(sorted(values, key=values.__getitem__, reverse=True)):
+        if all(distance_to_constraint(positions[node], c) > exclusion for c in constraints):
+            if rank == 0:
+                return None  # the maximum itself is regular: nothing to add
+            spot = _make_hotspot(HotspotKind.STRESS_REGULAR, {node}, values, field.unit,
+                                 mesh, surface, field.kind)
+            return spot
+    return None
 
 
 def gradient_hotspot(field: ResultField, mesh: MeshInfo, surface: Surface,

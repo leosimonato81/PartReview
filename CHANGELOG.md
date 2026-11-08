@@ -25,6 +25,19 @@ All notable changes to PartReview. / Mudanças importantes do PartReview.
   restart. / Os campos do último relatório (agora também o limite de
   escoamento) voltam só enquanto o FreeCAD fica aberto; o logo alterado é
   lembrado mesmo depois de fechar.
+- **Report fairness / Relatório imparcial:** the overview always shows the
+  most critical point first (a point outweighs all lesser ones together) and
+  says which points it could not show and in which figure they are; figures
+  read overview → its close-ups, then the next quantity. / A visão geral
+  sempre mostra o ponto mais crítico e avisa os pontos escondidos; as figuras
+  seguem visão geral → aproximações de cada grandeza.
+- **Stress away from supports and loads / Tensão fora de apoios e cargas**
+  (Saint-Venant): new point, row in the summary and results, and its safety
+  factor, next to a maximum that may be a singularity. / Novo ponto, com fator
+  de segurança, ao lado de um máximo que pode ser singularidade.
+- Supports/loads painting follows the CAD edges (each mesh triangle goes to
+  the nearest CAD face): clean on fillets and chamfers. / Pintura de apoios e
+  cargas segue as arestas do CAD.
 - The report no longer prints its level ("Report level") on the cover or in
   the traceability table. / O relatório não mostra mais o "nível do relatório". / A figura 1 mostra a
   peça em cinza, apoios em roxo, cargas em laranja e setas na direção das

@@ -117,3 +117,22 @@ def test_supports_and_loads_figure_is_optional_and_never_in_the_quick_summary():
         assert c.includes_boundary is wanted
     c.level, c.show_boundary = ReportLevel.FULL, False
     assert c.includes_boundary is False
+
+
+def test_painting_follows_the_cad_edge_even_with_a_loose_tolerance():
+    from freecad.PartReview.domain.surface import nearest_faces
+    mesh, elements = bar_mesh(3)
+    surface = build_surface(elements, mesh.node_positions)
+    pos = mesh.node_positions
+    def quad(a, b, c, d):
+        return ((a, b, c), (a, c, d))
+
+    v = [Vec3(x, y, z) for x in (0, 3) for y in (0, 1) for z in (0, 1)]  # box corners
+    faces = {"P:Face1": square(0.0), "P:Face2": square(3.0),  # every face of the part
+             "P:Face3": quad(v[0], v[4], v[6], v[2]), "P:Face4": quad(v[1], v[5], v[7], v[3]),
+             "P:Face5": quad(v[0], v[4], v[5], v[1]), "P:Face6": quad(v[2], v[6], v[7], v[3])}
+    # tolerance so loose that bottom triangles next to the end face are candidates too
+    got = nearest_faces(surface.triangles, pos, faces, {"P:Face1"}, 0.9)
+    end = {t for t, tri in enumerate(surface.triangles) if all(pos[n].x == 0.0 for n in tri)}
+    assert set(got) == end and set(got.values()) == {"P:Face1"}
+    assert nearest_faces(surface.triangles, pos, faces, {"P:Missing"}, 0.9) == {}

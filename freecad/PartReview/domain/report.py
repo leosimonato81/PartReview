@@ -8,7 +8,7 @@ labels) are copied as they are.
 """
 
 import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from . import colormap
 from . import geometry as g
@@ -74,6 +74,9 @@ class ReportInputs:
     error_view: PlannedView | None = None  # its image is the one after the views
     # Supports and loads on a gray part; their images come FIRST (figure 1...).
     boundary_views: list = field(default_factory=list)
+    # Distance from supports/loads beyond which stress counts as "regular"
+    # (the STRESS_REGULAR hotspot); None when not computed.
+    regular_exclusion: Quantity | None = None
     trace: Traceability | None = None  # step e
 
     def field(self, kind: FieldKind) -> ResultField | None:
@@ -152,9 +155,11 @@ def _summary(inputs: ReportInputs, tr: Translator) -> Table:
     return Table(header=(), rows=tuple(rows), widths=(0.25, 0.75))
 
 
-def _results(inputs: ReportInputs, tr: Translator, fs: float | None) -> Table:
+def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
+             fs_regular: float | None = None) -> Table:
     res, m = inputs.result, inputs.result.mesh
     rows = []
+    regular = next((h for h in inputs.hotspots if h.kind is HotspotKind.STRESS_REGULAR), None)
     for kind, max_key, min_key in ((FieldKind.VON_MISES, "results.vm_max", "results.vm_min"),
                                    (FieldKind.DISPLACEMENT, "results.disp_max", "results.disp_min")):
         f = res.get_field(kind)
@@ -163,11 +168,16 @@ def _results(inputs: ReportInputs, tr: Translator, fs: float | None) -> Table:
         for key, nv in ((max_key, f.maximum(m)), (min_key, f.minimum(m))):
             rows.append((tr.t(key), tr.quantity(nv.value, 4), tr.point(nv.position, m.length_unit),
                          str(nv.node_id)))
+            if key == "results.vm_max" and regular is not None:
+                rows.append((tr.t("results.vm_regular"), tr.quantity(regular.peak_value, 4),
+                             tr.point(regular.center, m.length_unit), str(regular.peak_node)))
     if inputs.yield_strength is not None:
         source = tr.t("results.yield_source." + inputs.yield_source) if inputs.yield_source else ""
         rows.append((tr.t("results.yield"), tr.quantity(inputs.yield_strength, 4), source, ""))
     if fs is not None:
         rows.append((tr.t("results.safety"), tr.number(fs, 3), "", ""))
+    if fs_regular is not None:
+        rows.append((tr.t("results.safety_regular"), tr.number(fs_regular, 3), "", ""))
     header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"),
               tr.t("results.node"))
     return Table(header=header, rows=tuple(rows), widths=(0.36, 0.2, 0.32, 0.12))
@@ -296,6 +306,7 @@ class FemContext:
     numbers: dict  # hotspot -> balloon number
     figures: list
     fs: float | None
+    fs_regular: float | None = None  # safety factor with the regular (away) stress
 
 
 def prepare_fem(inputs: ReportInputs, tr: Translator) -> FemContext:
@@ -306,9 +317,39 @@ def prepare_fem(inputs: ReportInputs, tr: Translator) -> FemContext:
     fs = None
     if inputs.yield_strength is not None and stress is not None:
         fs = safety_factor(inputs.yield_strength, stress.maximum(res.mesh).value)
+    regular = next((h for h in hotspots if h.kind is HotspotKind.STRESS_REGULAR), None)
+    fs_regular = None
+    if inputs.yield_strength is not None and regular is not None:
+        fs_regular = safety_factor(inputs.yield_strength, regular.peak_value)
     figures = [_figure(index, view, inputs, numbers, tr)  # capture order = figure order
                for index, view in enumerate(list(inputs.boundary_views) + list(inputs.views))]
-    return FemContext(inputs, numbers, figures, fs)
+    figures = _note_hidden(figures, inputs, numbers, tr)
+    return FemContext(inputs, numbers, figures, fs, fs_regular)
+
+
+def _note_hidden(figures, inputs: ReportInputs, numbers, tr: Translator) -> list:
+    """Overviews say which points of their field they could not show, and where
+    they are: a reader must never take the balloons of one view for the worst
+    points of the part."""
+    views = list(inputs.boundary_views) + list(inputs.views)
+    shown_in = {}
+    for fig in figures:
+        for m in fig.markers:
+            shown_in.setdefault(m.number, []).append(str(fig.view_index + 1))
+    out = []
+    for fig, view in zip(figures, views):
+        if view.is_overview and view.color_field is not None:
+            drawn = {m.number for m in fig.markers}
+            hidden = [numbers[h] for h in inputs.hotspots
+                      if h.color_field is view.color_field and numbers[h] not in drawn]
+            if hidden:
+                items = tr.list_sep.join(
+                    "%d (%s)" % (n, tr.t("fig.see", figures=", ".join(shown_in[n])))
+                    if n in shown_in else str(n) for n in sorted(hidden))
+                note = tr.t("fig.hidden", items=items)
+                fig = replace(fig, balloons=(fig.balloons + " " + note).strip())
+        out.append(fig)
+    return out
 
 
 def _section_views(ctx: FemContext, tr: Translator, level) -> list:
@@ -323,7 +364,7 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
     inputs, fs = ctx.inputs, ctx.fs
     res = inputs.result
     stress = res.get_field(FieldKind.VON_MISES)
-    blocks = [_results(inputs, tr, fs)]
+    blocks = [_results(inputs, tr, fs, ctx.fs_regular)]
     if fs is not None and fs < 1.0:
         blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, 3))))
     if fs is None and stress is not None:
@@ -396,6 +437,11 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     if stress is not None:
         value = tr.quantity(stress.maximum(res.mesh).value, 4)
         rows.append((tr.t("results.vm_max"), " ".join(p for p in (value, _where(ctx, tr, smax)) if p)))
+    regular = _first(ctx, HotspotKind.STRESS_REGULAR)
+    if regular is not None:
+        value = tr.quantity(regular.peak_value, 4)
+        rows.append((tr.t("results.vm_regular"),
+                     " ".join(p for p in (value, _where(ctx, tr, regular)) if p)))
     if disp is not None:
         dmax = _first(ctx, HotspotKind.DISPLACEMENT_MAX)
         value = tr.quantity(disp.maximum(res.mesh).value, 4)
@@ -407,11 +453,17 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
                                                  source=source)))
         key = "exec.fs_ok" if ctx.fs >= 1.0 else "exec.fs_low"
         sentences.append(tr.t(key, fs=tr.number(ctx.fs, 3)))
+        if ctx.fs_regular is not None:
+            rows.append((tr.t("exec.safety_regular"), tr.number(ctx.fs_regular, 3)))
     elif stress is not None:
         rows.append((tr.t("exec.safety"), tr.t("exec.safety_none")))
         sentences.append(tr.t("exec.no_yield"))
     if smax is not None and smax.singularity_near:
         sentences.append(tr.t("exec.singular", n=ctx.numbers[smax], label=smax.singularity_near))
+    if regular is not None and inputs.regular_exclusion is not None:
+        sentences.append(tr.t("exec.regular", n=ctx.numbers[regular],
+                              value=tr.quantity(regular.peak_value, 4),
+                              distance=tr.quantity(inputs.regular_exclusion, 2)))
     eq = inputs.equilibrium
     if eq is not None:
         rows.append((tr.t("quality.equilibrium"), tr.t("eq.status." + eq.status.value)))

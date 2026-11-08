@@ -117,6 +117,29 @@ def feature_edges(triangles, positions: Mapping[int, Vec3],
     return edges
 
 
+def _cell(point, size):
+    return (int(point[0] // size), int(point[1] // size), int(point[2] // size))
+
+
+def _grid(geometry, tolerance):
+    """(cell size, cell -> indices of the triangles whose box, grown by
+    ``tolerance``, meets the cell): a point then only meets its cell's triangles."""
+    lows = [tuple(min(p[k] for p in tri) for k in range(3)) for tri in geometry]
+    highs = [tuple(max(p[k] for p in tri) for k in range(3)) for tri in geometry]
+    span = max([highs[n][k] - lows[n][k] for n in range(len(geometry)) for k in range(3)]
+               + [0.0])
+    size = max(4.0 * tolerance, span / 40.0)
+    grid = {}
+    for n, (lo, hi) in enumerate(zip(lows, highs)):
+        a = _cell(tuple(v - tolerance for v in lo), size)
+        b = _cell(tuple(v + tolerance for v in hi), size)
+        for i in range(a[0], b[0] + 1):
+            for j in range(a[1], b[1] + 1):
+                for k in range(a[2], b[2] + 1):
+                    grid.setdefault((i, j, k), []).append(n)
+    return size, grid
+
+
 def triangles_on(geometry, triangles, positions: Mapping[int, Vec3], tolerance: float,
                  min_cos: float = 0.7) -> set[int]:
     """Indices of mesh ``triangles`` lying on the CAD faces given as ``geometry``.
@@ -131,20 +154,7 @@ def triangles_on(geometry, triangles, positions: Mapping[int, Vec3], tolerance: 
     """
     if not geometry or not triangles or tolerance <= 0:
         return set()
-    lows = [Vec3(*(min(p[k] for p in tri) for k in range(3))) for tri in geometry]
-    highs = [Vec3(*(max(p[k] for p in tri) for k in range(3))) for tri in geometry]
-    span = max(max(h[k] for h in highs) - min(lo[k] for lo in lows) for k in range(3))
-    cell = max(4.0 * tolerance, span / 40.0)
-
-    def index(v):
-        return int(v // cell)
-
-    grid = {}
-    for n, (lo, hi) in enumerate(zip(lows, highs)):
-        for i in range(index(lo[0] - tolerance), index(hi[0] + tolerance) + 1):
-            for j in range(index(lo[1] - tolerance), index(hi[1] + tolerance) + 1):
-                for k in range(index(lo[2] - tolerance), index(hi[2] + tolerance) + 1):
-                    grid.setdefault((i, j, k), []).append(n)
+    cell, grid = _grid(geometry, tolerance)
     face_normals = []
     for tri in geometry:
         n = g.cross(g.sub(tri[1], tri[0]), g.sub(tri[2], tri[0]))
@@ -154,7 +164,7 @@ def triangles_on(geometry, triangles, positions: Mapping[int, Vec3], tolerance: 
     for t, tri in enumerate(triangles):
         pa, pb, pc = (positions[i] for i in tri)
         c = g.centroid((pa, pb, pc))
-        candidates = grid.get((index(c[0]), index(c[1]), index(c[2])))
+        candidates = grid.get(_cell(c, cell))
         if not candidates:
             continue
         n = g.cross(g.sub(pb, pa), g.sub(pc, pa))
@@ -169,3 +179,47 @@ def triangles_on(geometry, triangles, positions: Mapping[int, Vec3], tolerance: 
                 found.add(t)
                 break
     return found
+
+
+def nearest_faces(triangles, positions: Mapping[int, Vec3], faces, wanted,
+                  tolerance: float) -> dict[int, str]:
+    """Mesh triangle index -> name of the ``wanted`` CAD face it lies on.
+
+    ``faces`` maps every face name of the part to its tessellation triangles.
+    A mesh triangle near a wanted face (centroid within ``tolerance``) is given
+    to the CLOSEST face of the whole part: on a fillet or a chamfer next to a
+    loaded face, the boundary of the painting then follows the CAD edge
+    instead of a jagged line.
+    """
+    wanted = [w for w in wanted if faces.get(w)]
+    if not wanted or not triangles or tolerance <= 0:
+        return {}
+    near = {}
+    for name in wanted:  # candidates: mesh triangles close to a wanted face
+        for t in triangles_on(faces[name], triangles, positions, tolerance, min_cos=-1.0):
+            near.setdefault(t, set()).add(name)
+    if not near:
+        return {}
+    centroids = {t: g.centroid([positions[i] for i in triangles[t]]) for t in near}
+    lo = [min(c[k] for c in centroids.values()) - tolerance for k in range(3)]
+    hi = [max(c[k] for c in centroids.values()) + tolerance for k in range(3)]
+
+    def touches(tri):  # face triangle bounding box meets the candidates' region
+        return all(min(p[k] for p in tri) <= hi[k] and max(p[k] for p in tri) >= lo[k]
+                   for k in range(3))
+
+    named = [(name, tri) for name, geo in faces.items() for tri in geo if touches(tri)]
+    cell, grid = _grid([tri for _, tri in named], tolerance)
+    result = {}
+    for t, c in centroids.items():
+        best, best_d = None, float("inf")
+        # the wanted face is within tolerance, so the nearest one is too: the
+        # centroid's cell holds every face triangle that can be the nearest
+        for k in grid.get(_cell(c, cell), ()):
+            name, tri = named[k]
+            d = g.point_triangle_distance(c, *tri)
+            if d < best_d:
+                best, best_d = name, d
+        if best in near[t]:
+            result[t] = best
+    return result

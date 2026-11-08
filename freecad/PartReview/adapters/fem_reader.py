@@ -258,6 +258,31 @@ def _reference_triangles(obj):
     return tuple(triangles)
 
 
+def part_faces(analysis):
+    """Every face of the parts that supports and loads refer to, tessellated in
+    global coordinates: {"Label:FaceN": triangles}. Used to paint supports and
+    loads up to the real CAD edges (domain/surface.nearest_faces)."""
+    faces, done = {}, set()
+    for obj in analysis.Group:
+        if constraint_kind(obj.TypeId) is None:
+            continue
+        for target, _subs in getattr(obj, "References", []) or []:
+            shape = getattr(target, "Shape", None)
+            if shape is None or target.Name in done:
+                continue
+            done.add(target.Name)
+            outer = container_placement(target)
+            for n, face in enumerate(shape.Faces, start=1):
+                face = face.copy()  # see _reference_triangles: keep the document clean
+                tolerance = max(0.01, 0.005 * face.BoundBox.DiagonalLength)
+                points, facets = face.tessellate(tolerance)
+                points = [outer.multVec(p) for p in points]
+                faces["%s:Face%d" % (target.Label, n)] = tuple(
+                    tuple(Vec3(p.x, p.y, p.z) for p in (points[i], points[j], points[k]))
+                    for i, j, k in facets)
+    return faces
+
+
 def read_constraints(analysis, unit_system):
     constraints = []
     for obj in analysis.Group:

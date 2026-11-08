@@ -133,20 +133,50 @@ def plan_target_view(target: Hotspot, model_center: Vec3, model_radius: float,
     return PlannedView(camera, target.color_field, (target,), score=best_score)
 
 
+OVERVIEW_DIRECTIONS = 48
+
+
 def plan_overview(color_field: FieldKind, targets, model_center: Vec3, model_radius: float,
                   is_visible: VisibilityFn) -> PlannedView:
-    """Whole-model isometric view that shows as many important targets as possible."""
+    """Whole-model isometric view that shows the most important targets first.
+
+    ``targets`` come in report order (most important first). Target i weighs
+    2**-i, so showing a point always beats showing all less important ones
+    together: the overview never hides the maximum to show two lesser peaks.
+    """
     targets = [t for t in targets if t.color_field is color_field]
 
-    def score(d):
-        seen = sum((7 - t.priority) for t in targets if is_visible(t.center, d))
-        looks_down = 0.5 if d.z < 0 else 0.0  # natural view from above
-        return seen + looks_down
+    tie = 0.5 ** (len(targets) + 1)  # below any target's weight: only breaks ties
 
-    best = max(ISO, key=score)
+    def score(d):
+        seen = sum(0.5 ** i for i, t in enumerate(targets) if is_visible(t.center, d))
+        return seen + (tie if d in ISO else 0.0) + (0.5 * tie if d.z < 0 else 0.0)
+
+    # Isometric views first (classic overview), then evenly spread directions,
+    # used only when they show more of the important points.
+    best = max(list(ISO) + list(g.fibonacci_sphere(OVERVIEW_DIRECTIONS)), key=score)
     camera = frame(best, model_center, 1.05 * model_radius, model_center, model_radius)
     shown = tuple(t for t in targets if is_visible(t.center, best))
     return PlannedView(camera, color_field, shown, is_overview=True, score=score(best))
+
+
+FIELD_ORDER = (FieldKind.VON_MISES, FieldKind.DISPLACEMENT, FieldKind.ESTIMATED_ERROR)
+
+
+def reading_order(views, ranking) -> list[PlannedView]:
+    """Overview of a quantity, then its close-ups (by point number), then the next
+    quantity: the reader goes from the whole part to the details of one result.
+
+    ``ranking`` is the hotspot list in report order (its index is the number - 1).
+    """
+    rank = {h: i for i, h in enumerate(ranking)}
+
+    def key(v):
+        field = FIELD_ORDER.index(v.color_field) if v.color_field in FIELD_ORDER else 99
+        first = min((rank.get(t, len(rank)) for t in v.targets), default=len(rank))
+        return (field, not v.is_overview, first)
+
+    return sorted(views, key=key)
 
 
 BOUNDARY_KINDS = (HotspotKind.SUPPORT, HotspotKind.LOAD)

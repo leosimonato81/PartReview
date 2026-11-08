@@ -11,7 +11,7 @@ from pivy import coin  # type: ignore
 
 from ..domain.colors import LOAD_RGB, PART_RGB, SUPPORT_RGB
 from ..domain.models import ConstraintKind
-from ..domain.surface import feature_edges, triangles_on
+from ..domain.surface import feature_edges, nearest_faces
 
 EDGE_RGB = (70, 70, 70)
 SUPPORT_KINDS = (ConstraintKind.FIXED, ConstraintKind.DISPLACEMENT)
@@ -86,8 +86,10 @@ def _dots(points, color, radius):
     return sep
 
 
-def build(result, surface, model_radius):
+def build(result, surface, model_radius, faces):
     """Coin root of the supports-and-loads scene (mesh coordinates).
+
+    ``faces``: every face of the part, tessellated (fem_reader.part_faces).
 
     Colors only, no arrows or balloons (owner's choice: cleaner and more
     professional); the caption names each support and load with its value."""
@@ -98,8 +100,10 @@ def build(result, surface, model_radius):
     points.point.setValues(0, len(ids), [tuple(positions[i]) for i in ids])
     local = [tuple(where[i] for i in tri) for tri in surface.triangles]
 
-    tolerance = 0.3 * surface.mean_edge_length
-    color_of = {}  # triangle index -> color (supports win over loads)
+    # Each mesh triangle near a support/load face goes to the CLOSEST CAD face of
+    # the part, so the painting stops at the real edge (fillets, chamfers).
+    tolerance = 0.5 * surface.mean_edge_length
+    color_of_face = {}  # "Label:FaceN" -> color (supports win over loads)
     segments = {SUPPORT_RGB: [], LOAD_RGB: []}
     dots = {SUPPORT_RGB: [], LOAD_RGB: []}
     for c in sorted(result.constraints, key=lambda c: c.kind in SUPPORT_KINDS):
@@ -107,10 +111,13 @@ def build(result, surface, model_radius):
                                                          ConstraintKind.PRESSURE):
             continue
         color = SUPPORT_RGB if c.kind in SUPPORT_KINDS else LOAD_RGB
-        for t in triangles_on(c.geometry, surface.triangles, positions, tolerance):
-            color_of[t] = color
+        for ref in c.references:
+            if ":Face" in ref:
+                color_of_face[ref] = color
         segments[color] += list(c.lines)
         dots[color] += list(c.points)
+    on = nearest_faces(surface.triangles, positions, faces, set(color_of_face), tolerance)
+    color_of = {t: color_of_face[name] for t, name in on.items()}
 
     root = coin.SoSeparator()
     plain = [tri for t, tri in enumerate(local) if t not in color_of]

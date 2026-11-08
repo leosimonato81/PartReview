@@ -24,7 +24,9 @@ from ..domain.hotspots import (
     drop_redundant,
     field_hotspots,
     gradient_hotspot,
+    HotspotKind,
     mark_singularities,
+    regular_stress_hotspot,
 )
 from ..domain.i18n import Translator
 from ..domain.models import ConstraintKind, FieldKind, ReportLevel, ResultField, Vec3
@@ -40,6 +42,7 @@ from ..domain.quality import (
 from ..domain.exporters import nodal_csv
 from ..domain.report import ReportInputs, build_report, order_hotspots, views_for_level
 from ..domain.surface import build_surface
+from ..domain.units import Quantity
 from . import boundary_scene, fem_reader, trace_reader
 from .error_estimator import estimate
 from .html_writer import write_html
@@ -49,6 +52,10 @@ from .view_state import ViewState
 from .visibility import RayVisibility
 
 IMAGE_SIZE = (1600, 1200)
+# "Away from supports and loads" = farther than 2x the "on a support/load"
+# tolerance (1.5 elements or 1 % of the part). Practical rule, stated with its
+# value in the report: a numerical singularity spreads over a few elements.
+REGULAR_EXCLUSION = 2.0
 
 
 class Cancelled(Exception):
@@ -77,15 +84,6 @@ def _yield_strength(config, result, stress_unit):
     return None, ""
 
 
-def _visible_leaders(views, is_visible):
-    """Supports and loads: a leader only to faces/edges really visible in that view (a
-    leader to a hidden face misleads). Result points keep the planner's choice: they
-    were already chosen visible, and a peak on a sharp corner can fail a strict ray."""
-    return [replace(v, leaders=tuple(
-        tuple(p for p in t.leader_points if is_visible(p, v.camera.direction))
-        if t.anchors else t.leader_points for t in v.targets)) for v in views]
-
-
 def _plan(result, surface, max_views, boundary_views):
     """Result hotspots (numbered order), result views, supports/loads views and
     the model radius.
@@ -105,6 +103,7 @@ def _plan(result, surface, max_views, boundary_views):
         def is_visible(point, direction):
             return True
         spots = []
+        exclusion = None
     else:
         is_visible = RayVisibility(mesh.node_positions, surface.triangles,
                                    epsilon=0.05 * surface.mean_edge_length)
@@ -116,8 +115,14 @@ def _plan(result, surface, max_views, boundary_views):
                 spots.append(grad)
         if disp is not None:
             spots += field_hotspots(disp, mesh, surface)
-        spots += [h for h in (constraint_hotspot(c) for c in result.constraints) if h]
         tolerance = max(1.5 * surface.mean_edge_length, 0.01 * radius)
+        exclusion = REGULAR_EXCLUSION * tolerance
+        if stress is not None:
+            regular = regular_stress_hotspot(stress, mesh, surface, result.constraints,
+                                             exclusion)
+            if regular is not None:
+                spots.append(regular)
+        spots += [h for h in (constraint_hotspot(c) for c in result.constraints) if h]
         spots = order_hotspots(drop_redundant(
             mark_singularities(spots, result.constraints, tolerance)))
 
@@ -127,13 +132,13 @@ def _plan(result, surface, max_views, boundary_views):
         if result.get_field(kind) is not None:
             views.append(cp.plan_overview(kind, results, center, radius, is_visible))
     views += [cp.plan_target_view(s, center, radius, is_visible) for s in results]
-    selected = cp.select_views(views, max_views=max_views)
+    selected = cp.reading_order(cp.select_views(views, max_views=max_views), results)
     boundary = []
     if surface is not None:
         boundary = cp.plan_boundary_views(spots, center, radius, is_visible, boundary_views)
     # Supports and loads are shown by color and arrows only (no balloons, owner's
     # request): the numbered points of the report are results only.
-    return results, selected, boundary, radius
+    return results, selected, boundary, radius, exclusion
 
 
 def _equilibrium(analysis, result):
@@ -212,7 +217,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
     zz, error_field = _error_estimate(analysis, result_obj, result, tets)
 
     progress(tr.t("progress.hotspots"), 0.3)
-    spots, views, boundary_views, radius = _plan(
+    spots, views, boundary_views, radius, exclusion = _plan(
         result, surface, views_for_level(config),
         2 if config.includes_boundary else 0)
     progress(tr.t("progress.planning"), 0.4)
@@ -246,7 +251,8 @@ def generate_fem_report(doc, config, progress=_no_progress):
                 vs.save_image(image_paths[len(boundary_views) + i], *IMAGE_SIZE)
             if boundary_views:  # last, because the mesh is hidden for them
                 vs.show_only([])
-                vs.add_overlay(boundary_scene.build(result, surface, radius))
+                vs.add_overlay(boundary_scene.build(result, surface, radius,
+                                                      fem_reader.part_faces(analysis)))
                 for i, view in enumerate(boundary_views):
                     progress(tr.t("progress.capture", n=len(shots) + i + 1, total=total),
                              0.4 + 0.5 * (len(shots) + i) / total)
@@ -266,6 +272,9 @@ def generate_fem_report(doc, config, progress=_no_progress):
             tool_version=__version__, freecad_version=".".join(App.Version()[:3]),
             equilibrium=equilibrium, mesh_quality=quality, error_estimate=zz,
             error_field=error_field, error_view=error_view, boundary_views=boundary_views,
+            regular_exclusion=(Quantity(exclusion, result.mesh.length_unit)
+                               if exclusion and any(s.kind is HotspotKind.STRESS_REGULAR
+                                                    for s in spots) else None),
             trace=trace_reader.collect(doc, result_obj, analysis, result.solver,
                                        result.analysis_type, __version__, unsaved))
         document = build_report(inputs, tr)

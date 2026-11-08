@@ -413,5 +413,12 @@
   "fig.boundary_loads": "Em laranja (cargas): {items}.",
   "ui.figures": "Figuras",
   "ui.show_boundary": "Incluir figura de apoios e cargas (beta)",
-  "ui.show_boundary_tip": "Versão beta. Mostra a peça em cinza com os apoios pintados de roxo e as cargas de laranja, para quem lê o relatório sem ter feito a análise. Desmarcada por padrão; não entra no Resumo rápido."
+  "ui.show_boundary_tip": "Versão beta. Mostra a peça em cinza com os apoios pintados de roxo e as cargas de laranja, para quem lê o relatório sem ter feito a análise. Desmarcada por padrão; não entra no Resumo rápido.",
+  "hotspot.stress_regular": "Tensão máxima fora de apoios e cargas",
+  "results.vm_regular": "Tensão de von Mises máxima fora de apoios e cargas",
+  "results.safety_regular": "Fator de segurança fora de apoios e cargas (escoamento / von Mises)",
+  "exec.safety_regular": "Fator de segurança fora de apoios e cargas",
+  "exec.regular": "A mais de {distance} de apoios e cargas, a maior tensão de von Mises é {value} (ponto {n}). Perto de apoios e cargas idealizados a tensão depende de como eles foram modelados (princípio de Saint-Venant); longe deles, este é o valor de referência do modelo.",
+  "fig.hidden": "Pontos desta grandeza escondidos neste ângulo: {items}.",
+  "fig.see": "ver figura {figures}"
 }

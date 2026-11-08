@@ -413,5 +413,12 @@
   "fig.boundary_loads": "In orange (loads): {items}.",
   "ui.figures": "Figures",
   "ui.show_boundary": "Include supports and loads figure (beta)",
-  "ui.show_boundary_tip": "Beta. Shows the part in gray with supports painted purple and loads orange, for readers who did not run the analysis. Off by default; not in the Quick summary."
+  "ui.show_boundary_tip": "Beta. Shows the part in gray with supports painted purple and loads orange, for readers who did not run the analysis. Off by default; not in the Quick summary.",
+  "hotspot.stress_regular": "Maximum stress away from supports and loads",
+  "results.vm_regular": "Maximum von Mises stress away from supports and loads",
+  "results.safety_regular": "Safety factor away from supports and loads (yield / von Mises)",
+  "exec.safety_regular": "Safety factor away from supports and loads",
+  "exec.regular": "Farther than {distance} from supports and loads, the highest von Mises stress is {value} (point {n}). Near idealised supports and loads the stress depends on how they were modelled (Saint-Venant's principle); away from them, this is the model's reference value.",
+  "fig.hidden": "Points of this quantity hidden from this angle: {items}.",
+  "fig.see": "see figure {figures}"
 }
