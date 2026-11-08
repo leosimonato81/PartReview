@@ -62,7 +62,8 @@ class MeshOptimizerPanel:
         t = self.tr.t
         self.machine = machine_profile()
         self.history_samples, _ = machine_calibration.load(self.machine)
-        self.mesh, self.solid, self.analysis = self._find_setup()
+        self.candidates = self._find_setups()
+        self.mesh, self.solid, self.analysis = self._preselected()
         self.singular = set()
         self.stress_excluded = set()
         self.passes = []  # adaptive.Pass
@@ -84,6 +85,15 @@ class MeshOptimizerPanel:
 
         setup = QGroupBox(t("mo.group.setup"))
         form = QFormLayout(setup)
+        self.mesh_combo = None
+        if len(self.candidates) > 1:  # several parts with an assistant mesh: user picks
+            self.mesh_combo = QComboBox()
+            for mesh, solid, analysis in self.candidates:
+                self.mesh_combo.addItem("%s (%s)" % (solid.Label, analysis.Label), mesh.Name)
+            self.mesh_combo.setCurrentIndex(
+                [c[0].Name for c in self.candidates].index(self.mesh.Name))
+            self.mesh_combo.currentIndexChanged.connect(self._mesh_chosen)
+            form.addRow("<b>%s</b>" % t("mo.choose"), self.mesh_combo)
         self.setup_labels = {}
         for key in ("mo.analysis", "mo.part", "mo.mesh"):
             label = QLabel()
@@ -111,6 +121,9 @@ class MeshOptimizerPanel:
         goal_note = QLabel(t("mo.goal_note"))
         goal_note.setWordWrap(True)
         goal_form.addRow(goal_note)
+        self.forecast = QLabel(t("mo.fc.before"))  # which targets fit THIS computer
+        self.forecast.setWordWrap(True)
+        goal_form.addRow("<b>%s</b>" % t("mo.fc.title"), self.forecast)
         layout.addWidget(goal)
 
         run = QGroupBox(t("mo.group.run"))
@@ -159,15 +172,38 @@ class MeshOptimizerPanel:
 
     # --- setup ------------------------------------------------------------------------
 
-    def _find_setup(self):
-        """(assistant mesh, solid, analysis): the optimiser refines the assistant's own
-        mesh (user meshes are never changed)."""
+    def _find_setups(self):
+        """[(assistant mesh, solid, analysis)]: the optimiser refines the assistant's
+        own meshes that are in an analysis (user meshes are never changed)."""
+        found = []
         for obj in mesh_runner.assistant_objects(self.doc):
-            if obj.isDerivedFrom("Fem::FemMeshObject"):
+            if obj.isDerivedFrom("Fem::FemMeshObject") and getattr(obj, "Shape", None):
                 analysis = optimizer.analysis_of(self.doc, obj)
                 if analysis is not None:
-                    return obj, obj.Shape, analysis
-        return None, None, None
+                    found.append((obj, obj.Shape, analysis))
+        return found
+
+    def _preselected(self):
+        """The candidate selected in the tree (its mesh, part or analysis), else the
+        first one."""
+        if not self.candidates:
+            return None, None, None
+        names = {o.Name for o in Gui.Selection.getSelection(self.doc.Name)}
+        for candidate in self.candidates:
+            if names & {candidate[0].Name, candidate[1].Name, candidate[2].Name}:
+                return candidate
+        return self.candidates[0]
+
+    def _mesh_chosen(self, index):
+        if self.job is not None:
+            return
+        self.mesh, self.solid, self.analysis = self.candidates[index]
+        self.notes.clear()
+        self.table.setRowCount(0)
+        self.passes, self.samples = [], []
+        self.forecast.setText(self.tr.t("mo.fc.before"))
+        self.status.setText("")
+        self._fill_setup()
 
     def _fill_setup(self):
         t = self.tr.t
@@ -289,6 +325,7 @@ class MeshOptimizerPanel:
                                    time.monotonic() - self.pass_started, job.peak_mb,
                                    global_error=info["error"]))
         self._add_row(self.passes[-1])
+        self._show_forecast()
         self.doc.openTransaction("PartReview: optimise mesh")  # undoable, like the regions
         optimizer.save_history(self.mesh, self.passes)
         self.doc.commitTransaction()
@@ -369,6 +406,32 @@ class MeshOptimizerPanel:
         for col, value in enumerate(cells):
             self.table.setItem(row, col, QTableWidgetItem(value))
 
+    def _show_forecast(self):
+        """Which targets fit THIS computer, from the last solve: nodes needed by the
+        a priori convergence rate (adaptive.nodes_for_error), memory and time from
+        the solves measured on this part."""
+        t, last = self.tr.t, self.passes[-1]
+        model = mp.part_model(self.samples, mp.machine_time_law(self.history_samples)
+                              if self.history_samples else None)
+        free = machine_profile().available_mb
+        margin = 1 + min(model.error, mp.PROBE_PLANNING_ERROR)
+        speed = speed_factor(self.samples or self.history_samples)
+        lines = []
+        for target in TARGETS:
+            pct = int(round(100 * target))
+            if last.error <= target:
+                lines.append(t("mo.fc.reached", target=pct))
+                continue
+            nodes = ad.nodes_for_error(last.nodes, last.error, target)
+            memory = model.memory_mb(nodes) * margin
+            seconds = mp.total_seconds(model, nodes, None, speed) if model.time_known else None
+            key = "mo.fc.fits" if memory <= TIGHT_FRACTION * free else "mo.fc.too_big"
+            lines.append(t(key, target=pct, nodes=self.tr.integer(nodes),
+                           memory=mt.memory(self.tr, memory), free=mt.memory(self.tr, free),
+                           time=format_duration(seconds) if seconds is not None
+                           else t("ma.time_unknown")))
+        self.forecast.setText("\n".join(lines) + "\n" + t("mo.fc.note"))
+
     def _show_progress(self):
         t = self.tr.t
         what = t("mo.stage." + self.stage, n=len(self.passes))
@@ -382,6 +445,8 @@ class MeshOptimizerPanel:
         self.start_button.setEnabled(not busy and self.mesh is not None)
         self.target_box.setEnabled(not busy)
         self.time_box.setEnabled(not busy)
+        if self.mesh_combo is not None:
+            self.mesh_combo.setEnabled(not busy)
 
     def _cleanup(self):
         if self.job is not None:

@@ -102,3 +102,21 @@ def group_by_size(sizes, digits=2):
         groups.setdefault(key, []).append(face)
     return {k: sorted(v, key=lambda f: int(f[4:]) if f[4:].isdigit() else f)
             for k, v in sorted(groups.items())}
+
+
+DIMENSION = 3
+
+
+def nodes_for_error(nodes, error, target):
+    """Nodes needed to bring the estimated error down to ``target``.
+
+    A priori estimate of finite element theory: in energy norm the error falls
+    as h^p (p = 2 for quadratic elements) and in 3D the number of nodes grows
+    as h^-3, so error ~ N^(-p/3) and N_target = N (error / target)^(3/p). This
+    is the rate of uniform refinement on a smooth solution: refining only where
+    the error is high usually needs fewer nodes, so the estimate errs on the
+    safe (larger) side.
+    """
+    if error <= target or nodes <= 0 or target <= 0:
+        return nodes
+    return int(math.ceil(nodes * (error / target) ** (DIMENSION / ORDER)))

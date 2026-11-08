@@ -32,6 +32,12 @@ class SolverSample:
     seconds: float  # CalculiX wall time
     peak_mb: float  # CalculiX peak resident memory
 
+    @property
+    def measured(self) -> bool:
+        """False when the run was too short for the memory watchdog to sample it
+        (peak 0) or has no time: such a sample would break the fits."""
+        return self.nodes > 0 and self.seconds > 0 and self.peak_mb > 0
+
 
 @dataclass(frozen=True)
 class PowerLaw:
@@ -87,6 +93,8 @@ class SolverModel:
 def fit_coefficient(points, exponent) -> PowerLaw:
     """y = c * n^exponent with the exponent fixed by theory: c = geometric mean."""
     logs = [math.log(y) - exponent * math.log(n) for n, y in points if n > 0 and y > 0]
+    if not logs:
+        raise ValueError("no measured point to fit")
     return PowerLaw(math.exp(sum(logs) / len(logs)), exponent)
 
 
@@ -133,10 +141,16 @@ def prior_model(machine_time: "PowerLaw | None" = None) -> "SolverModel":
 REFERENCE = prior_model()  # kept for older callers: memory band, time unknown
 
 
+MIN_TIMING_NODES = 15000  # below this, CalculiX's start-up time dominates the run
+
+
 def speed_factor(samples) -> float:
     """This computer's solve time relative to the reference PC (1 = same speed,
     2 = twice as slow), from CalculiX trials: median ratio at the same node count."""
-    ratios = sorted(max(s.seconds, 0.05) / REFERENCE_TIME(s.nodes) for s in samples)
+    samples = [s for s in samples if s.seconds > 0]
+    # Small runs are dominated by start-up time: use them only when nothing larger exists.
+    large = [s for s in samples if s.nodes >= MIN_TIMING_NODES]
+    ratios = sorted(max(s.seconds, 0.05) / REFERENCE_TIME(s.nodes) for s in (large or samples))
     if not ratios:
         return 1.0
     mid = len(ratios) // 2

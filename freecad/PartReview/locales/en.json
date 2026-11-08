@@ -471,5 +471,12 @@
   "warn.yield_above_uts": "The limit entered ({limit}) is higher than the material card's tensile strength ({uts}): by that card, the material breaks before reaching the limit entered. Check the value; the tension safety factor uses the tensile strength.",
   "volume.none": "No part of the volume exceeds {pct} % of the material limit ({limit}): the whole part works with margin.",
   "exec.error_quick": "The estimated error of the analysis, in energy norm, is {eta} %. The standard and full reports show where the mesh limits accuracy the most.",
-  "assume.short_polymer": "Polymer material: the principal stress was also checked against the tensile strength (Rankine). If the part is 3D printed, it was treated as solid and the same in every direction; between layers the strength can be much lower. Polymers creep and soften when warm (PLA near 55–60 °C)."
+  "assume.short_polymer": "Polymer material: the principal stress was also checked against the tensile strength (Rankine). If the part is 3D printed, it was treated as solid and the same in every direction; between layers the strength can be much lower. Polymers creep and soften when warm (PLA near 55–60 °C).",
+  "mo.choose": "Part",
+  "mo.fc.title": "Targets on this computer",
+  "mo.fc.before": "Shown after the first solve, which measures the current mesh's error and the cost of solving this part.",
+  "mo.fc.reached": "{target} %: already reached.",
+  "mo.fc.fits": "{target} %: about {nodes} nodes, {memory} of memory, {time} per solve — fits this computer.",
+  "mo.fc.too_big": "{target} %: about {nodes} nodes, {memory} of memory — does not fit the free memory now ({free}). The optimiser gets as close as fits.",
+  "mo.fc.note": "Estimate from the theoretical convergence rate (error ∝ N^(−2/3) for quadratic elements); refining only where the error is high usually needs fewer nodes. Singularities can prevent any target."
 }

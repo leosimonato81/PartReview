@@ -38,7 +38,7 @@ def load(machine):
         if data.get("signature") != signature(machine):
             return [], ""
         samples = [SolverSample(int(n), float(s), float(m)) for n, s, m in data["samples"]]
-        return samples, data.get("date", "")
+        return [s for s in samples if s.measured], data.get("date", "")
     except FileNotFoundError:
         return [], ""
     except (OSError, ValueError, KeyError, TypeError) as err:
@@ -48,7 +48,7 @@ def load(machine):
 
 def save(machine, new_samples):
     old, _ = load(machine)
-    samples = (old + list(new_samples))[-KEEP:]
+    samples = (old + [s for s in new_samples if s.measured])[-KEEP:]  # unmeasured: no data
     data = {"signature": signature(machine), "date": time.strftime("%Y-%m-%d"),
             "samples": [[s.nodes, round(s.seconds, 3), round(s.peak_mb, 1)] for s in samples]}
     path = _file()

@@ -471,5 +471,12 @@
   "warn.yield_above_uts": "O limite informado ({limit}) é maior que a resistência à tração do material no cartão ({uts}): por esse cartão, o material rompe antes de chegar ao limite informado. Confira o valor; o fator de segurança à tração usa a resistência à tração.",
   "volume.none": "Nenhuma parte da peça passa de {pct} % do limite do material ({limit}): a peça inteira trabalha com folga.",
   "exec.error_quick": "O erro estimado da análise, em norma de energia, é de {eta} %. Os relatórios intermediário e completo mostram onde a malha mais limita a precisão.",
-  "assume.short_polymer": "Material polimérico: também foi verificada a tensão principal contra a resistência à tração (Rankine). Se a peça for impressa em 3D, ela foi tratada como maciça e igual em todas as direções; entre camadas a resistência pode ser bem menor. Polímeros sofrem fluência e amolecem com o calor (PLA perto de 55–60 °C)."
+  "assume.short_polymer": "Material polimérico: também foi verificada a tensão principal contra a resistência à tração (Rankine). Se a peça for impressa em 3D, ela foi tratada como maciça e igual em todas as direções; entre camadas a resistência pode ser bem menor. Polímeros sofrem fluência e amolecem com o calor (PLA perto de 55–60 °C).",
+  "mo.choose": "Peça",
+  "mo.fc.title": "Metas neste computador",
+  "mo.fc.before": "Aparece depois do primeiro cálculo, que mede o erro da malha atual e o custo do cálculo nesta peça.",
+  "mo.fc.reached": "{target} %: já atingida.",
+  "mo.fc.fits": "{target} %: cerca de {nodes} nós, {memory} de memória, {time} por cálculo — cabe neste computador.",
+  "mo.fc.too_big": "{target} %: cerca de {nodes} nós, {memory} de memória — não cabe na memória livre agora ({free}). O otimizador chega o mais perto que couber.",
+  "mo.fc.note": "Estimativa pela taxa teórica de convergência (erro ∝ N^(−2/3) em elementos quadráticos); o refino só onde o erro é alto costuma precisar de menos nós. Singularidades podem impedir qualquer meta."
 }

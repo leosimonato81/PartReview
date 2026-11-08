@@ -56,3 +56,12 @@ def test_stop_reasons():
 def test_group_by_size():
     groups = group_by_size({"Face10": 0.512, "Face2": 0.508, "Face3": 1.04})
     assert groups == {0.51: ["Face2", "Face10"], 1.0: ["Face3"]}
+
+
+def test_nodes_for_error_follows_the_a_priori_rate():
+    from freecad.PartReview.domain.adaptive import nodes_for_error
+    # error ~ N^(-2/3): halving the error needs 2^1.5 = 2.83x the nodes
+    assert nodes_for_error(10000, 0.10, 0.05) == 28285
+    assert nodes_for_error(10000, 0.04, 0.05) == 10000  # already there
+    assert nodes_for_error(67801, 0.0917, 0.02) == pytest.approx(67801 * (0.0917 / 0.02) ** 1.5,
+                                                                rel=1e-4)

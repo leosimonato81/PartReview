@@ -42,13 +42,14 @@ def part_model(samples, machine_time: PowerLaw | None = None) -> SolverModel:
 
     No probe yet: memory band from two measured shapes (machine-independent) and the
     time this computer showed on earlier parts, if any (``machine_time``)."""
-    useful = [s for s in samples if s.nodes >= PROBE_MIN_NODES]
+    measured = [s for s in samples if s.measured]  # a run too short to sample is no data
+    useful = [s for s in measured if s.nodes >= PROBE_MIN_NODES]
     if len(useful) >= 2:
         return fit_model(useful)
-    if samples:  # one point: theoretical exponents, coefficient through the point
-        s = max(samples, key=lambda x: x.nodes)
+    if measured:  # one point: theoretical exponents, coefficient through the largest
+        s = max(measured, key=lambda x: x.nodes)
         model = fit_model([s])
-        return SolverModel(model.memory, model.time, ONE_POINT_ERROR, tuple(samples), True)
+        return SolverModel(model.memory, model.time, ONE_POINT_ERROR, tuple(measured), True)
     return prior_model(machine_time)
 
 
