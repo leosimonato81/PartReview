@@ -110,26 +110,3 @@ def point_triangle_distance(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> float:
     v, w = vb * denom, vc * denom
     closest = add(a, add(scale(ab, v), scale(ac, w)))
     return distance(p, closest)
-
-
-def spread(points, count: int, min_distance: float) -> list[int]:
-    """Indices of up to ``count`` points spread evenly (farthest-point sampling).
-
-    Starts at the point nearest to the centroid, then repeatedly takes the point
-    farthest from those already chosen; stops early when that distance falls
-    below ``min_distance`` (a small face gets one arrow, a large one several).
-    """
-    points = list(points)
-    if not points or count < 1:
-        return []
-    c = centroid(points)
-    first = min(range(len(points)), key=lambda i: distance(points[i], c))
-    chosen = [first]
-    gap = [distance(p, points[first]) for p in points]
-    for _ in range(count - 1):  # ends: bounded by count
-        far = max(range(len(points)), key=gap.__getitem__)
-        if gap[far] < min_distance:
-            break
-        chosen.append(far)
-        gap = [min(d, distance(p, points[far])) for d, p in zip(gap, points)]
-    return chosen

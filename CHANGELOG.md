@@ -11,14 +11,14 @@ All notable changes to PartReview. / Mudanças importantes do PartReview.
   (singularities); every refined mesh is tried in a hidden document before it is
   applied; old results stay until the new solve succeeds. / Novo comando: refino
   adaptativo pelo erro, seguro e com explicação de por que parou.
-- **Report: supports and loads figure / Relatório: figura de apoios e cargas.**
-  Figure 1 shows the part in gray with the held regions in purple, the loaded
-  regions in orange and arrows along each force, without balloons (the caption
-  names each support and load with its value); a second view is added only for
-  supports or loads hidden in the first. Forces are drawn as a few thin
-  arrows spread over each loaded face. The figure is optional (a check box in
-  the report dialog, remembered) and never in the quick summary. Result images
-  keep only the result balloons, and the numbered points are results only.
+- **Report: supports and loads figure (beta) / Relatório: figura de apoios e
+  cargas (beta).** Optional, off by default (check box in the report dialog,
+  remembered; never in the quick summary): the part in gray with the held
+  regions painted purple and the loaded regions orange, colors only; the
+  caption names each support and load with its value. A second view is added
+  only for supports or loads hidden in the first. Result images keep only the
+  result balloons, and the numbered points are results only. / Opcional e
+  desmarcada por padrão: peça em cinza, apoios em roxo, cargas em laranja.
 - The report no longer prints its level ("Report level") on the cover or in
   the traceability table. / O relatório não mostra mais o "nível do relatório". / A figura 1 mostra a
   peça em cinza, apoios em roxo, cargas em laranja e setas na direção das

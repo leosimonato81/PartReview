@@ -409,10 +409,9 @@
   "mo.col.global": "Erro global",
   "fig.boundary": "Apoios e cargas: regiões presas em roxo, regiões carregadas em laranja",
   "fig.boundary_legend": "Condições de contorno",
-  "fig.boundary_arrows": "Setas: direção de cada força.",
   "fig.boundary_supports": "Em roxo (apoios): {items}.",
   "fig.boundary_loads": "Em laranja (cargas): {items}.",
   "ui.figures": "Figuras",
-  "ui.show_boundary": "Incluir figura de apoios e cargas",
-  "ui.show_boundary_tip": "Mostra a peça em cinza com os apoios em roxo e as cargas em laranja, para quem lê o relatório sem ter feito a análise. Não entra no Resumo rápido."
+  "ui.show_boundary": "Incluir figura de apoios e cargas (beta)",
+  "ui.show_boundary_tip": "Versão beta. Mostra a peça em cinza com os apoios pintados de roxo e as cargas de laranja, para quem lê o relatório sem ter feito a análise. Desmarcada por padrão; não entra no Resumo rápido."
 }

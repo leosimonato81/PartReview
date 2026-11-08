@@ -261,7 +261,7 @@ def _constraint_text(c, tr: Translator) -> str:
 
 def _boundary_figure(index, view: PlannedView, inputs: ReportInputs, numbers,
                      tr: Translator) -> Figure:
-    """Supports (purple) and loads (orange) on the gray part: colors and arrows only.
+    """Supports (purple) and loads (orange) on the gray part: colors only.
 
     No balloons (owner's request): the caption names what is visible in this view.
     """
@@ -279,8 +279,6 @@ def _boundary_figure(index, view: PlannedView, inputs: ReportInputs, numbers,
         parts.append(tr.t("fig.boundary_supports", items=tr.list_sep.join(supports)))
     if loads:
         parts.append(tr.t("fig.boundary_loads", items=tr.list_sep.join(loads)))
-    if any(t.kind is HotspotKind.LOAD for t in view.targets):
-        parts.append(tr.t("fig.boundary_arrows"))
     legend = Legend(title=tr.t("fig.boundary_legend"), ticks=(),
                     swatches=((SUPPORT_RGB, tr.t("summary.supports")),
                               (LOAD_RGB, tr.t("summary.loads"))))

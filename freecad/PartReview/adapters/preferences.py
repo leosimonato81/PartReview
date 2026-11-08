@@ -42,7 +42,7 @@ def last_report_fields():
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
         return (ReportTemplate.from_dict(data["fields"]), bool(data.get("csv")),
-                bool(data.get("html")), bool(data.get("boundary", True)))
+                bool(data.get("html")), bool(data.get("boundary", False)))
     except (OSError, ValueError, KeyError, TypeError) as err:
         App.Console.PrintWarning("PartReview: last report settings ignored (%s): %s\n"
                                  % (path, err))

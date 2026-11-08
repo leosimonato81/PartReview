@@ -246,11 +246,8 @@ def generate_fem_report(doc, config, progress=_no_progress):
                 vs.save_image(image_paths[len(boundary_views) + i], *IMAGE_SIZE)
             if boundary_views:  # last, because the mesh is hidden for them
                 vs.show_only([])
-                scene, show_arrows = boundary_scene.build(result, surface, radius)
-                vs.add_overlay(scene)
+                vs.add_overlay(boundary_scene.build(result, surface, radius))
                 for i, view in enumerate(boundary_views):
-                    # arrows of a load hidden in this view would float over the part
-                    show_arrows({t.label for t in view.targets})
                     progress(tr.t("progress.capture", n=len(shots) + i + 1, total=total),
                              0.4 + 0.5 * (len(shots) + i) / total)
                     vs.apply_camera(view.camera)

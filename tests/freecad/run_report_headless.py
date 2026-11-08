@@ -17,6 +17,7 @@
 #   PARTREVIEW_COMPANY / PARTREVIEW_LOGO / PARTREVIEW_AUTHOR optional cover data
 #   PARTREVIEW_ACCENT optional accent color "#rrggbb" (empty = default)
 #   PARTREVIEW_EXPORTS "csv,html" to also write those files
+#   PARTREVIEW_BOUNDARY "1" to include the supports-and-loads figure (beta, off by default)
 #   PARTREVIEW_RESULT  internal name of the result to use (default: the first)
 #   PARTREVIEW_EXIT  "1" to quit FreeCAD at the end
 #   e.g. flatpak run --env=QT_QPA_PLATFORM=offscreen --env=PARTREVIEW_EXIT=1 ... \
@@ -65,6 +66,7 @@ def main():
         author=os.environ.get("PARTREVIEW_AUTHOR", ""),
         export_csv="csv" in os.environ.get("PARTREVIEW_EXPORTS", ""),
         export_html="html" in os.environ.get("PARTREVIEW_EXPORTS", ""),
+        show_boundary=os.environ.get("PARTREVIEW_BOUNDARY") == "1",
     )
     modified_before = Gui.getDocument(doc.Name).Modified
     vis_before = {o.Name: o.ViewObject.Visibility for o in doc.Objects if o.ViewObject}

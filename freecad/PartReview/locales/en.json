@@ -409,10 +409,9 @@
   "mo.col.global": "Global error",
   "fig.boundary": "Supports and loads: held regions in purple, loaded regions in orange",
   "fig.boundary_legend": "Boundary conditions",
-  "fig.boundary_arrows": "Arrows: direction of each force.",
   "fig.boundary_supports": "In purple (supports): {items}.",
   "fig.boundary_loads": "In orange (loads): {items}.",
   "ui.figures": "Figures",
-  "ui.show_boundary": "Include supports and loads figure",
-  "ui.show_boundary_tip": "Shows the part in gray with supports in purple and loads in orange, for readers who did not run the analysis. Not in the Quick summary."
+  "ui.show_boundary": "Include supports and loads figure (beta)",
+  "ui.show_boundary_tip": "Beta. Shows the part in gray with supports painted purple and loads orange, for readers who did not run the analysis. Off by default; not in the Quick summary."
 }
