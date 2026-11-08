@@ -51,9 +51,10 @@ OWNER = [SolverSample(56445, 10.5, 1029.0), SolverSample(95129, 27.6, 2082.0)]
 
 def test_part_model_from_probes():
     model = part_model(OWNER)
-    assert model.measured and model.memory_mb(56445) == pytest.approx(1029, rel=1e-6)
-    one = part_model(OWNER[:1])  # one point: reference exponent through it
-    assert one.memory_mb(56445) == pytest.approx(1029, rel=1e-6) and one.error == 0.4
+    assert model.measured and model.memory_mb(56445) == pytest.approx(1029, rel=0.01)
+    one = part_model(OWNER[:1])  # one point: theoretical exponents through it
+    assert one.memory_mb(56445) == pytest.approx(1029, rel=1e-6) and one.error == 0.25
+    assert one.memory.exponent == pytest.approx(4 / 3)
     prior = part_model([])
     assert not prior.measured and not prior.time_known  # time unknown before measuring
     assert prior.memory_low(56445) < 1100 < prior.memory_mb(56445)  # band, safe side up

@@ -2,17 +2,25 @@
 # SPDX-FileCopyrightText: 2026 Leonardo Simonato
 """How much memory and time CalculiX needs on THIS computer (pure, no Qt).
 
-Peak memory and solve time of the direct solver grow as power laws of the node
-count, y = a * n^b (b > 1: they grow faster than the mesh). The law is fitted in
-log-log by least squares to measured runs: the reference PC of spike 8.0 until the
-user measures their own computer with the benchmark. The relative error of the
-law on its own samples is kept and used as a safety margin: a precise model
-allows a mesh closer to the limit, an uncertain one keeps more margin.
+Theory (sparse direct solvers with nested-dissection ordering, as SPOOLES uses;
+A. George, "Nested dissection of a regular finite element mesh", SIAM J. Numer.
+Anal. 10, 1973; Lipton, Rose & Tarjan 1979): for 3D meshes the factor fill, hence
+the MEMORY, grows as n^(4/3) and the factorisation WORK as n^2 (n = unknowns,
+proportional to nodes). Measured here: memory exponents 1.35, 1.35, 1.39 on three
+different shapes (theory 1.33); time exponents 1.45-2.27 (small meshes are
+dominated by fixed costs and threads).
+
+So the memory law keeps the theoretical exponent and only its coefficient (which
+depends on the part's shape) is measured: ONE trial is enough. The time exponent
+is fitted but kept within [4/3, 2]. The relative error of the law on its samples
+is the safety margin: a precise model allows a mesh closer to the limit.
 """
 
 import math
 from dataclasses import dataclass
 
+MEMORY_EXPONENT = 4.0 / 3.0  # nested dissection, 3D (George 1973)
+TIME_EXPONENT_MIN, TIME_EXPONENT_MAX = 4.0 / 3.0, 2.0
 MIN_ERROR = 0.15  # never trust a model more than +-15 %
 TWO_POINT_ERROR = 0.30  # a law through 2 points has no residual to measure
 REFERENCE_ERROR = 0.50  # reference PC model applied to an unmeasured computer
@@ -76,10 +84,20 @@ class SolverModel:
         return min(limits) if limits else 0
 
 
+def fit_coefficient(points, exponent) -> PowerLaw:
+    """y = c * n^exponent with the exponent fixed by theory: c = geometric mean."""
+    logs = [math.log(y) - exponent * math.log(n) for n, y in points if n > 0 and y > 0]
+    return PowerLaw(math.exp(sum(logs) / len(logs)), exponent)
+
+
 def fit_model(samples, measured=True) -> SolverModel:
     samples = tuple(sorted(samples, key=lambda s: s.nodes))
-    memory = fit_power_law([(s.nodes, s.peak_mb) for s in samples])
-    time = fit_power_law([(s.nodes, max(s.seconds, 0.05)) for s in samples])
+    memory = fit_coefficient([(s.nodes, s.peak_mb) for s in samples], MEMORY_EXPONENT)
+    time_points = [(s.nodes, max(s.seconds, 0.05)) for s in samples]
+    exponent = fit_power_law(time_points).exponent if len({s.nodes for s in samples}) > 1 \
+        else TIME_EXPONENT_MAX
+    exponent = min(TIME_EXPONENT_MAX, max(TIME_EXPONENT_MIN, exponent))
+    time = fit_coefficient(time_points, exponent)
     if len(samples) < 3:
         error = TWO_POINT_ERROR
     else:
@@ -97,8 +115,8 @@ def fit_model(samples, measured=True) -> SolverModel:
 # Solve TIME depends on the computer: it is never predicted from another machine.
 THIN_SAMPLES = (SolverSample(56445, 10.5, 1029.0), SolverSample(95129, 27.6, 2082.0))
 COMPACT_SAMPLES = (SolverSample(32075, 14.8, 1284.0), SolverSample(53626, 47.6, 2570.0))
-MEMORY_LOW = fit_power_law([(s.nodes, s.peak_mb) for s in THIN_SAMPLES])
-MEMORY_HIGH = fit_power_law([(s.nodes, s.peak_mb) for s in COMPACT_SAMPLES])
+MEMORY_LOW = fit_coefficient([(s.nodes, s.peak_mb) for s in THIN_SAMPLES], MEMORY_EXPONENT)
+MEMORY_HIGH = fit_coefficient([(s.nodes, s.peak_mb) for s in COMPACT_SAMPLES], MEMORY_EXPONENT)
 # Time law of the reference PC: only its exponent (how time grows with the mesh) is
 # reused; its scale is replaced by this computer's measurements.
 REFERENCE_TIME = fit_power_law([(s.nodes, s.seconds) for s in THIN_SAMPLES])

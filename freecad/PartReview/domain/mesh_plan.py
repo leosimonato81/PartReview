@@ -20,7 +20,10 @@ PROBE_MIN_NODES = 15000  # below this the solver's fixed memory dominates the fi
 PROBE_MAX_SECONDS = 60.0  # a probe may be predicted up to 60 s (with margin)
 PROBE_MEMORY_SHARE = 0.6  # ... and up to 60 % of the free memory (watchdog kills at 65 %)
 GMSH_MAX_NODES = 3_000_000  # never ask Gmsh for more (it would take minutes and GBs)
-ONE_POINT_ERROR = 0.4  # reference law rescaled through a single measured point
+# One trial + theoretical exponents. Checked on every measured run of the project:
+# the 4/3 law through the SMALLEST trial predicted the larger runs 1-23 % too low
+# (never too high), so one trial needs a 25 % margin; the largest trial is used.
+ONE_POINT_ERROR = 0.25
 
 
 class Objective(Enum):
@@ -42,12 +45,10 @@ def part_model(samples, machine_time: PowerLaw | None = None) -> SolverModel:
     useful = [s for s in samples if s.nodes >= PROBE_MIN_NODES]
     if len(useful) >= 2:
         return fit_model(useful)
-    if samples:  # one point: keep the known exponents, rescale through the point
+    if samples:  # one point: theoretical exponents, coefficient through the point
         s = max(samples, key=lambda x: x.nodes)
-        memory = PowerLaw(s.peak_mb / s.nodes ** MEMORY_HIGH.exponent, MEMORY_HIGH.exponent)
-        time = PowerLaw(max(s.seconds, 0.05) / s.nodes ** REFERENCE_TIME.exponent,
-                        REFERENCE_TIME.exponent)
-        return SolverModel(memory, time, ONE_POINT_ERROR, tuple(samples), True)
+        model = fit_model([s])
+        return SolverModel(model.memory, model.time, ONE_POINT_ERROR, tuple(samples), True)
     return prior_model(machine_time)
 
 

@@ -20,8 +20,10 @@ def test_power_law_fit_is_exact_on_a_power_law():
 
 def test_prior_memory_band_covers_both_measured_shapes():
     from freecad.PartReview.domain.solver_model import MEMORY_HIGH, MEMORY_LOW
-    assert MEMORY_LOW(56445) == pytest.approx(1029, rel=1e-6)  # thin-walled part
-    assert MEMORY_HIGH(53626) == pytest.approx(2570, rel=1e-6)  # compact block
+    # theoretical exponent 4/3: the two measured points of each shape within 1 %
+    assert MEMORY_LOW(56445) == pytest.approx(1029, rel=0.01)  # thin-walled part
+    assert MEMORY_HIGH(53626) == pytest.approx(2570, rel=0.01)  # compact block
+    assert MEMORY_LOW.exponent == MEMORY_HIGH.exponent == pytest.approx(4 / 3)
     assert MEMORY_LOW(183059) > 4500  # the run that froze the PC is too big anyway
     assert not REFERENCE.measured and not REFERENCE.time_known and REFERENCE.error == 0.5
 
