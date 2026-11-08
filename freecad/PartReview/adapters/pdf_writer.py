@@ -31,6 +31,7 @@ from ..domain import colormap
 from ..domain.colors import accent_palette
 from ..domain.logo import COMPACT_COVER_BOX_MM, FULL_COVER_BOX_MM
 from ..domain.blocks import BarChart, BulletList, Figure, Heading, Notice, Paragraph, Table
+from ..domain.balloons import place_balloon
 from .logo_loader import load_logo
 
 DPI = 300
@@ -138,36 +139,41 @@ def _line_op(x1, y1, x2, y2, color, width_mm):
     return op
 
 
-# Where a balloon may sit relative to its tip, in balloon radii: up-right first (the
-# usual reading direction), then the other diagonals, then farther away.
-_BALLOON_OFFSETS = ((3, -3), (-3, -3), (3, 3), (-3, 3), (5.5, -1), (-5.5, -1), (5, -5), (-5, -5),
-                    (0, -5.5), (0, 5.5), (7, -4), (-7, -4))
+# Balloon colors outside the result color map (blue-cyan-green-yellow-red):
+# results black (white balloon), loads dark orange and supports purple (filled
+# balloons, white number). Tips are white with a colored border, so they stand out
+# on any color of the map: round for results and loads, square for supports.
+MARKER_COLORS = {"result": QColor(20, 20, 20), "load": QColor(230, 81, 0),
+                 "support": QColor(106, 27, 154)}
+_DRAW_ORDER = {"result": 0, "load": 1, "support": 2}
 
 
-def balloon_position(u, v, radius, width, height, placed):
-    """Balloon center near the tip (u, v), inside the image, not overlapping ``placed``."""
-    def inside(x, y):
-        return min(max(x, radius), width - radius), min(max(y, radius), height - radius)
+def _background_test(image):
+    """is_background(x, y) for a capture made on a white background."""
+    width, height = image.width(), image.height()
 
-    best = None
-    for dx, dy in _BALLOON_OFFSETS:
-        x, y = inside(u + dx * radius, v + dy * radius)
-        gap = min((((x - px) ** 2 + (y - py) ** 2) ** 0.5 for px, py in placed),
-                  default=float("inf"))
-        if gap >= 2.4 * radius:
-            return x, y
-        if best is None or gap > best[0]:
-            best = (gap, x, y)
-    return best[1], best[2]  # crowded image: the least overlapping position
+    def is_background(x, y):
+        xi, yi = int(x), int(y)
+        if not (0 <= xi < width and 0 <= yi < height):
+            return False
+        c = image.pixel(xi, yi)
+        return min((c >> 16) & 255, (c >> 8) & 255, c & 255) >= 235
+
+    return is_background
 
 
-# Balloon colors: results black, loads orange, supports blue (with a square tip).
-MARKER_COLORS = {"result": QColor(20, 20, 20), "load": QColor(214, 96, 0),
-                 "support": QColor(25, 95, 170)}
+def _part_center(image, is_background, step=8):
+    xs = ys = n = 0
+    for y in range(0, image.height(), step):
+        for x in range(0, image.width(), step):
+            if not is_background(x, y):
+                xs, ys, n = xs + x, ys + y, n + 1
+    return (xs / n, ys / n) if n else None
 
 
 def draw_markers(image, markers):
-    """Numbered markers on a copy of the captured image, pointing at the spot."""
+    """Numbered balloons on a copy of the captured image: one balloon per visible
+    face/edge (same number), placed on the background next to its tip."""
     out = image.copy()
     p = QPainter(out)
     p.setRenderHint(QPainter.Antialiasing)
@@ -176,31 +182,44 @@ def draw_markers(image, markers):
     font.setPixelSize(int(radius * 1.1))
     font.setBold(True)
     p.setFont(font)
+    is_background = _background_test(image)
+    center_of_part = _part_center(image, is_background)
+    callouts = []  # (style, number, tip, balloon center)
     placed = []
-    for m in markers:
-        color = MARKER_COLORS.get(m.style, MARKER_COLORS["result"])
-        cx, cy = balloon_position(m.u, m.v, radius, image.width(), image.height(), placed)
-        placed.append((cx, cy))
-        center = QPointF(cx, cy)
-        for u, v in ((m.u, m.v),) + tuple(m.more):  # one leader per visible face/edge
-            target = QPointF(u, v)
-            p.setPen(QPen(QColor(255, 255, 255), radius / 6 + 3))  # white halo: readable
-            p.drawLine(target, center)                              # on any color map
-            p.setPen(QPen(color, radius / 6))
-            p.drawLine(target, center)
+    for m in sorted(markers, key=lambda m: _DRAW_ORDER.get(m.style, 0)):
+        for tip in ((m.u, m.v),) + tuple(m.more):
+            c = place_balloon(tip, radius, (image.width(), image.height()), is_background,
+                              placed, center_of_part)
+            placed.append(c)
+            callouts.append((m.style, m.number, tip, c))
+    for style, number, (u, v), (cx, cy) in callouts:  # leaders first, balloons on top
+        color = MARKER_COLORS.get(style, MARKER_COLORS["result"])
+        target, center = QPointF(u, v), QPointF(cx, cy)
+        p.setPen(QPen(QColor(255, 255, 255), radius / 6 + 3))  # white halo: readable
+        p.drawLine(target, center)                              # on any color map
+        p.setPen(QPen(color, radius / 6))
+        p.drawLine(target, center)
+        if style == "result":
+            p.setPen(QPen(QColor(255, 255, 255), 2))
             p.setBrush(color)
-            p.setPen(QPen(QColor(255, 255, 255), 1.5))
-            if m.style == "support":  # square tip: support
-                s = radius / 3.2
+            p.drawEllipse(target, radius / 3.4, radius / 3.4)
+        else:
+            p.setPen(QPen(color, radius / 5))
+            p.setBrush(QColor(255, 255, 255))
+            if style == "support":
+                s = radius / 3.0
                 p.drawRect(QRectF(u - s, v - s, 2 * s, 2 * s))
-            else:  # round tip: result or load
-                p.drawEllipse(target, radius / 3.6, radius / 3.6)
+            else:
+                p.drawEllipse(target, radius / 3.0, radius / 3.0)
+    for style, number, _, (cx, cy) in callouts:
+        color = MARKER_COLORS.get(style, MARKER_COLORS["result"])
+        filled = style != "result"
         p.setPen(QPen(color, radius / 5))
-        p.setBrush(QColor(255, 255, 255))
-        p.drawEllipse(center, radius, radius)
-        p.setPen(color)
+        p.setBrush(color if filled else QColor(255, 255, 255))
+        p.drawEllipse(QPointF(cx, cy), radius, radius)
+        p.setPen(QColor(255, 255, 255) if filled else color)
         p.drawText(QRectF(cx - radius, cy - radius, 2 * radius, 2 * radius),
-                   int(Qt.AlignCenter), str(m.number))
+                   int(Qt.AlignCenter), str(number))
     p.end()
     return out
 

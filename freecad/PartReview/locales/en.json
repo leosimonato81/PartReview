@@ -357,5 +357,5 @@
   "ma.group.numbers": "Show all the numbers",
   "ma.card.nodes": "{nodes}k nodes",
   "ma.card.not_tested": "not tried",
-  "fig.marker_colors": "Balloon colors: black = result; orange (round tip) = load; blue (square tip) = support; one line per visible face or edge."
+  "fig.marker_colors": "Balloons: black = result; orange (round tip) = load; purple (square tip) = support. A load or support on several faces or edges repeats its number, one balloon per visible one."
 }

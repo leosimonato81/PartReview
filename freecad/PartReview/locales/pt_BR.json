@@ -357,5 +357,5 @@
   "ma.group.numbers": "Ver todos os números",
   "ma.card.nodes": "{nodes} mil nós",
   "ma.card.not_tested": "não testada",
-  "fig.marker_colors": "Cores dos balões: preto = resultado; laranja (ponta redonda) = carga; azul (ponta quadrada) = apoio; uma linha para cada face ou aresta visível."
+  "fig.marker_colors": "Balões: preto = resultado; laranja (ponta redonda) = carga; roxo (ponta quadrada) = apoio. Carga ou apoio em várias faces ou arestas repete o número, um balão para cada uma visível."
 }
