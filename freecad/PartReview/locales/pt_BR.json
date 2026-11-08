@@ -342,5 +342,6 @@
   "ma.status.big_for_gmsh": "não testada (grande demais)",
   "mesh.reason.objective": "{size}: tamanho calculado para o objetivo escolhido.",
   "ma.limit.memory": "Neste computador quem limita é a memória livre, não o tempo: por isso objetivos de tempo maiores podem dar a mesma malha. Fechar outros programas libera memória para uma malha mais fina.",
-  "ma.limit.time": "Aqui quem limita é o tempo escolhido; há memória sobrando."
+  "ma.limit.time": "Aqui quem limita é o tempo escolhido; há memória sobrando.",
+  "warn.line_constraint": "{label} atua em arestas ou vértices (uma linha ou um ponto). Na teoria da elasticidade, apoio ou carga numa linha ou num ponto concentra a força numa área nula: a tensão ali é infinita, e o valor calculado cresce sempre que a malha é refinada, sem convergir. Para tensões confiáveis perto dele, aplique-o na face onde a peça realmente se apoia (por exemplo, a face cilíndrica de um furo de parafuso)."
 }

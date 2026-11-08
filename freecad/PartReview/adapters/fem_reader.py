@@ -212,11 +212,31 @@ def container_placement(target):
     return target.getGlobalPlacement().multiply(target.Placement.inverse())
 
 
+def _reference_lines_points(obj):
+    """Discretised CAD edges and vertices of a constraint, global coordinates (mm)."""
+    lines, points = [], []
+    for target, subs in getattr(obj, "References", []) or []:
+        shape = getattr(target, "Shape", None)
+        if shape is None:
+            continue
+        outer = container_placement(target)
+        for sub in subs or ():
+            if sub.startswith("Edge"):
+                edge = shape.getElement(sub).copy()
+                pts = [outer.multVec(p) for p in edge.discretize(
+                    Deflection=max(0.005, 0.002 * edge.Length))]
+                lines += [(Vec3(a.x, a.y, a.z), Vec3(b.x, b.y, b.z)) for a, b in zip(pts, pts[1:])]
+            elif sub.startswith("Vertex"):
+                p = outer.multVec(shape.getElement(sub).Point)
+                points.append(Vec3(p.x, p.y, p.z))
+    return tuple(lines), tuple(points)
+
+
 def _reference_triangles(obj):
     """Tessellated CAD faces of a constraint, in global coordinates (mm).
 
     Uses the CAD face instead of FemMesh.getNodesByFace, which took ~21 s for
-    one large face of a.FCStd. Non-face references (edges, vertices) are skipped.
+    one large face of a.FCStd. Edges and vertices: see _reference_lines_points.
     """
     triangles = []
     for target, subs in getattr(obj, "References", []) or []:
@@ -252,8 +272,10 @@ def read_constraints(analysis, unit_system):
             direction = Vec3(d.x, d.y, d.z)
         elif kind is ConstraintKind.PRESSURE:
             magnitude = to_report_units(obj.Pressure, unit_system)
+        lines, points = _reference_lines_points(obj)
         constraints.append(Constraint(kind, obj.Label, _references(obj), magnitude, direction,
-                                      geometry=_reference_triangles(obj)))
+                                      geometry=_reference_triangles(obj), lines=lines,
+                                      points=points))
     return tuple(constraints)
 
 

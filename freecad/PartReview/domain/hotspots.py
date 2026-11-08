@@ -205,8 +205,10 @@ def constraint_hotspot(constraint: Constraint) -> Hotspot | None:
 
 
 def distance_to_constraint(point: Vec3, constraint: Constraint) -> float:
-    return min((g.point_triangle_distance(point, *tri) for tri in constraint.geometry),
-               default=float("inf"))
+    """Distance to the faces, edges or vertices the constraint acts on."""
+    return min([g.point_triangle_distance(point, *tri) for tri in constraint.geometry]
+               + [g.point_segment_distance(point, *seg) for seg in constraint.lines]
+               + [g.distance(point, v) for v in constraint.points], default=float("inf"))
 
 
 def drop_redundant(hotspots) -> list[Hotspot]:

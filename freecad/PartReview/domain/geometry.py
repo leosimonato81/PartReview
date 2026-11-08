@@ -70,6 +70,16 @@ def fibonacci_sphere(count: int) -> list[Vec3]:
     return points
 
 
+def point_segment_distance(p: Vec3, a: Vec3, b: Vec3) -> float:
+    """Exact distance from point ``p`` to segment ``ab``."""
+    ab = sub(b, a)
+    length2 = dot(ab, ab)
+    if length2 == 0:
+        return distance(p, a)
+    t = max(0.0, min(1.0, dot(sub(p, a), ab) / length2))
+    return distance(p, add(a, scale(ab, t)))
+
+
 def point_triangle_distance(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> float:
     """Exact distance from point ``p`` to triangle ``abc`` (Ericson, RTCD 5.1.5)."""
     ab, ac, ap = sub(b, a), sub(c, a), sub(p, a)

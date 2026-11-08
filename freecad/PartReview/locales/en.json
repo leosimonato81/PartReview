@@ -342,5 +342,6 @@
   "ma.status.big_for_gmsh": "not tried (too big)",
   "mesh.reason.objective": "{size}: size computed for the chosen objective.",
   "ma.limit.memory": "On this computer the limit is the free memory, not the time: that is why larger time objectives can give the same mesh. Closing other programs frees memory for a finer mesh.",
-  "ma.limit.time": "Here the limit is the chosen time; there is memory to spare."
+  "ma.limit.time": "Here the limit is the chosen time; there is memory to spare.",
+  "warn.line_constraint": "{label} acts on edges or vertices (a line or a point). In elasticity theory a support or load on a line or point concentrates the force on a zero area: the stress there is infinite, and the computed value grows every time the mesh is refined, without converging. For reliable stresses near it, apply it to the face the part actually rests on (for example, the cylindrical face of a bolt hole)."
 }

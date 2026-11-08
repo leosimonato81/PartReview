@@ -288,6 +288,9 @@ def _section_points(ctx: FemContext, tr: Translator, level) -> list:
         return []
     blocks = [Paragraph(tr.t("points.intro")),
               _points(hotspots, tr, ctx.inputs.result.mesh.length_unit, ctx.figures)]
+    for c in ctx.inputs.result.constraints:
+        if c.on_edges_or_vertices and c.kind in (ConstraintKind.FIXED, ConstraintKind.FORCE):
+            blocks.append(Notice(tr.t("warn.line_constraint", label=c.label)))
     for n, spot in enumerate(hotspots, start=1):
         if spot.singularity_near:
             blocks.append(Notice(tr.t("warn.singularity", n=n, label=spot.singularity_near)))
@@ -318,6 +321,7 @@ def _where(ctx: FemContext, tr: Translator, spot: Hotspot | None) -> str:
 def _alerts(ctx: FemContext) -> int:
     inputs = ctx.inputs
     count = sum(1 for h in inputs.hotspots if h.singularity_near)
+    count += sum(1 for c in inputs.result.constraints if c.on_edges_or_vertices)
     if ctx.fs is not None and ctx.fs < 1.0:
         count += 1
     if inputs.equilibrium is not None and inputs.equilibrium.status is EquilibriumStatus.IMBALANCE:

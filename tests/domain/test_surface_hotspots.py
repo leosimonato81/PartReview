@@ -145,3 +145,19 @@ def test_constraint_hotspot_and_singularity():
     marked = mark_singularities(spots, [fixed, load], tolerance=0.5)
     assert marked[0].singularity_near == "Força"  # peak at x=6 sits on the load face
     assert marked[1].singularity_near == "Fixo"
+
+
+def test_stress_on_an_edge_support_is_flagged_as_singular():
+    from freecad.PartReview.domain.geometry import point_segment_distance
+    from freecad.PartReview.domain.hotspots import distance_to_constraint
+    from freecad.PartReview.domain.models import Constraint, ConstraintKind, Vec3
+    assert point_segment_distance(Vec3(1, 1, 0), Vec3(0, 0, 0), Vec3(2, 0, 0)) == 1.0
+    assert point_segment_distance(Vec3(5, 0, 0), Vec3(0, 0, 0), Vec3(2, 0, 0)) == 3.0
+    edge = Constraint(ConstraintKind.FIXED, "ConstraintFixed", ("Shroud 001:Edge23",),
+                      lines=((Vec3(21, 6.9, 14), Vec3(21, 8, 14)),))
+    assert edge.on_edges_or_vertices
+    assert distance_to_constraint(Vec3(21.0, 6.9, 14.0), edge) == 0.0  # owner's max stress
+    face = Constraint(ConstraintKind.FIXED, "F", ("P:Face2",))
+    assert not face.on_edges_or_vertices
+    point = Constraint(ConstraintKind.FORCE, "P", ("P:Vertex3",), points=(Vec3(0, 0, 0),))
+    assert distance_to_constraint(Vec3(3, 4, 0), point) == 5.0

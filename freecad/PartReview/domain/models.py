@@ -112,6 +112,14 @@ class Constraint:
     direction: Vec3 | None = None
     # Tessellated CAD faces the constraint acts on (mesh length unit).
     geometry: tuple[tuple[Vec3, Vec3, Vec3], ...] = field(default=(), repr=False)
+    # Discretised CAD edges and vertices it acts on: line/point supports and loads.
+    lines: tuple[tuple[Vec3, Vec3], ...] = field(default=(), repr=False)
+    points: tuple[Vec3, ...] = field(default=(), repr=False)
+
+    @property
+    def on_edges_or_vertices(self) -> bool:
+        """Acts on a line or a point: theoretically infinite stress there."""
+        return any(":Edge" in r or ":Vertex" in r for r in self.references)
 
 
 @dataclass(frozen=True)
