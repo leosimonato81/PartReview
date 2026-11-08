@@ -92,3 +92,16 @@ def test_load_on_supports_is_explained_in_the_report():
                        Translator("en", strict=True))
     text = "\n".join(v for b in quality_blocks(doc) if isinstance(b, Table) for _, v in b.rows)
     assert "also fixed" not in text
+
+
+def test_convergence_study_from_the_optimiser():
+    from freecad.PartReview.domain.quality import ConvergencePass
+    inputs = with_quality(ReportLevel.FULL)
+    inputs.convergence = [ConvergencePass(5000, 0.09, 0.19, 0.40, 1.00e-4),
+                          ConvergencePass(8000, 0.076, 0.17, 0.41, 1.02e-4)]
+    blocks = quality_blocks(build_report(inputs, Translator("pt_BR", strict=True)))
+    table = next(b for b in blocks if isinstance(b, Table) and b.header
+                 and b.header[0] == "Rodada")
+    assert [r[1] for r in table.rows] == ["5 000", "8 000"]
+    note = next(b for b in blocks if isinstance(b, Notice) and "duas últimas" in b.text)
+    assert "2,4 %" in note.text and "estáveis" in note.text  # 0.01/0.41, 0.02/1.02

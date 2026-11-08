@@ -289,6 +289,9 @@ class MeshOptimizerPanel:
                                    time.monotonic() - self.pass_started, job.peak_mb,
                                    global_error=info["error"]))
         self._add_row(self.passes[-1])
+        self.doc.openTransaction("PartReview: optimise mesh")  # undoable, like the regions
+        optimizer.save_history(self.mesh, self.passes)
+        self.doc.commitTransaction()
         target = self.target_box.currentData()
         reason = ad.stop_reason(self.passes, target)
         if reason:

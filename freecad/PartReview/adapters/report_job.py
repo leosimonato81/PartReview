@@ -43,7 +43,7 @@ from ..domain.exporters import nodal_csv
 from ..domain.report import ReportInputs, build_report, order_hotspots, views_for_level
 from ..domain.surface import build_surface, reentrant_edges
 from ..domain.units import Quantity
-from . import boundary_scene, fem_reader, trace_reader
+from . import boundary_scene, fem_reader, optimizer, trace_reader
 from .error_estimator import estimate
 from .html_writer import write_html
 from .logo_loader import inspect_logo
@@ -326,6 +326,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
             equilibrium=equilibrium, mesh_quality=quality, error_estimate=zz,
             error_field=error_field, error_view=error_view, boundary_views=boundary_views,
             reactions=_reactions(analysis, result),
+            convergence=optimizer.read_history(analysis, result.mesh.node_count),
             regular_exclusion=(Quantity(exclusion, result.mesh.length_unit)
                                if exclusion and any(s.kind is HotspotKind.STRESS_REGULAR
                                                     for s in spots) else None),

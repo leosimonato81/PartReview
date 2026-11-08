@@ -182,6 +182,24 @@ class ErrorEstimate:
     reason_key: str = ""
 
 
+@dataclass(frozen=True)
+class ConvergencePass:
+    """One solve of "Optimise mesh by the error" (stored on the mesh)."""
+
+    nodes: int
+    error: float  # estimated error away from supports, 0..1
+    global_error: float  # whole part, 0..1
+    max_stress_regular: float  # MPa, away from supports and singular faces
+    max_displacement: float  # mm
+
+
+def relative_change(old: float, new: float) -> float | None:
+    """|new - old| / |new|, or None when undefined."""
+    if new == 0:
+        return None
+    return abs(new - old) / abs(new)
+
+
 STRESS_FRACTIONS = (0.5, 0.8, 1.0)
 
 

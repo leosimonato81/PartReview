@@ -41,7 +41,7 @@ from .models import (
 )
 from .hotspots import HotspotKind
 from .quality import (EquilibriumCheck, EquilibriumStatus, ErrorEstimate, MeshQuality,
-                      volume_above)
+                      relative_change, volume_above)
 from .colors import LOAD_RGB, SUPPORT_RGB
 from .templates import accent_rgb
 from .trace import Traceability
@@ -81,6 +81,8 @@ class ReportInputs:
     regular_exclusion: Quantity | None = None
     # Reaction force of each support from CalculiX: [(support label, Vec3 in N)].
     reactions: list = field(default_factory=list)
+    # Passes of "Optimise mesh by the error" that produced this mesh (quality.ConvergencePass).
+    convergence: list = field(default_factory=list)
     trace: Traceability | None = None  # step e
 
     def field(self, kind: FieldKind) -> ResultField | None:
@@ -766,6 +768,8 @@ def _section_quality(ctx: FemContext, tr: Translator, level) -> list:
         blocks.append(Paragraph(tr.t("quality.zz_explain")))
         if inputs.error_view is not None and inputs.error_field is not None:
             blocks.append(_error_figure(ctx, tr))
+    if inputs.convergence and detailed:
+        blocks += _convergence(inputs.convergence, tr)
     if q is not None and level is ReportLevel.FULL:
         labels = tuple("%s–%s" % (tr.number(i / 10, 1), tr.number((i + 1) / 10, 1))
                        for i in range(10))
@@ -774,6 +778,36 @@ def _section_quality(ctx: FemContext, tr: Translator, level) -> list:
                                caption=tr.t("quality.histogram_caption"),
                                x_title=tr.t("quality.histogram_x"),
                                y_title=tr.t("quality.histogram_y")))
+    return blocks
+
+
+CONVERGED_CHANGE = 0.05  # practical rule: < 5 % change between the last two meshes
+
+
+def _convergence(passes, tr: Translator) -> list:
+    """Mesh convergence study recorded by the optimiser: each mesh, its error and
+    results, and how much the results changed between the last two meshes."""
+    rows = tuple((str(i), tr.integer(p.nodes), tr.number(100 * p.error, 3) + " %",
+                  tr.number(100 * p.global_error, 3) + " %",
+                  tr.quantity(Quantity(p.max_stress_regular, "MPa"), 3),
+                  tr.quantity(Quantity(p.max_displacement, "mm"), 3))
+                 for i, p in enumerate(passes))
+    header = (tr.t("conv.pass"), tr.t("conv.nodes"), tr.t("conv.error"),
+              tr.t("conv.global_error"), tr.t("conv.stress"), tr.t("conv.displacement"))
+    blocks = [Paragraph(tr.t("conv.intro")),
+              Table(header=header, rows=rows, widths=(0.1, 0.15, 0.17, 0.15, 0.22, 0.21))]
+    if len(passes) >= 2:
+        a, b = passes[-2], passes[-1]
+        ds = relative_change(a.max_stress_regular, b.max_stress_regular)
+        dd = relative_change(a.max_displacement, b.max_displacement)
+        if ds is not None and dd is not None:
+            converged = max(ds, dd) < CONVERGED_CHANGE
+            blocks.append(Notice(tr.t("conv.converged" if converged else "conv.not_converged",
+                                      stress=tr.number(100 * ds, 2),
+                                      disp=tr.number(100 * dd, 2)),
+                                 level="info" if converged else "warning"))
+    else:
+        blocks.append(Notice(tr.t("conv.single"), level="info"))
     return blocks
 
 

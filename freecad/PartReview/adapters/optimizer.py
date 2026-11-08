@@ -223,3 +223,41 @@ def error_by_element(analysis, mesh_obj, singular, stress_excluded=()):
             "max_stress_regular": max(regular) if regular else 0.0,
             "max_displacement": max(result.DisplacementLengths) if result.DisplacementLengths
             else 0.0}
+
+
+HISTORY = "PartReviewConvergence"  # JSON list of passes, on the optimised mesh
+
+
+def save_history(mesh_obj, passes):
+    """Store the passes on the mesh (caller holds an undoable transaction), so the
+    report can show the convergence study of the mesh that made the results."""
+    import json
+    if not hasattr(mesh_obj, HISTORY):
+        mesh_obj.addProperty("App::PropertyString", HISTORY, "PartReview",
+                             "Convergence study of 'Optimise mesh by the error'")
+        mesh_obj.setPropertyStatus(HISTORY, ["ReadOnly"])
+    rows = [{"nodes": p.nodes, "error": p.error, "global_error": p.global_error,
+             "max_stress_regular": p.max_stress_regular,
+             "max_displacement": p.max_displacement} for p in passes]
+    setattr(mesh_obj, HISTORY, json.dumps(rows))
+
+
+def read_history(analysis, result_nodes):
+    """[ConvergencePass] stored on the analysis' mesh, or [] when there is none or
+    it does not belong to the current results (last pass node count differs:
+    the mesh was changed after optimising)."""
+    import json
+    from ..domain.quality import ConvergencePass
+    for obj in analysis.Group:
+        text = getattr(obj, HISTORY, "") if obj.isDerivedFrom("Fem::FemMeshObject") else ""
+        if not text:
+            continue
+        try:
+            rows = [ConvergencePass(int(r["nodes"]), float(r["error"]),
+                                    float(r["global_error"]), float(r["max_stress_regular"]),
+                                    float(r["max_displacement"])) for r in json.loads(text)]
+        except (ValueError, KeyError, TypeError) as err:
+            App.Console.PrintWarning("PartReview: convergence history ignored: %s\n" % err)
+            return []
+        return rows if rows and rows[-1].nodes == result_nodes else []
+    return []

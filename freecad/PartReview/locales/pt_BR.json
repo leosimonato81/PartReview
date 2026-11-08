@@ -457,5 +457,15 @@
   "volume.intro": "Quanto da peça está carregado: parte do volume com tensão de von Mises acima de frações do limite do material. Um pico em poucos elementos e uma região grande carregada podem ter o mesmo máximo; esta tabela os distingue.",
   "volume.stress": "Tensão de von Mises",
   "volume.share": "Parte do volume da peça",
-  "volume.row": "≥ {pct} % do limite ({limit})"
+  "volume.row": "≥ {pct} % do limite ({limit})",
+  "conv.intro": "Estudo de convergência da malha, registrado pelo comando “Otimizar malha pelo erro”: cada linha é uma malha calculada, da inicial à usada neste relatório.",
+  "conv.pass": "Rodada",
+  "conv.nodes": "Nós",
+  "conv.error": "Erro fora dos apoios",
+  "conv.global_error": "Erro global",
+  "conv.stress": "Tensão máx. fora dos apoios",
+  "conv.displacement": "Deslocamento máx.",
+  "conv.converged": "Entre as duas últimas malhas, a tensão fora dos apoios mudou {stress} % e o deslocamento máximo {disp} %: abaixo de 5 %, os resultados estão estáveis em relação à malha (regra prática usual em estudos de convergência).",
+  "conv.not_converged": "Entre as duas últimas malhas, a tensão fora dos apoios mudou {stress} % e o deslocamento máximo {disp} %: acima de 5 %, os resultados ainda dependem da malha. Refine mais, se o computador permitir.",
+  "conv.single": "Só uma malha foi calculada: não há comparação entre malhas para mostrar convergência."
 }

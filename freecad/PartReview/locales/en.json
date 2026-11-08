@@ -457,5 +457,15 @@
   "volume.intro": "How much of the part is loaded: share of the volume with von Mises stress above fractions of the material limit. A peak on a few elements and a large loaded region can have the same maximum; this table tells them apart.",
   "volume.stress": "Von Mises stress",
   "volume.share": "Share of the part's volume",
-  "volume.row": "≥ {pct} % of the limit ({limit})"
+  "volume.row": "≥ {pct} % of the limit ({limit})",
+  "conv.intro": "Mesh convergence study, recorded by the “Optimise mesh by the error” command: each row is a solved mesh, from the first one to the one used in this report.",
+  "conv.pass": "Pass",
+  "conv.nodes": "Nodes",
+  "conv.error": "Error away from supports",
+  "conv.global_error": "Global error",
+  "conv.stress": "Max. stress away from supports",
+  "conv.displacement": "Max. displacement",
+  "conv.converged": "Between the last two meshes, the stress away from supports changed {stress} % and the maximum displacement {disp} %: below 5 %, the results are stable with respect to the mesh (usual practical rule in convergence studies).",
+  "conv.not_converged": "Between the last two meshes, the stress away from supports changed {stress} % and the maximum displacement {disp} %: above 5 %, the results still depend on the mesh. Refine further if the computer allows.",
+  "conv.single": "Only one mesh was solved: there is no mesh comparison to show convergence."
 }
