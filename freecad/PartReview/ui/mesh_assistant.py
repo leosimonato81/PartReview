@@ -14,11 +14,15 @@ import time
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
-from PySide6.QtCore import Qt, QTimer  # type: ignore
-from PySide6.QtGui import QColor  # type: ignore
+from PySide6.QtCore import QPointF, QSize, Qt, QTimer  # type: ignore
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF  # type: ignore
 from PySide6.QtWidgets import (  # type: ignore
     QAbstractItemView,
     QApplication,
+    QButtonGroup,
+    QGridLayout,
+    QSizePolicy,
+    QToolButton,
     QComboBox,
     QDialogButtonBox,
     QFormLayout,
@@ -63,6 +67,35 @@ STATUS_COLORS = {BudgetStatus.FITS: QColor(46, 125, 50), BudgetStatus.TIGHT: QCo
                  BudgetStatus.TOO_BIG: QColor(198, 40, 40)}
 COLUMNS = ("ma.col.option", "ma.col.size", "ma.col.nodes", "ma.col.memory", "ma.col.time",
            "ma.col.status", "ma.col.gmsh")
+
+
+# Same card look as the report dialog's level cards (any FreeCAD theme).
+CARD_STYLE = ("QToolButton{border:1px solid palette(mid);border-radius:6px;padding:6px}"
+              "QToolButton:checked{border:3px solid palette(highlight);"
+              "background:palette(highlight);color:palette(highlighted-text);font-weight:bold}")
+DENSITY = {MeshLevel.VERY_COARSE: 1, MeshLevel.COARSE: 2, MeshLevel.MEDIUM: 3,
+           MeshLevel.FINE: 4, MeshLevel.VERY_FINE: 5, MeshLevel.AUTO: 3}
+
+
+def mesh_icon(divisions, size=48):
+    """A triangle split into divisions^2 smaller ones: a picture of mesh density."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    p = QPainter(pixmap)
+    p.setRenderHint(QPainter.Antialiasing)
+    a, b, c = QPointF(4, size - 6), QPointF(size - 4, size - 6), QPointF(size / 2, 5)
+    p.setBrush(QColor(232, 238, 246))
+    p.setPen(QPen(QColor(44, 62, 80), 2))
+    p.drawPolygon(QPolygonF([a, b, c]))
+    p.setPen(QPen(QColor(44, 62, 80), 1))
+    n = max(1, divisions)
+    for i in range(1, n):
+        f = i / n
+        p.drawLine(a + (c - a) * f, b + (c - b) * f)  # parallel to the base
+        p.drawLine(a + (b - a) * f, a + (b - a) * f + (c - a) * (1 - f))  # parallel to a-c
+        p.drawLine(b + (a - b) * f, b + (a - b) * f + (c - b) * (1 - f))  # parallel to b-c
+    p.end()
+    return QIcon(pixmap)
 
 
 class _Trial:
@@ -172,10 +205,25 @@ class MeshAssistantPanel:
             "QLabel{border:1px solid palette(mid);border-radius:6px;padding:8px;}")
         self.refine_label = QLabel()
         self.refine_label.setWordWrap(True)
+        self.cards_widget = QWidget()
+        self.cards_layout = QGridLayout(self.cards_widget)
+        self.cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.cards_widget.setStyleSheet(CARD_STYLE)
+        self.card_group = QButtonGroup(self.form)
+        self.card_group.setExclusive(True)
+        self.cards = {}
+        self.numbers_box = QGroupBox(t("ma.group.numbers"))
+        self.numbers_box.setCheckable(True)
+        self.numbers_box.setChecked(False)
+        numbers_layout = QVBoxLayout(self.numbers_box)
+        numbers_layout.addWidget(self.table)
+        self.table.setVisible(False)
+        self.numbers_box.toggled.connect(self.table.setVisible)
         options_layout.addWidget(self.recommend_label)
-        options_layout.addWidget(self.refine_label)
-        options_layout.addWidget(self.table)
+        options_layout.addWidget(self.cards_widget)
         options_layout.addWidget(self.reason_label)
+        options_layout.addWidget(self.refine_label)
+        options_layout.addWidget(self.numbers_box)
         options_layout.addWidget(self.test_button)
         options_layout.addLayout(objective_row)
         layout.addWidget(self.options_box)
@@ -191,6 +239,8 @@ class MeshAssistantPanel:
         layout.addWidget(self.status_label)
         layout.addLayout(progress_row)
 
+        self.create_title = QLabel("<b>%s</b>" % t("ma.group.create"))
+        layout.addWidget(self.create_title)
         actions = QHBoxLayout()
         self.create_button = QPushButton(t("ma.create"))
         self.create_button.setToolTip(t("ma.create_tip"))
@@ -289,6 +339,10 @@ class MeshAssistantPanel:
         self.machine = machine_profile()
         self._show_machine()
         self.recommended = None
+        for button in self.cards.values():
+            self.card_group.removeButton(button)
+            button.deleteLater()
+        self.cards = {}
         self._fill_table()
         self._select_level(DEFAULT_LEVEL)  # medium: ~2 elements across the wall
         self.recommend_label.setText(t("ma.recommend.before"))
@@ -329,6 +383,10 @@ class MeshAssistantPanel:
         size = mp.size_for_nodes(law, self.auto_target)
         self.options = [o for o in self.options if o.level is not MeshLevel.AUTO]
         self.trials.pop(MeshLevel.AUTO, None)
+        auto_card = self.cards.pop(MeshLevel.AUTO, None)
+        if auto_card is not None:
+            self.card_group.removeButton(auto_card)
+            auto_card.deleteLater()
         self.auto_attempt = 1
         self._run([("auto", auto_option(self.summary, size, "mesh.reason.objective"))])
 
@@ -606,11 +664,41 @@ class MeshAssistantPanel:
                 if color is not None and col == 5:
                     item.setForeground(color)
                 self.table.setItem(row, col, item)
+            self._card(row, option, cells, trial)
+
+    def _card(self, row, option, cells, trial):
+        """Big clickable card for one option (same look as the report level cards)."""
+        t = self.tr.t
+        button = self.cards.get(option.level)
+        if button is None:
+            button = QToolButton()
+            button.setCheckable(True)
+            button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+            button.setIcon(mesh_icon(DENSITY[option.level]))
+            button.setIconSize(QSize(36, 36))
+            button.setMinimumHeight(112)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            button.clicked.connect(lambda _=False, lv=option.level: self._select_level(lv))
+            self.card_group.addButton(button)
+            self.cards[option.level] = button
+            index = len(self.cards) - 1
+            self.cards_layout.addWidget(button, index // 3, index % 3)
+            self.cards_layout.setColumnStretch(index % 3, 1)
+        if trial is not None:
+            lines = [cells[0], "%s · %s" % (cells[1], t(
+                         "ma.card.nodes", nodes=self.tr.integer(round(trial.nodes, -3) / 1000))),
+                     "%s · %s" % (cells[4], cells[5].split(" (")[0])]
+        else:
+            lines = [cells[0], cells[1], t("ma.card.not_tested")]
+        button.setText("\n".join(lines))
+        button.setToolTip(mt.option_reason(option, self.summary, self.tr))
 
     def _select_level(self, level):
         for row, option in enumerate(self.options):
             if option.level is level:
                 self.table.selectRow(row)
+                if level in self.cards:
+                    self.cards[level].setChecked(True)
                 return
 
     def _selected_option(self):
@@ -699,7 +787,8 @@ class MeshAssistantPanel:
         self.remove_button.setEnabled(not busy)
 
     def _enable(self, analysed):
-        for widget in (self.part_box, self.issues_box, self.options_box, self.details_box):
+        for widget in (self.part_box, self.issues_box, self.options_box, self.details_box,
+                       self.create_title):
             widget.setVisible(analysed)
         self._set_busy(False)
 

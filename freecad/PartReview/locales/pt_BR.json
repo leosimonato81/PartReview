@@ -261,10 +261,10 @@
   "ma.intro": "Selecione um sólido na árvore ou na tela e clique em Analisar peça.",
   "ma.analyze": "Analisar peça",
   "ma.no_solid": "Selecione um sólido (peça) para analisar.",
-  "ma.group.part": "Peça",
+  "ma.group.part": "1 · Peça",
   "ma.group.issues": "Avisos de geometria",
-  "ma.group.machine": "Seu computador",
-  "ma.group.options": "Opções de malha",
+  "ma.group.machine": "2 · Seu computador",
+  "ma.group.options": "3 · Escolha da malha",
   "ma.group.details": "Detalhes técnicos",
   "ma.part.size": "Dimensões",
   "ma.part.volume": "Volume",
@@ -352,5 +352,9 @@
   "ma.recommend.fine": "A fina cabe com folga e calcula rápido: mais precisão sem risco.",
   "ma.recommend.medium": "Cerca de 2 elementos na espessura: o mínimo usual para tensões com elementos quadráticos. A grossa (1 elemento) tende a dar erro alto.",
   "ma.recommend.coarse": "A média não cabe com folga neste computador. A grossa roda, mas o erro tende a ser alto: confira o erro estimado no relatório e, se puder, feche outros programas e teste de novo.",
-  "ma.recommend.very_coarse": "Só a muito grossa cabe com folga agora: serve para uma primeira olhada, não para dimensionar. Conserte os detalhes minúsculos e feche outros programas."
+  "ma.recommend.very_coarse": "Só a muito grossa cabe com folga agora: serve para uma primeira olhada, não para dimensionar. Conserte os detalhes minúsculos e feche outros programas.",
+  "ma.group.create": "4 · Criar a malha",
+  "ma.group.numbers": "Ver todos os números",
+  "ma.card.nodes": "{nodes} mil nós",
+  "ma.card.not_tested": "não testada"
 }

@@ -261,10 +261,10 @@
   "ma.intro": "Select a solid in the tree or in the view and click Analyse part.",
   "ma.analyze": "Analyse part",
   "ma.no_solid": "Select a solid (part) to analyse.",
-  "ma.group.part": "Part",
+  "ma.group.part": "1 · Part",
   "ma.group.issues": "Geometry warnings",
-  "ma.group.machine": "Your computer",
-  "ma.group.options": "Mesh options",
+  "ma.group.machine": "2 · Your computer",
+  "ma.group.options": "3 · Choose the mesh",
   "ma.group.details": "Technical details",
   "ma.part.size": "Size",
   "ma.part.volume": "Volume",
@@ -352,5 +352,9 @@
   "ma.recommend.fine": "Fine fits with margin and solves quickly: more accuracy at no risk.",
   "ma.recommend.medium": "About 2 elements across the wall: the usual minimum for stresses with quadratic elements. Coarse (1 element) tends to give a high error.",
   "ma.recommend.coarse": "Medium does not fit with margin on this computer. Coarse runs, but the error tends to be high: check the estimated error in the report and, if possible, close other programs and test again.",
-  "ma.recommend.very_coarse": "Only very coarse fits with margin now: good for a first look, not for sizing. Fix the tiny details and close other programs."
+  "ma.recommend.very_coarse": "Only very coarse fits with margin now: good for a first look, not for sizing. Fix the tiny details and close other programs.",
+  "ma.group.create": "4 · Create the mesh",
+  "ma.group.numbers": "Show all the numbers",
+  "ma.card.nodes": "{nodes}k nodes",
+  "ma.card.not_tested": "not tried"
 }
