@@ -2,6 +2,13 @@
 
 All notable changes to PartReview. / Mudanças importantes do PartReview.
 
+## 1.5.1 — 2026-11-08
+
+- Running the assistant again updates its own mesh of the part instead of
+  adding another (no remove button needed); "Your computer" separates what was
+  read from the system, measured on this computer and estimated. / Rodar de
+  novo atualiza a malha do assistente; o passo 2 separa lido / medido / estimado.
+
 ## 1.5.0 — 2026-11-08
 
 **Mesh assistant / Assistente de malha** (new command):
@@ -30,10 +37,6 @@ All notable changes to PartReview. / Mudanças importantes do PartReview.
   generated only when the measured law says they may fit; the panel closes and
   selects the new mesh when it is created. / Peça escolhida numa lista; cartão
   "Malha atual"; ensaio mais curto; o painel fecha ao criar a malha.
-- Running the assistant again updates its own mesh of the part instead of
-  adding another (no remove button needed); "Your computer" separates what was
-  read from the system, measured on this computer and estimated. / Rodar de
-  novo atualiza a malha do assistente; o passo 2 separa lido / medido / estimado.
 
 **Report / Relatório:**
 - Balloons rebuilt: anchored on the part (never in the air), one per visible
