@@ -369,7 +369,7 @@
   "mo.mesh": "Malha",
   "mo.mesh_value": "{label} ({nodes} nós)",
   "mo.need_assistant_mesh": "Nenhuma malha do assistente numa análise. Crie a malha com o Assistente de malha primeiro (ele coloca a malha na análise); malhas feitas à mão não são alteradas.",
-  "mo.singular": "Apoio ou carga em arestas/vértices: as faces vizinhas ({faces}) ficam fora do refino, porque ali a tensão teórica é infinita e o erro não converge.",
+  "mo.singular": "Apoio ou carga em arestas/vértices: as faces vizinhas ({faces}) ficam fora do refino, porque ali a tensão teórica é infinita e o erro não converge. Sistemas assim são mal condicionados: cálculos idênticos com vários núcleos podem dar resultados um pouco diferentes. Apoie nas faces para resultados confiáveis.",
   "mo.corners": "As faces de apoio fixo também têm quinas singulares: a coluna de tensão mostra o máximo fora delas.",
   "mo.uses_results": "Esta ferramenta usa resultados de cálculo e troca os resultados do documento a cada rodada (só depois que o novo cálculo terminar bem). As mudanças na malha podem ser desfeitas com Ctrl+Z.",
   "mo.group.goal": "2 · Meta",

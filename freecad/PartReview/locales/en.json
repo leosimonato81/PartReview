@@ -369,7 +369,7 @@
   "mo.mesh": "Mesh",
   "mo.mesh_value": "{label} ({nodes} nodes)",
   "mo.need_assistant_mesh": "No assistant mesh in an analysis. Create the mesh with the Mesh assistant first (it puts the mesh in the analysis); hand-made meshes are not changed.",
-  "mo.singular": "Support or load on edges/vertices: the neighbouring faces ({faces}) are not refined, because the theoretical stress there is infinite and the error does not converge.",
+  "mo.singular": "Support or load on edges/vertices: the neighbouring faces ({faces}) are not refined, because the theoretical stress there is infinite and the error does not converge. Such systems are ill-conditioned: identical multi-core solves can give slightly different results. Support on faces for reliable results.",
   "mo.corners": "Fixed-support faces also have singular corners: the stress column shows the maximum away from them.",
   "mo.uses_results": "This tool uses calculation results and replaces the document's results on each pass (only after the new solve finished well). Mesh changes can be undone with Ctrl+Z.",
   "mo.group.goal": "2 · Goal",
