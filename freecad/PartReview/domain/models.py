@@ -54,6 +54,7 @@ class FieldKind(Enum):
     VON_MISES = "von_mises"
     DISPLACEMENT = "displacement"
     ESTIMATED_ERROR = "estimated_error"  # derived: ZZ local error indicator (decision 005)
+    PRINCIPAL_MAX = "principal_max"  # largest principal stress (tension when > 0)
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,24 @@ class Material:
     poisson_ratio: float | None = None
     density: Quantity | None = None
     yield_strength: Quantity | None = None
+    ultimate_strength: Quantity | None = None  # tensile strength (UltimateTensileStrength)
+    family: str = "other"  # "metal", "polymer" or "other" (see material_family)
+
+
+def material_family(youngs_modulus_mpa: float | None) -> str:
+    """"metal", "polymer" or "other", from Young's modulus (in MPa) alone.
+
+    Ashby's material property charts: engineering polymers lie between about
+    0,1 and 10 GPa (PLA 3,6, ABS 2,3, PETG ~2), metals above about 40 GPa
+    (aluminium 70, steel 200). Between them (wood, composites, concrete): other.
+    """
+    if youngs_modulus_mpa is None:
+        return "other"
+    if youngs_modulus_mpa >= 40000.0:
+        return "metal"
+    if 100.0 <= youngs_modulus_mpa <= 10000.0:
+        return "polymer"
+    return "other"
 
 
 class ConstraintKind(Enum):

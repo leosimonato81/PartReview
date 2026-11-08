@@ -80,7 +80,14 @@ def _yield_strength(config, result, stress_unit):
         return fem_reader.parse_quantity_as(config.yield_strength, stress_unit), "user"
     for material in result.materials:
         if material.yield_strength is not None:
-            return fem_reader.convert(material.yield_strength, stress_unit), "material"
+            ys = fem_reader.convert(material.yield_strength, stress_unit)
+            if material.ultimate_strength is not None:
+                uts = fem_reader.convert(material.ultimate_strength, stress_unit)
+                if uts.value < ys.value:
+                    # The card says the material breaks before it yields (e.g. the
+                    # generic PLA and ABS cards): the lower limit is the one that holds.
+                    return uts, "material_uts"
+            return ys, "material"
     return None, ""
 
 

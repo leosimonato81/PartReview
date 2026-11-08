@@ -19,6 +19,7 @@ from ..domain.models import (
     FemResult,
     FieldKind,
     Material,
+    material_family,
     MeshInfo,
     ResultField,
     UnitSystem,
@@ -30,10 +31,12 @@ from ..domain.units import Quantity, is_raw_unit
 RESULT_STORAGE_UNITS = {
     FieldKind.VON_MISES: "MPa",
     FieldKind.DISPLACEMENT: "mm",
+    FieldKind.PRINCIPAL_MAX: "MPa",
 }
 RESULT_ARRAYS = {
     FieldKind.VON_MISES: "vonMises",
     FieldKind.DISPLACEMENT: "DisplacementLengths",
+    FieldKind.PRINCIPAL_MAX: "PrincipalMax",
 }
 MESH_LENGTH_UNIT = "mm"  # FreeCAD internal length unit for node coordinates
 
@@ -46,6 +49,7 @@ MATERIAL_KEYS = {
     "youngs_modulus": "YoungsModulus",
     "density": "Density",
     "yield_strength": "YieldStrength",
+    "ultimate_strength": "UltimateTensileStrength",
 }
 
 SOLVER_NAMES = (("Ccx", "CalculiX"), ("Elmer", "Elmer"), ("Z88", "Z88"),
@@ -163,6 +167,16 @@ def read_fields(result_obj, unit_system):
     return fields
 
 
+def _mpa(text):
+    """Material card text (e.g. "3640 MPa", "210 GPa") in MPa, or None."""
+    if not text:
+        return None
+    try:
+        return App.Units.Quantity(text).getValueAs("MPa").Value
+    except (ValueError, TypeError):
+        return None
+
+
 def _material_quantity(props, key, unit_system):
     text = props.get(key)
     if not text:
@@ -188,6 +202,9 @@ def read_materials(analysis, unit_system):
             poisson_ratio=float(poisson) if poisson else None,
             density=_material_quantity(props, MATERIAL_KEYS["density"], unit_system),
             yield_strength=_material_quantity(props, MATERIAL_KEYS["yield_strength"], unit_system),
+            ultimate_strength=_material_quantity(props, MATERIAL_KEYS["ultimate_strength"],
+                                                 unit_system),
+            family=material_family(_mpa(props.get(MATERIAL_KEYS["youngs_modulus"]))),
         ))
     return tuple(materials)
 

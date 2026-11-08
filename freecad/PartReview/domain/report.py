@@ -168,7 +168,7 @@ def _summary(inputs: ReportInputs, tr: Translator) -> Table:
 
 
 def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
-             fs_regular: float | None = None) -> Table:
+             fs_regular: float | None = None, fs_tension: float | None = None) -> Table:
     res, m = inputs.result, inputs.result.mesh
     d = result_digits(inputs)
     rows = []
@@ -181,16 +181,28 @@ def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
         for key, nv in ((max_key, f.maximum(m)), (min_key, f.minimum(m))):
             rows.append((tr.t(key), tr.quantity(nv.value, d), tr.point(nv.position, m.length_unit),
                          str(nv.node_id)))
+            if key == "results.vm_min":
+                p = res.get_field(FieldKind.PRINCIPAL_MAX)
+                if p is not None:
+                    nv1 = p.maximum(m)
+                    rows.append((tr.t("results.principal_max"), tr.quantity(nv1.value, d),
+                                 tr.point(nv1.position, m.length_unit), str(nv1.node_id)))
             if key == "results.vm_max" and regular is not None:
                 rows.append((tr.t("results.vm_regular"), tr.quantity(regular.peak_value, d),
                              tr.point(regular.center, m.length_unit), str(regular.peak_node)))
     if inputs.yield_strength is not None:
         source = tr.t("results.yield_source." + inputs.yield_source) if inputs.yield_source else ""
-        rows.append((tr.t("results.yield"), tr.quantity(inputs.yield_strength, 4), source, ""))
+        label = "results.uts_used" if inputs.yield_source == "material_uts" else "results.yield"
+        rows.append((tr.t(label), tr.quantity(inputs.yield_strength, 4), source, ""))
     if fs is not None:
         rows.append((tr.t("results.safety"), tr.number(fs, d), "", ""))
     if fs_regular is not None:
         rows.append((tr.t("results.safety_regular"), tr.number(fs_regular, d), "", ""))
+    if fs_tension is not None:
+        mat = _material(inputs)
+        rows.append((tr.t("results.ultimate"), tr.quantity(mat.ultimate_strength, 4),
+                     tr.t("results.yield_source.material"), ""))
+        rows.append((tr.t("results.safety_tension"), tr.number(fs_tension, d), "", ""))
     header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"),
               tr.t("results.node"))
     return Table(header=header, rows=tuple(rows), widths=(0.36, 0.2, 0.32, 0.12))
@@ -332,6 +344,7 @@ class FemContext:
     figures: list
     fs: float | None
     fs_regular: float | None = None  # safety factor with the regular (away) stress
+    fs_tension: float | None = None  # polymers: tensile strength / max principal stress
 
 
 def prepare_fem(inputs: ReportInputs, tr: Translator) -> FemContext:
@@ -349,7 +362,26 @@ def prepare_fem(inputs: ReportInputs, tr: Translator) -> FemContext:
     figures = [_figure(index, view, inputs, numbers, tr)  # capture order = figure order
                for index, view in enumerate(list(inputs.boundary_views) + list(inputs.views))]
     figures = _note_hidden(figures, inputs, numbers, tr)
-    return FemContext(inputs, numbers, figures, fs, fs_regular)
+    return FemContext(inputs, numbers, figures, fs, fs_regular, _fs_tension(inputs))
+
+
+def _material(inputs: ReportInputs):
+    return inputs.result.materials[0] if len(inputs.result.materials) == 1 else None
+
+
+def _fs_tension(inputs: ReportInputs) -> float | None:
+    """Rankine (maximum principal stress) check for polymers: less ductile than
+    metals, they tend to break in tension, so the largest principal stress is
+    compared with the tensile strength (in addition to von Mises)."""
+    mat = _material(inputs)
+    principal = inputs.result.get_field(FieldKind.PRINCIPAL_MAX)
+    if mat is None or mat.family != "polymer" or mat.ultimate_strength is None \
+            or principal is None:
+        return None
+    sigma1 = principal.maximum(inputs.result.mesh).value
+    if sigma1.value <= 0 or sigma1.unit != mat.ultimate_strength.unit:
+        return None
+    return mat.ultimate_strength.value / sigma1.value
 
 
 def _note_hidden(figures, inputs: ReportInputs, numbers, tr: Translator) -> list:
@@ -389,7 +421,7 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
     inputs, fs = ctx.inputs, ctx.fs
     res = inputs.result
     stress = res.get_field(FieldKind.VON_MISES)
-    blocks = [_results(inputs, tr, fs, ctx.fs_regular)]
+    blocks = [_results(inputs, tr, fs, ctx.fs_regular, ctx.fs_tension)]
     if fs is not None and fs < 1.0:
         blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, result_digits(inputs)))))
     if fs is None and stress is not None:
@@ -479,7 +511,9 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
         rows.append((tr.t("results.disp_max"), " ".join(p for p in (value, _where(ctx, tr, dmax)) if p)))
     if ctx.fs is not None:
         source = tr.t("results.yield_source." + inputs.yield_source) if inputs.yield_source else ""
-        rows.append((tr.t("exec.safety"), tr.t("exec.safety_value", fs=tr.number(ctx.fs, d),
+        value_key = ("exec.safety_value_uts" if inputs.yield_source == "material_uts"
+                     else "exec.safety_value")
+        rows.append((tr.t("exec.safety"), tr.t(value_key, fs=tr.number(ctx.fs, d),
                                                  limit=tr.quantity(inputs.yield_strength, 4),
                                                  source=source)))
         if ctx.fs_regular is not None:
@@ -494,6 +528,10 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     elif stress is not None:
         rows.append((tr.t("exec.safety"), tr.t("exec.safety_none")))
         sentences.append(tr.t("exec.no_yield"))
+    if ctx.fs_tension is not None:
+        rows.append((tr.t("exec.safety_tension"), tr.number(ctx.fs_tension, d)))
+        key = "exec.tension_ok" if ctx.fs_tension >= 1.0 else "exec.tension_low"
+        sentences.append(tr.t(key, fs=tr.number(ctx.fs_tension, d)))
     if smax is not None and smax.singularity_near:
         sentences.append(tr.t("exec.singular", n=ctx.numbers[smax], label=smax.singularity_near))
     if regular is not None and inputs.regular_exclusion is not None:
@@ -542,6 +580,15 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
                                 e=tr.quantity(mat.youngs_modulus, 4),
                                 nu=tr.number(mat.poisson_ratio, 2)
                                 if mat.poisson_ratio is not None else "—"))
+    mat = _material(inputs)
+    if mat is not None and mat.family == "metal":
+        assumed.append(tr.t("assume.criterion_metal"))
+    elif mat is not None and mat.family == "polymer":
+        assumed.append(tr.t("assume.criterion_polymer"))
+        assumed.append(tr.t("assume.printed"))
+        assumed.append(tr.t("assume.polymer_time"))
+    if inputs.yield_source == "material_uts":
+        assumed.append(tr.t("assume.uts_used"))
     if any(c.kind is ConstraintKind.FIXED for c in res.constraints):
         assumed.append(tr.t("assume.fixed"))
     if any(c.kind is ConstraintKind.FORCE for c in res.constraints):
