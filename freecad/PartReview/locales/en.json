@@ -423,5 +423,6 @@
   "fig.see": "see figure {figures}",
   "ui.logo_reset": "Default",
   "ui.logo_reset_tip": "Back to FreeCAD's logo. To make the report without a logo, leave the field empty.",
-  "ui.logo_empty": "empty = report without a logo"
+  "ui.logo_empty": "empty = report without a logo",
+  "fig.deformed": "Deformed shape, color = {field} (displacements magnified {scale}×; gray lines = unloaded part)"
 }

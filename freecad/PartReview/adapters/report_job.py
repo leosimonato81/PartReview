@@ -132,6 +132,7 @@ def _plan(result, surface, max_views, boundary_views):
         if result.get_field(kind) is not None:
             views.append(cp.plan_overview(kind, results, center, radius, is_visible))
     views += [cp.plan_target_view(s, center, radius, is_visible) for s in results]
+    views = cp.drop_redundant_closeups(views)
     selected = cp.reading_order(cp.select_views(views, max_views=max_views), results)
     boundary = []
     if surface is not None:
@@ -139,6 +140,26 @@ def _plan(result, surface, max_views, boundary_views):
     # Supports and loads are shown by color and arrows only (no balloons, owner's
     # request): the numbered points of the report are results only.
     return results, selected, boundary, radius, exclusion
+
+
+def _deformed(view, displacement, radius):
+    """The displacement overview becomes the deformed shape (as in commercial
+    reports): magnified displacements, balloons on the displaced points."""
+    if not (view.is_overview and view.color_field is FieldKind.DISPLACEMENT and displacement):
+        return view
+    largest = max(g.length(Vec3(*u)) for u in displacement.values())
+    scale = cp.deformation_scale(largest, radius)
+
+    def moved(t, p):
+        u = displacement.get(t.peak_node)
+        return g.add(p, g.scale(Vec3(*u), scale)) if u is not None else p
+
+    cam = view.camera
+    # room for the magnified shape (largest drawn displacement ~8 % of the radius)
+    camera = replace(cam, height=cam.height * (1.0 + cp.DEFORMED_SHARE))
+    return replace(view, camera=camera, deformation=scale,
+                   leaders=tuple(tuple(moved(t, p) for p in t.leader_points)
+                                 for t in view.targets))
 
 
 def _equilibrium(analysis, result):
@@ -221,6 +242,9 @@ def generate_fem_report(doc, config, progress=_no_progress):
         result, surface, views_for_level(config),
         2 if config.includes_boundary else 0)
     progress(tr.t("progress.planning"), 0.4)
+    displacement = fem_reader.read_displacement_vectors(result_obj) \
+        if result.get_field(FieldKind.DISPLACEMENT) is not None else {}
+    views = [_deformed(v, displacement, radius) for v in views]
     error_view = None
     if error_field is not None and views and config.level is not ReportLevel.QUICK:
         error_view = replace(views[0], color_field=FieldKind.ESTIMATED_ERROR, targets=())
@@ -248,7 +272,14 @@ def generate_fem_report(doc, config, progress=_no_progress):
                                                                 max(f.values)))
                     colored = view.color_field
                 vs.apply_camera(view.camera)
+                if view.deformation:
+                    vs.displace(mesh_obj, list(displacement), list(displacement.values()),
+                                view.deformation)
+                    vs.add_overlay(boundary_scene.outline(result, surface))  # unloaded part
                 vs.save_image(image_paths[len(boundary_views) + i], *IMAGE_SIZE)
+                if view.deformation:
+                    vs.undisplace(mesh_obj)
+                    vs.remove_overlays()
             if boundary_views:  # last, because the mesh is hidden for them
                 vs.show_only([])
                 vs.add_overlay(boundary_scene.build(result, surface, radius,

@@ -423,5 +423,6 @@
   "fig.see": "ver figura {figures}",
   "ui.logo_reset": "Padrão",
   "ui.logo_reset_tip": "Volta ao logo do FreeCAD. Para gerar sem logo, deixe o campo em branco.",
-  "ui.logo_empty": "em branco = relatório sem logo"
+  "ui.logo_empty": "em branco = relatório sem logo",
+  "fig.deformed": "Forma deformada, cor = {field} (deslocamentos ampliados {scale}×; linhas cinza = peça sem carga)"
 }

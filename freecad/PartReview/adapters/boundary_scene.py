@@ -135,3 +135,13 @@ def build(result, surface, model_radius, faces):
             root.addChild(_dots(dots[color], color, 0.02 * model_radius))
 
     return root
+
+
+OUTLINE_RGB = (90, 90, 90)
+
+
+def outline(result, surface):
+    """Edges of the unloaded part, thin gray lines: drawn under a deformed shape."""
+    positions = result.mesh.node_positions
+    edges = feature_edges(surface.triangles, positions)
+    return _lines([(positions[a], positions[b]) for a, b in edges], OUTLINE_RGB, 1.6)

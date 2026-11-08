@@ -59,3 +59,22 @@ def test_stress_away_from_supports_is_found_when_the_maximum_sits_on_one():
     # maximum already far from every support: nothing to add
     far = Constraint(ConstraintKind.FIXED, "Longe", geometry=square(6.0))
     assert regular_stress_hotspot(stress, mesh, surface, [far], exclusion=2.5) is None
+
+
+def test_deformation_scale_is_a_round_number_and_never_shrinks():
+    assert cp.deformation_scale(1.057e-4, 30.0) == 20000.0  # 0.08*30/1.057e-4 = 22 705
+    assert cp.deformation_scale(0.6, 30.0) == 2.0  # raw 4 -> 2
+    assert cp.deformation_scale(5.0, 30.0) == 1.0  # flexible part: true scale
+    assert cp.deformation_scale(0.0, 30.0) == 1.0
+
+
+def test_displacement_close_up_dropped_when_the_overview_shows_it():
+    d1 = spot(HotspotKind.DISPLACEMENT_MAX, Vec3(2, 0, 0), FieldKind.DISPLACEMENT)
+    s1 = spot(HotspotKind.STRESS_MAX, ORIGIN)
+    cam = cp.frame(Vec3(0, 0, -1), ORIGIN, 1.0, ORIGIN, 3.0)
+    over = cp.PlannedView(cam, FieldKind.DISPLACEMENT, (d1,), is_overview=True)
+    close_d, close_s = cp.PlannedView(cam, FieldKind.DISPLACEMENT, (d1,)), \
+        cp.PlannedView(cam, FieldKind.VON_MISES, (s1,))
+    assert cp.drop_redundant_closeups([over, close_d, close_s]) == [over, close_s]
+    hidden = cp.PlannedView(cam, FieldKind.DISPLACEMENT, (), is_overview=True)
+    assert cp.drop_redundant_closeups([hidden, close_d]) == [hidden, close_d]

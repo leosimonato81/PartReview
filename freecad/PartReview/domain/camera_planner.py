@@ -7,6 +7,7 @@ this module can be tested without FreeCAD; the adapter supplies a ray test
 against the mesh surface.
 """
 
+import math
 from dataclasses import dataclass, replace
 from typing import Callable
 
@@ -55,6 +56,8 @@ class PlannedView:
     # Per target, the leader points visible in this view (filled after planning).
     # Empty tuple of tuples: not computed, every leader point is drawn.
     leaders: tuple = ()
+    # Deformed-shape view: displacements drawn multiplied by this (0 = undeformed).
+    deformation: float = 0.0
 
     @property
     def priority(self) -> int:
@@ -158,6 +161,36 @@ def plan_overview(color_field: FieldKind, targets, model_center: Vec3, model_rad
     camera = frame(best, model_center, 1.05 * model_radius, model_center, model_radius)
     shown = tuple(t for t in targets if is_visible(t.center, best))
     return PlannedView(camera, color_field, shown, is_overview=True, score=score(best))
+
+
+DEFORMED_SHARE = 0.08  # largest drawn displacement = 8 % of the model radius
+
+
+def deformation_scale(max_displacement: float, model_radius: float) -> float:
+    """Magnification of the deformed shape: the largest displacement is drawn at
+    about ``DEFORMED_SHARE`` of the model radius, rounded down to 1, 2 or 5 x 10^k
+    so the caption reads well. Never below 1: a part that already deforms a lot
+    (e.g. a flexible polymer) is drawn at true scale.
+    """
+    if max_displacement <= 0 or model_radius <= 0:
+        return 1.0
+    raw = DEFORMED_SHARE * model_radius / max_displacement
+    if raw <= 1.0:
+        return 1.0
+    power = 10.0 ** math.floor(math.log10(raw))
+    for step in (5.0, 2.0, 1.0):
+        if step * power <= raw:
+            return step * power
+    return power
+
+
+def drop_redundant_closeups(views) -> list[PlannedView]:
+    """Displacement varies smoothly: when its overview already shows the maximum,
+    a close-up of it adds nothing and only takes a figure from a stress point."""
+    shown = {t for v in views if v.is_overview and v.color_field is FieldKind.DISPLACEMENT
+             for t in v.targets}
+    return [v for v in views if v.is_overview or v.color_field is not FieldKind.DISPLACEMENT
+            or not all(t in shown for t in v.targets)]
 
 
 FIELD_ORDER = (FieldKind.VON_MISES, FieldKind.DISPLACEMENT, FieldKind.ESTIMATED_ERROR)

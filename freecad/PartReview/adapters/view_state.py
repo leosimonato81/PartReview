@@ -50,6 +50,7 @@ class ViewState:
         self._written = set()  # objects whose Visibility property we had to write
         self._touched_before = set()  # objects already touched (e.g. needing recompute)
         self._overlays = []  # Coin nodes added to the scene for a capture
+        self._displaced = set()  # FEM meshes drawn deformed for a capture
 
     # --- enter / exit ---------------------------------------------------------
 
@@ -68,6 +69,7 @@ class ViewState:
 
     def __exit__(self, exc_type, exc, tb):
         self._restore("overlays", self._remove_overlays)
+        self._restore("deformed shape", self._undisplace_all)
         self._restore("node colors", self._restore_colors)
         self._restore("backface culling", self._restore_culling)
         self._restore("scene switches", self._restore_switches)
@@ -187,6 +189,27 @@ class ViewState:
         if mesh_obj.Name not in self._colors:
             self._colors[mesh_obj.Name] = (vo.ColorMode, list(vo.NodeColorArray))
         vo.setNodeColorByScalars(list(node_ids), list(scalars))
+
+    def displace(self, mesh_obj, node_ids, vectors, factor):
+        """Draw ``mesh_obj`` deformed: node + factor x displacement (view only)."""
+        vo = mesh_obj.ViewObject
+        vo.setNodeDisplacementByVectors(list(node_ids), list(vectors))
+        vo.applyDisplacement(float(factor))
+        self._displaced.add(mesh_obj.Name)
+        Gui.updateGui()
+
+    def undisplace(self, mesh_obj):
+        if mesh_obj.Name in self._displaced:
+            mesh_obj.ViewObject.resetNodeDisplacement()
+            self._displaced.discard(mesh_obj.Name)
+            Gui.updateGui()
+
+    def _undisplace_all(self):
+        for name in list(self._displaced):
+            obj = self.doc.getObject(name)
+            if obj is not None:
+                obj.ViewObject.resetNodeDisplacement()
+        self._displaced.clear()
 
     def add_overlay(self, node):
         """Draw an extra Coin node (not a document object) until the context exits."""

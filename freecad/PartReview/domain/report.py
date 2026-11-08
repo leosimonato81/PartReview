@@ -251,7 +251,10 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
     markers, shown = _markers(view, inputs, numbers)
     field_name = _field_name(view.color_field, tr)
     key = "fig.overview" if view.is_overview else "fig.closeup"
-    caption = tr.t("fig.caption", n=index + 1, text=tr.t(key, field=field_name))
+    text = tr.t(key, field=field_name)
+    if view.deformation:
+        text = tr.t("fig.deformed", field=field_name, scale=tr.integer(view.deformation))
+    caption = tr.t("fig.caption", n=index + 1, text=text)
     balloons = ""
     if shown:
         balloons = tr.t("fig.marker_list", items=tr.list_sep.join(
