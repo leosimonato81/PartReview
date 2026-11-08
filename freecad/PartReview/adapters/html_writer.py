@@ -14,7 +14,7 @@ from PySide6.QtGui import QImage  # type: ignore
 
 from ..domain.blocks import Figure
 from ..domain.exporters import render_html
-from .pdf_writer import draw_markers
+from .pdf_writer import draw_figure
 
 
 def _png_uri(image):
@@ -33,8 +33,8 @@ def _file_uri(path):
 
 
 def write_html(doc, image_paths, output_path, language):
-    markers = {b.view_index: b.markers for b in doc.blocks if isinstance(b, Figure)}
-    uris = [_png_uri(draw_markers(QImage(path), markers.get(i, ())))
+    figures = {b.view_index: b for b in doc.blocks if isinstance(b, Figure)}
+    uris = [_png_uri(draw_figure(QImage(path), figures[i]) if i in figures else QImage(path))
             for i, path in enumerate(image_paths)]
     logo = _file_uri(doc.cover.logo_path) if doc.cover.logo_path else ""
     with open(output_path, "w", encoding="utf-8") as fh:

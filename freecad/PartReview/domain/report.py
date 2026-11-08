@@ -27,7 +27,7 @@ from .blocks import (  # noqa: F401  (re-exported for callers and tests)
     Paragraph,
     Table,
 )
-from .camera_planner import PlannedView, project
+from .camera_planner import PlannedView, axes_2d, project, scale_bar
 from .hotspots import Hotspot
 from .i18n import Translator
 from .models import (
@@ -288,6 +288,15 @@ def _legend(inputs: ReportInputs, kind: FieldKind, tr: Translator) -> Legend:
     return Legend(title="%s [%s]" % (_field_name(kind, tr), pretty_unit(f.unit)), ticks=labels)
 
 
+def _orientation(view: PlannedView, inputs: ReportInputs, tr: Translator) -> dict:
+    """Axes triad and scale bar of a view, for the figure image."""
+    w, h = inputs.image_size
+    length, px = scale_bar(view.camera, w, h)
+    unit = inputs.result.mesh.length_unit
+    scale = (tr.quantity(Quantity(length, unit), 3), px) if px > 0 else ()
+    return {"axes": tuple(axes_2d(view.camera)), "scale": scale}
+
+
 def _markers(view: PlannedView, inputs: ReportInputs, numbers):
     """Balloons of one view (each spot once) and the spots that got one."""
     w, h = inputs.image_size
@@ -324,7 +333,8 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
             balloons += " " + tr.t("fig.marker_colors")
     return Figure(view_index=index, caption=caption,
                   legend=_legend(inputs, view.color_field, tr), markers=tuple(markers),
-                  image_size=inputs.image_size, balloons=balloons)
+                  image_size=inputs.image_size, balloons=balloons,
+                  **_orientation(view, inputs, tr))
 
 
 def _constraint_text(c, tr: Translator) -> str:
@@ -359,7 +369,7 @@ def _boundary_figure(index, view: PlannedView, inputs: ReportInputs, numbers,
     return Figure(view_index=index,
                   caption=tr.t("fig.caption", n=index + 1, text=tr.t("fig.boundary")),
                   legend=legend, markers=(), image_size=inputs.image_size,
-                  balloons=" ".join(parts))
+                  balloons=" ".join(parts), **_orientation(view, inputs, tr))
 
 
 @dataclass
@@ -815,9 +825,11 @@ def _error_figure(ctx: FemContext, tr: Translator) -> Figure:
     inputs = ctx.inputs
     index = len(inputs.boundary_views) + len(inputs.views)  # captured after the views
     caption = tr.t("fig.caption", n=index + 1, text=tr.t("fig.error_map"))
+    view = inputs.error_view
+    extra = _orientation(view, inputs, tr) if view is not None else {}
     return Figure(view_index=index, caption=caption,
                   legend=_legend(inputs, FieldKind.ESTIMATED_ERROR, tr), markers=(),
-                  image_size=inputs.image_size)
+                  image_size=inputs.image_size, **extra)
 
 
 # Order chosen by the owner: images first, then the tables. Steps c) to f) of

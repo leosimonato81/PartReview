@@ -4,6 +4,8 @@
 figures read overview -> close-ups per quantity, and the stress away from
 supports/loads is reported next to a possibly singular maximum."""
 
+import pytest
+
 from freecad.PartReview.domain import camera_planner as cp
 from freecad.PartReview.domain.hotspots import Hotspot, HotspotKind, regular_stress_hotspot
 from freecad.PartReview.domain.models import (Constraint, ConstraintKind, FieldKind,
@@ -106,3 +108,17 @@ def test_reentrant_edges_finds_the_inner_corner_of_an_l_and_not_the_outer():
     # Same faces with the material on the other side (normals -z, -x): convex edge.
     flipped = [(a, c, b) for a, b, c in floor + wall]
     assert reentrant_edges(flipped, pos) == []
+
+
+def test_axes_scale_and_recentering():
+    cam = cp.frame(Vec3(0, 0, -1), ORIGIN, 5.0, ORIGIN, 50.0)  # looking down, 10 units tall
+    axes = dict((label, (du, dv)) for label, du, dv in cp.axes_2d(cam))
+    assert abs(axes["Z"][0]) < 1e-9 and abs(axes["Z"][1]) < 1e-9  # Z points at the viewer
+    length, px = cp.scale_bar(cam, 1600, 1200)  # 120 px per unit; raw 2.4 -> 2
+    assert length == 2.0 and px == 240.0
+    # the part lies only on the left half of the frame (x <= 0): the camera moves left,
+    # but the target (at the center) stays within 35 % of the half-width
+    part = [Vec3(x / 10.0, y / 10.0, 0) for x in range(-80, 1) for y in range(-50, 51, 10)]
+    moved = cp.recenter(cam, ORIGIN, part, 1600, 1200)
+    u, v = cp.project(moved, ORIGIN, 1600, 1200)
+    assert u > 800 and u <= 800 + 0.35 * 800 + 1e-6 and v == pytest.approx(600)

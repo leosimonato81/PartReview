@@ -143,6 +143,12 @@ def _plan(result, surface, max_views, boundary_views):
     views += [cp.plan_target_view(s, center, radius, is_visible) for s in results]
     views = cp.drop_redundant_closeups(views)
     selected = cp.reading_order(cp.select_views(views, max_views=max_views), results)
+    if surface is not None:  # close-ups: let the part fill the frame
+        nodes = sorted(surface.nodes)
+        sample = [mesh.node_positions[n] for n in nodes[::max(1, len(nodes) // 6000)]]
+        selected = [v if v.is_overview or not v.targets else
+                    replace(v, camera=cp.recenter(v.camera, v.targets[0].center, sample,
+                                                  *IMAGE_SIZE)) for v in selected]
     boundary = []
     if surface is not None:
         boundary = cp.plan_boundary_views(spots, center, radius, is_visible, boundary_views)

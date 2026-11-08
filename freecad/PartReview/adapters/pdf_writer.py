@@ -171,9 +171,82 @@ def _part_center(image, is_background, step=8):
     return (xs / n, ys / n) if n else None
 
 
-def draw_markers(image, markers):
+# Corners kept for the axes triad (bottom left) and the scale bar (bottom right),
+# as fractions of the image size: balloons are never placed there.
+TRIAD_BOX = (0.0, 0.8, 0.14, 1.0)
+SCALE_BOX = (0.72, 0.88, 1.0, 1.0)
+
+
+def _reserved(image):
+    """Points filling the triad and scale corners, treated as taken balloons."""
+    w, h = image.width(), image.height()
+    points = []
+    for x0, y0, x1, y1 in (TRIAD_BOX, SCALE_BOX):
+        for i in range(5):
+            for j in range(3):
+                points.append((w * (x0 + (x1 - x0) * i / 4), h * (y0 + (y1 - y0) * j / 2)))
+    return points
+
+
+def draw_figure(image, figure):
+    """Captured image with the figure's balloons, axes triad and scale bar."""
+    reserved = _reserved(image) if (figure.axes or figure.scale) else []
+    out = draw_markers(image, figure.markers, reserved)
+    if figure.axes or figure.scale:
+        _draw_orientation(out, figure)
+    return out
+
+
+def _draw_orientation(image, figure):
+    p = QPainter(image)
+    p.setRenderHint(QPainter.Antialiasing)
+    w, h = image.width(), image.height()
+    unit = h / 1200.0
+    font = QFont(FONT_FAMILY)
+    font.setPixelSize(int(28 * unit))
+    font.setBold(True)
+    p.setFont(font)
+    colors = {"X": QColor(200, 40, 40), "Y": QColor(30, 140, 50), "Z": QColor(40, 70, 200)}
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor(255, 255, 255, 200))  # readable over the part in close-ups
+    if figure.axes:
+        p.drawRoundedRect(QRectF(w * 0.015, h * 0.79, w * 0.11, h * 0.19), 8 * unit, 8 * unit)
+    if figure.scale:
+        _, px = figure.scale
+        p.drawRoundedRect(QRectF(w * 0.97 - px - 14 * unit, h * 0.95 - 52 * unit,
+                                 px + 28 * unit, 72 * unit), 8 * unit, 8 * unit)
+    if figure.axes:
+        ox, oy, length = w * 0.07, h * 0.9, 70 * unit
+        for label, du, dv in figure.axes:
+            if (du * du + dv * dv) < 0.02:  # pointing at the viewer: a dot
+                p.setPen(Qt.NoPen)
+                p.setBrush(colors[label])
+                p.drawEllipse(QPointF(ox, oy), 5 * unit, 5 * unit)
+                ex, ey = ox + 12 * unit, oy - 12 * unit
+            else:
+                ex, ey = ox + du * length, oy + dv * length
+                p.setPen(QPen(colors[label], 4 * unit))
+                p.drawLine(QPointF(ox, oy), QPointF(ex, ey))
+            p.setPen(colors[label])
+            p.drawText(QPointF(ex + 6 * unit * (1 if du >= 0 else -2.2),
+                               ey + 8 * unit * (1 if dv >= 0 else -0.2)), label)
+    if figure.scale:
+        label, px = figure.scale
+        x1, y = w * 0.97, h * 0.95
+        x0 = x1 - px
+        p.setPen(QPen(QColor(30, 30, 30), 4 * unit))
+        p.drawLine(QPointF(x0, y), QPointF(x1, y))
+        for x in (x0, x1):
+            p.drawLine(QPointF(x, y - 10 * unit), QPointF(x, y + 10 * unit))
+        p.setPen(QColor(30, 30, 30))
+        p.drawText(QRectF(x0, y - 44 * unit, px, 30 * unit), int(Qt.AlignCenter), label)
+    p.end()
+
+
+def draw_markers(image, markers, reserved=()):
     """Numbered balloons on a copy of the captured image: one balloon per visible
-    face/edge (same number), placed on the background next to its tip."""
+    face/edge (same number), placed on the background next to its tip.
+    ``reserved``: points balloons must keep away from (axes, scale bar)."""
     out = image.copy()
     p = QPainter(out)
     p.setRenderHint(QPainter.Antialiasing)
@@ -185,7 +258,7 @@ def draw_markers(image, markers):
     is_background = _background_test(image)
     center_of_part = _part_center(image, is_background)
     callouts = []  # (style, number, tip, balloon center)
-    placed, leaders = [], []
+    placed, leaders = list(reserved), []
     for m in sorted(markers, key=lambda m: _DRAW_ORDER.get(m.style, 0)):
         tips = []
         for tip in ((m.u, m.v),) + tuple(m.more):  # nearby tips of one spot: one balloon
@@ -514,7 +587,7 @@ def layout_document(doc, image_paths, style, page_w, page_h):
             cap_h = style.height(style.caption, figure_text(block), layout.width)
             layout.ensure(img_h + cap_h + mm(2))
             y = layout.y
-            image = draw_markers(QImage(image_paths[block.view_index]), block.markers)
+            image = draw_figure(QImage(image_paths[block.view_index]), block)
             rect = QRectF(x0, y, img_w, img_h)
             layout.add(lambda p, r=rect, im=image: (p.drawImage(r, im),
                                                     p.setPen(QPen(RULE, mm(0.2))),
