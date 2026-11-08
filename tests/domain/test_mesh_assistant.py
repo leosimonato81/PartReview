@@ -10,7 +10,7 @@ from freecad.PartReview.domain.geometry_summary import (
     find_issues,
 )
 from freecad.PartReview.domain.gmsh_log import parse_gmsh_log
-from freecad.PartReview.domain.mesh_sizing import MeshLevel, mesh_options
+from freecad.PartReview.domain.mesh_sizing import MeshLevel, mesh_options, with_straight_edges
 
 # Owner's part (spike 8.0, "Shroud 001"): real numbers from the geometry inventory.
 SHROUD = GeometrySummary(
@@ -98,3 +98,20 @@ def test_parse_gmsh_log():
     assert good.nodes == 191066 and good.inverted == 0
     broken = parse_gmsh_log("Error   : Unable to recover the edge 12\n")
     assert not broken.finished and broken.errors
+
+
+# Real node counts from the assistant tests in FreeCAD (curvature 12, 2nd order).
+@pytest.mark.parametrize("summary, level, nodes", [
+    (SHROUD, 0, 57285), (SHROUD, 1, 98723), (SHROUD, 2, 198495),
+    (box(1000, 1000, 1000), 0, 2492), (box(1000, 1000, 1000), 2, 41524),
+    (box(8000, 1000, 1000), 0, 1448), (box(8000, 1000, 1000), 2, 16277)])
+def test_real_node_counts_fall_in_the_estimated_range(summary, level, nodes):
+    option = mesh_options(summary)[level]
+    assert option.nodes_low <= nodes <= option.nodes_high
+
+
+def test_straight_edges_fallback_keeps_the_size():
+    coarse = mesh_options(SHROUD)[0]
+    fixed = with_straight_edges(coarse)
+    assert fixed.straight_edges and not coarse.straight_edges
+    assert fixed.max_size == coarse.max_size and fixed.level is coarse.level

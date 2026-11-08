@@ -7,22 +7,24 @@ Starting points (practical FEM rules), not verdicts: each option says why.
 - medium: about 2 (h = t/2); fine: about 3 (h = t/3);
 - chunky parts (t close to the part size) are capped by the bounding-box
   diagonal D: h <= D/10, D/20, D/30, so a solid block still gets a usable mesh.
-Always 2nd order and curvature-based sizing (FreeCAD default 12): in spike 8.0
+Always 2nd order (straight sides only as a fallback, see with_straight_edges) and
+curvature-based sizing (FreeCAD default 12): in spike 8.0
 coarse meshes WITHOUT curvature produced inverted 2nd-order elements that
 CalculiX refused; with curvature 12 the same sizes ran.
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from .geometry_summary import GeometrySummary
 
 CURVATURE = 12  # Gmsh "elements per 2*pi radians" (FreeCAD default, spike 8.0)
 TETS_PER_UNIT_VOLUME = 6.0 * math.sqrt(2.0)  # regular tetrahedron of edge h: V = h^3/(6 sqrt 2)
-# Spike 8.0: real meshes had 1.9x (no curvature) to 5.5x (curvature, small holes) the
-# tetrahedra of the regular-tet formula, and ~1.75 nodes per 2nd-order tetrahedron.
-TET_FACTOR_LOW, TET_FACTOR_HIGH = 2.0, 6.0
+# Real Gmsh meshes (2nd order, curvature 12) had 0.5x (plain blocks) to 5.7x (small
+# holes and fillets) the nodes of the regular-tetrahedron formula below, with
+# ~1.75 nodes per 2nd-order tetrahedron (spike 8.0 and the assistant tests).
+TET_FACTOR_LOW, TET_FACTOR_HIGH = 0.5, 6.0
 NODES_PER_TET = 1.75
 
 
@@ -46,6 +48,18 @@ class MeshOption:
     reason_key: str  # i18n key explaining max_size
     nodes_low: int  # rough range before meshing (the real count comes from Gmsh)
     nodes_high: int
+    straight_edges: bool = False  # -> SecondOrderLinear (fallback for inverted elements)
+
+
+def with_straight_edges(option: MeshOption) -> MeshOption:
+    """Same option with straight-sided 2nd-order elements.
+
+    Curved 2nd-order elements follow curved surfaces better, but near tiny details
+    they can fold (negative Jacobian) and CalculiX refuses them. Straight sides
+    remove the fold at the same size (spike 8.0: 1 inverted element -> 0).
+    Gmsh's HighOrderOptimize is NOT used: it aborted Gmsh in FreeCAD 1.1.4.
+    """
+    return replace(option, straight_edges=True)
 
 
 def estimate_nodes(volume: float, size: float, factor: float) -> int:
