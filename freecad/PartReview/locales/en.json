@@ -356,5 +356,6 @@
   "ma.group.create": "4 · Create the mesh",
   "ma.group.numbers": "Show all the numbers",
   "ma.card.nodes": "{nodes}k nodes",
-  "ma.card.not_tested": "not tried"
+  "ma.card.not_tested": "not tried",
+  "fig.marker_colors": "Balloon colors: black = result; orange (round tip) = load; blue (square tip) = support; one line per visible face or edge."
 }

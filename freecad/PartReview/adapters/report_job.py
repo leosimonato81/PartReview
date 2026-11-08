@@ -111,7 +111,14 @@ def _plan(result, surface, max_views):
         if result.get_field(kind) is not None:
             views.append(cp.plan_overview(kind, spots, center, radius, is_visible))
     views += [cp.plan_target_view(s, center, radius, is_visible) for s in spots]
-    return spots, cp.select_views(views, max_views=max_views)
+    selected = cp.select_views(views, max_views=max_views)
+    # Supports and loads: a leader only to faces/edges really visible in that view (a
+    # leader to a hidden face misleads). Result points keep the planner's choice: they
+    # were already chosen visible, and a peak on a sharp corner can fail a strict ray.
+    selected = [replace(v, leaders=tuple(
+        tuple(p for p in t.leader_points if is_visible(p, v.camera.direction))
+        if t.anchors else t.leader_points for t in v.targets)) for v in selected]
+    return spots, selected
 
 
 def _equilibrium(analysis, result):

@@ -47,8 +47,10 @@ class Legend:
 @dataclass(frozen=True)
 class Marker:
     number: int
-    u: float  # pixel position in the captured image
+    u: float  # pixel position in the captured image (first leader)
     v: float
+    style: str = "result"  # "result" (black), "load" (orange) or "support" (blue)
+    more: tuple[tuple[float, float], ...] = ()  # extra leaders: other faces/edges
 
 
 @dataclass(frozen=True)

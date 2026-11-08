@@ -44,6 +44,13 @@ class Hotspot:
     peak_value: Quantity | None = None
     label: str = ""  # user label for supports/loads: never translated
     singularity_near: str = ""  # label of the constraint it touches, if any
+    # Points ON the part where the balloon leaders point (one per face/edge group of a
+    # support or load). Empty: the leader points at ``center``.
+    anchors: tuple[Vec3, ...] = ()
+
+    @property
+    def leader_points(self) -> tuple[Vec3, ...]:
+        return self.anchors or (self.center,)
 
     @property
     def priority(self) -> int:
@@ -169,28 +176,98 @@ def _triangle_normal_area(tri):
     return g.cross(g.sub(b, a), g.sub(c, a))  # length = 2 * area
 
 
+MAX_ANCHORS = 6
+
+
+def _groups(items, keys):
+    """Connected groups of items (triangles or segments) that share a vertex."""
+    parent = list(range(len(items)))
+
+    def root(i):
+        for _ in range(len(items)):  # bounded path walk (rule 6)
+            if parent[i] == i:
+                break
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    first_owner = {}
+    for index, item in enumerate(items):
+        for k in keys(item):
+            if k in first_owner:
+                a, b = root(index), root(first_owner[k])
+                if a != b:
+                    parent[a] = b
+            else:
+                first_owner[k] = index
+    groups = {}
+    for index, item in enumerate(items):
+        groups.setdefault(root(index), []).append(item)
+    return list(groups.values())
+
+
+def _surface_anchor(triangles):
+    """(point on the triangles nearest their area-weighted centroid, area).
+
+    The centroid of a curved or L-shaped face can lie in the air; the centroid of
+    the triangle closest to it always lies on the face.
+    """
+    weighted, area_sum = Vec3(0.0, 0.0, 0.0), 0.0
+    for tri in triangles:
+        area = g.length(_triangle_normal_area(tri)) / 2.0
+        weighted = g.add(weighted, g.scale(g.centroid(tri), area))
+        area_sum += area
+    if area_sum <= 0:
+        return None, 0.0
+    c = g.scale(weighted, 1.0 / area_sum)
+    best = min(triangles, key=lambda tri: g.point_triangle_distance(c, *tri))
+    return g.centroid(best), area_sum
+
+
+def _line_anchor(segments):
+    """(midpoint of the segment nearest the group's middle, length)."""
+    length = sum(g.distance(a, b) for a, b in segments)
+    mid = g.scale(g.add(*segments[0]), 0.5) if length == 0 else None
+    if mid is None:
+        weighted = Vec3(0.0, 0.0, 0.0)
+        for a, b in segments:
+            weighted = g.add(weighted, g.scale(g.add(a, b), 0.5 * g.distance(a, b)))
+        c = g.scale(weighted, 1.0 / length)
+        a, b = min(segments, key=lambda s: g.point_segment_distance(c, *s))
+        mid = g.scale(g.add(a, b), 0.5)
+    return mid, length
+
+
+def _key(p):
+    return (round(p.x, 6), round(p.y, 6), round(p.z, 6))
+
+
 def constraint_hotspot(constraint: Constraint) -> Hotspot | None:
-    """Support/load region from the constraint's CAD face triangles."""
-    if not constraint.geometry:
+    """Support/load region: one anchor ON the part per face, edge or vertex group."""
+    if not (constraint.geometry or constraint.lines or constraint.points):
         return None
     if constraint.kind is ConstraintKind.FIXED or constraint.kind is ConstraintKind.DISPLACEMENT:
         kind = HotspotKind.SUPPORT
     else:
         kind = HotspotKind.LOAD
-    weighted = Vec3(0.0, 0.0, 0.0)
+    anchors = []  # (size, point): faces by area, edges by length, vertices last
+    for group in _groups(list(constraint.geometry), lambda tri: [_key(p) for p in tri]):
+        point, area = _surface_anchor(group)
+        if point is not None:
+            anchors.append((area, point))
+    for group in _groups(list(constraint.lines), lambda seg: [_key(p) for p in seg]):
+        point, length = _line_anchor(group)
+        anchors.append((length, point))
+    anchors += [(0.0, p) for p in constraint.points]
+    anchors.sort(key=lambda a: -a[0])
+    points = tuple(p for _, p in anchors[:MAX_ANCHORS])
+    center = points[0]
+    vertices = ([p for tri in constraint.geometry for p in tri]
+                + [p for seg in constraint.lines for p in seg] + list(constraint.points))
+    radius = max(g.distance(center, p) for p in vertices) if vertices else 0.0
     normal_sum = Vec3(0.0, 0.0, 0.0)
-    total_area = 0.0
     for tri in constraint.geometry:
-        n = _triangle_normal_area(tri)
-        area = g.length(n) / 2.0
-        weighted = g.add(weighted, g.scale(g.centroid(tri), area))
-        normal_sum = g.add(normal_sum, n)
-        total_area += area
-    if total_area <= 0:
-        return None
-    center = g.scale(weighted, 1.0 / total_area)
-    vertices = [p for tri in constraint.geometry for p in tri]
-    radius = max(g.distance(center, p) for p in vertices)
+        normal_sum = g.add(normal_sum, _triangle_normal_area(tri))
     centroids = [g.centroid(tri) for tri in constraint.geometry]
     step = max(1, len(centroids) // 6)
     return Hotspot(
@@ -198,9 +275,10 @@ def constraint_hotspot(constraint: Constraint) -> Hotspot | None:
         center=center,
         radius=radius,
         normal=g.normalize(normal_sum) if g.length(normal_sum) > 1e-9 else None,
-        sample_points=tuple([center] + centroids[::step][:6]),
+        sample_points=tuple(list(points) + centroids[::step][:6]),
         color_field=FieldKind.VON_MISES,
         label=constraint.label,
+        anchors=points,
     )
 
 

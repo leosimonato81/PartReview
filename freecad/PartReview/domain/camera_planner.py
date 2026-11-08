@@ -52,6 +52,9 @@ class PlannedView:
     targets: tuple[Hotspot, ...]  # hotspots shown (marked) in this view
     is_overview: bool = False
     score: float = 0.0
+    # Per target, the leader points visible in this view (filled after planning).
+    # Empty tuple of tuples: not computed, every leader point is drawn.
+    leaders: tuple = ()
 
     @property
     def priority(self) -> int:

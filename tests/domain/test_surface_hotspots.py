@@ -135,7 +135,9 @@ def test_constraint_hotspot_and_singularity():
     load = Constraint(ConstraintKind.FORCE, "Força", geometry=square(6.0))
     spot = constraint_hotspot(fixed)
     assert spot.kind is HotspotKind.SUPPORT and spot.label == "Fixo"
-    assert spot.center == pytest.approx(Vec3(0.0, 0.5, 0.5))
+    assert spot.center.x == 0.0  # on the face (x = 0), near its middle
+    assert abs(spot.center.y - 0.5) < 0.25 and abs(spot.center.z - 0.5) < 0.25
+    assert spot.anchors == (spot.center,)
     assert constraint_hotspot(load).kind is HotspotKind.LOAD
     assert constraint_hotspot(Constraint(ConstraintKind.FIXED, "x")) is None
 
@@ -161,3 +163,58 @@ def test_stress_on_an_edge_support_is_flagged_as_singular():
     assert not face.on_edges_or_vertices
     point = Constraint(ConstraintKind.FORCE, "P", ("P:Vertex3",), points=(Vec3(0, 0, 0),))
     assert distance_to_constraint(Vec3(3, 4, 0), point) == 5.0
+
+
+def test_load_on_two_separate_faces_gets_one_anchor_on_each_never_in_the_air():
+    # Owner's model: one force on two faces of different plates. Their common
+    # centroid is in the air; the balloon must point at each face instead.
+    from freecad.PartReview.domain.geometry import point_triangle_distance
+    a = square(0.0)  # face at x = 0, 0..1 in y and z
+    b = tuple(tuple(Vec3(p.z + 5.0, 3.0, p.y) for p in tri) for tri in square(0.0))  # y = 3
+    load = Constraint(ConstraintKind.FORCE, "ConstraintForce", ("P:Face4", "P:Face38"),
+                      geometry=a + b)
+    spot = constraint_hotspot(load)
+    assert len(spot.anchors) == 2
+    for anchor in spot.anchors:
+        assert min(point_triangle_distance(anchor, *tri) for tri in a + b) < 1e-9
+    assert spot.center in spot.anchors
+
+
+def test_support_on_hole_edges_gets_an_anchor_on_each_edge():
+    import math
+    def circle(cx, n=12):
+        pts = [Vec3(cx + math.cos(2 * math.pi * k / n), math.sin(2 * math.pi * k / n), 0.0)
+               for k in range(n + 1)]
+        return tuple(zip(pts, pts[1:]))
+    fixed = Constraint(ConstraintKind.FIXED, "ConstraintFixed", ("P:Edge19", "P:Edge20"),
+                       lines=circle(0.0) + circle(10.0))
+    spot = constraint_hotspot(fixed)
+    assert spot.kind is HotspotKind.SUPPORT and len(spot.anchors) == 2
+    for anchor in spot.anchors:  # on a circle of radius 1 around x = 0 or x = 10
+        cx = 0.0 if anchor.x < 5 else 10.0
+        assert math.hypot(anchor.x - cx, anchor.y) == pytest.approx(1.0, abs=0.05)
+
+
+def test_figure_markers_follow_visible_leaders_and_kind():
+    from dataclasses import replace
+    from freecad.PartReview.domain.camera_planner import CameraSpec, PlannedView
+    from freecad.PartReview.domain.i18n import Translator
+    from freecad.PartReview.domain.report import _figure
+    from test_i18n_report import make_inputs
+    a = square(0.0)
+    b = tuple(tuple(Vec3(p.z + 5.0, 3.0, p.y) for p in tri) for tri in square(0.0))
+    load = constraint_hotspot(Constraint(ConstraintKind.FORCE, "F", ("P:Face1", "P:Face2"),
+                                         geometry=a + b))
+    cam = CameraSpec(direction=Vec3(0, 0, -1), up=Vec3(0, 1, 0), center=Vec3(2.5, 1.5, 0.5),
+                     height=10.0, distance=50.0, near=1.0, far=100.0)
+    inputs = make_inputs()
+    numbers = {load: 3}
+    both = PlannedView(cam, FieldKind.VON_MISES, (load,), leaders=(load.anchors,))
+    fig = _figure(0, both, inputs, numbers, Translator("pt_BR", strict=True))
+    m = fig.markers[0]
+    assert m.number == 3 and m.style == "load" and len(m.more) == 1
+    assert "laranja" in fig.balloons
+    one = replace(both, leaders=(load.anchors[:1],))
+    assert _figure(0, one, inputs, numbers, Translator("en", strict=True)).markers[0].more == ()
+    hidden = replace(both, leaders=((),))
+    assert _figure(0, hidden, inputs, numbers, Translator("en", strict=True)).markers == ()

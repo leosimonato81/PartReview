@@ -356,5 +356,6 @@
   "ma.group.create": "4 · Criar a malha",
   "ma.group.numbers": "Ver todos os números",
   "ma.card.nodes": "{nodes} mil nós",
-  "ma.card.not_tested": "não testada"
+  "ma.card.not_tested": "não testada",
+  "fig.marker_colors": "Cores dos balões: preto = resultado; laranja (ponta redonda) = carga; azul (ponta quadrada) = apoio; uma linha para cada face ou aresta visível."
 }

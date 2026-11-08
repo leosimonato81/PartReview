@@ -217,10 +217,16 @@ def _legend(inputs: ReportInputs, kind: FieldKind, tr: Translator) -> Legend:
 def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Translator) -> Figure:
     w, h = inputs.image_size
     markers, shown = [], []
+    leaders = dict(zip(view.targets, view.leaders)) if view.leaders else {}
     for spot in sorted(view.targets, key=numbers.__getitem__):
-        u, v = project(view.camera, spot.center, w, h)
-        if 0 <= u <= w and 0 <= v <= h:
-            markers.append(Marker(numbers[spot], u, v))
+        points = leaders.get(spot, spot.leader_points)
+        pixels = [project(view.camera, p, w, h) for p in points]
+        pixels = [(u, v) for u, v in pixels if 0 <= u <= w and 0 <= v <= h]
+        if pixels:
+            style = {HotspotKind.LOAD: "load", HotspotKind.SUPPORT: "support"}.get(
+                spot.kind, "result")
+            markers.append(Marker(numbers[spot], pixels[0][0], pixels[0][1], style,
+                                  tuple(pixels[1:])))
             shown.append(spot)
     field_name = _field_name(view.color_field, tr)
     key = "fig.overview" if view.is_overview else "fig.closeup"
@@ -229,6 +235,8 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
     if shown:
         balloons = tr.t("fig.marker_list", items=tr.list_sep.join(
             _balloon_text(s, numbers[s], tr) for s in shown))
+        if any(m.style != "result" for m in markers):
+            balloons += " " + tr.t("fig.marker_colors")
     return Figure(view_index=index, caption=caption,
                   legend=_legend(inputs, view.color_field, tr), markers=tuple(markers),
                   image_size=inputs.image_size, balloons=balloons)
