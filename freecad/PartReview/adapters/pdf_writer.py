@@ -31,7 +31,7 @@ from ..domain import colormap
 from ..domain.colors import accent_palette
 from ..domain.logo import COMPACT_COVER_BOX_MM, FULL_COVER_BOX_MM
 from ..domain.blocks import BarChart, BulletList, Figure, Heading, Notice, Paragraph, Table
-from ..domain.balloons import place_balloon
+from ..domain.balloons import place_balloon, untangle
 from .logo_loader import load_logo
 
 DPI = 300
@@ -185,13 +185,17 @@ def draw_markers(image, markers):
     is_background = _background_test(image)
     center_of_part = _part_center(image, is_background)
     callouts = []  # (style, number, tip, balloon center)
-    placed = []
+    placed, leaders = [], []
     for m in sorted(markers, key=lambda m: _DRAW_ORDER.get(m.style, 0)):
         for tip in ((m.u, m.v),) + tuple(m.more):
             c = place_balloon(tip, radius, (image.width(), image.height()), is_background,
-                              placed, center_of_part)
+                              placed, center_of_part, leaders)
             placed.append(c)
+            leaders.append((tip, c))
             callouts.append((m.style, m.number, tip, c))
+    pairs = untangle([[tip, c] for _, _, tip, c in callouts])  # no crossing leaders
+    callouts = [(style, number, tip, pair[1])
+                for (style, number, tip, _), pair in zip(callouts, pairs)]
     for style, number, (u, v), (cx, cy) in callouts:  # leaders first, balloons on top
         color = MARKER_COLORS.get(style, MARKER_COLORS["result"])
         target, center = QPointF(u, v), QPointF(cx, cy)

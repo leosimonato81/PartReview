@@ -30,8 +30,20 @@ def _disc_is_clear(x, y, radius, is_background):
     return True
 
 
-def place_balloon(tip, radius, size, is_background, placed=(), away_from=None):
-    """Balloon center for a leader ending at ``tip`` (pixels) in an image of ``size``."""
+def segments_cross(a, b, c, d) -> bool:
+    """True when segments ab and cd properly intersect (shared end points do not count)."""
+    def orient(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+    d1, d2 = orient(c, d, a), orient(c, d, b)
+    d3, d4 = orient(a, b, c), orient(a, b, d)
+    return d1 * d2 < 0 and d3 * d4 < 0
+
+
+def place_balloon(tip, radius, size, is_background, placed=(), away_from=None, leaders=()):
+    """Balloon center for a leader ending at ``tip`` (pixels) in an image of ``size``.
+
+    ``placed``: centers already used; ``leaders``: (tip, center) of balloons already
+    placed, so the new leader does not cross them."""
     u, v = tip
     width, height = size
     if away_from is None or (away_from[0] - u, away_from[1] - v) == (0, 0):
@@ -53,6 +65,8 @@ def place_balloon(tip, radius, size, is_background, placed=(), away_from=None):
         gap = min((math.hypot(x - px, y - py) for px, py in placed), default=math.inf)
         if gap < MIN_GAP * radius:
             continue
+        if any(segments_cross(tip, (x, y), t, c) for t, c in leaders):
+            continue
         if _disc_is_clear(x, y, radius, is_background):
             return x, y
         if fallback is None:
@@ -61,3 +75,22 @@ def place_balloon(tip, radius, size, is_background, placed=(), away_from=None):
         return fallback
     return (min(max(u + 3 * radius, radius), width - radius),
             min(max(v - 3 * radius, radius), height - radius))
+
+
+def untangle(callouts, max_rounds=20):
+    """Swap the balloons of two crossing leaders until none cross (bounded, rule 6).
+
+    ``callouts``: list of [tip, center]; swapping two centers removes a crossing and
+    never makes the total leader length longer (classic exchange argument)."""
+    for _ in range(max_rounds):
+        changed = False
+        for i in range(len(callouts)):
+            for j in range(i + 1, len(callouts)):
+                ti, ci = callouts[i]
+                tj, cj = callouts[j]
+                if segments_cross(ti, ci, tj, cj):
+                    callouts[i][1], callouts[j][1] = cj, ci
+                    changed = True
+        if not changed:
+            break
+    return callouts

@@ -40,3 +40,21 @@ def test_balloon_stays_inside_the_image():
     part = block(0, 0, 790, 590)  # almost everything is the part
     x, y = place_balloon((780, 580), R, (W, H), part, away_from=(400, 300))
     assert R <= x <= W - R and R <= y <= H - R
+
+
+def test_leaders_do_not_cross():
+    from freecad.PartReview.domain.balloons import segments_cross, untangle
+    assert segments_cross((0, 0), (10, 10), (0, 10), (10, 0))
+    assert not segments_cross((0, 0), (10, 0), (0, 5), (10, 5))
+    part = block(200, 150, 600, 450)
+    placed, leaders = [], []
+    tips = [(300, 300), (320, 310), (500, 200), (560, 420), (210, 440), (590, 160)]
+    for tip in tips:
+        c = place_balloon(tip, R, (W, H), part, placed, (400, 300), leaders)
+        placed.append(c)
+        leaders.append((tip, c))
+    for i, (a, b) in enumerate(leaders):
+        for c, d in leaders[i + 1:]:
+            assert not segments_cross(a, b, c, d)
+    crossed = untangle([[(0, 0), (10, 10)], [(0, 10), (10, 0)]])
+    assert not segments_cross(crossed[0][0], crossed[0][1], crossed[1][0], crossed[1][1])
