@@ -253,23 +253,41 @@ def _figure(index, view: PlannedView, inputs: ReportInputs, numbers, tr: Transla
                   image_size=inputs.image_size, balloons=balloons)
 
 
+def _constraint_text(c, tr: Translator) -> str:
+    if c.magnitude is not None:
+        return "%s (%s)" % (c.label, tr.quantity(c.magnitude, 4))
+    return c.label
+
+
 def _boundary_figure(index, view: PlannedView, inputs: ReportInputs, numbers,
                      tr: Translator) -> Figure:
-    """Supports (purple) and loads (orange) on the gray part, with their balloons."""
-    markers, shown = _markers(view, inputs, numbers)
-    caption = tr.t("fig.caption", n=index + 1, text=tr.t("fig.boundary"))
-    balloons = ""
-    if shown:
-        balloons = tr.t("fig.marker_list", items=tr.list_sep.join(
-            _balloon_text(s, numbers[s], tr) for s in shown))
-    arrows = any(t.kind is HotspotKind.LOAD for t in view.targets)
-    balloons = (balloons + " " + tr.t("fig.boundary_arrows" if arrows
-                                      else "fig.boundary_note")).strip()
+    """Supports (purple) and loads (orange) on the gray part: colors and arrows only.
+
+    No balloons (owner's request): the caption names what is visible in this view.
+    """
+    seen = {t.label for t in view.targets}
+    supports, loads = [], []
+    for c in inputs.result.constraints:
+        if c.label not in seen:
+            continue
+        if c.kind in (ConstraintKind.FIXED, ConstraintKind.DISPLACEMENT):
+            supports.append(_constraint_text(c, tr))
+        elif c.kind in (ConstraintKind.FORCE, ConstraintKind.PRESSURE):
+            loads.append(_constraint_text(c, tr))
+    parts = []
+    if supports:
+        parts.append(tr.t("fig.boundary_supports", items=tr.list_sep.join(supports)))
+    if loads:
+        parts.append(tr.t("fig.boundary_loads", items=tr.list_sep.join(loads)))
+    if any(t.kind is HotspotKind.LOAD for t in view.targets):
+        parts.append(tr.t("fig.boundary_arrows"))
     legend = Legend(title=tr.t("fig.boundary_legend"), ticks=(),
                     swatches=((SUPPORT_RGB, tr.t("summary.supports")),
                               (LOAD_RGB, tr.t("summary.loads"))))
-    return Figure(view_index=index, caption=caption, legend=legend, markers=tuple(markers),
-                  image_size=inputs.image_size, balloons=balloons)
+    return Figure(view_index=index,
+                  caption=tr.t("fig.caption", n=index + 1, text=tr.t("fig.boundary")),
+                  legend=legend, markers=(), image_size=inputs.image_size,
+                  balloons=" ".join(parts))
 
 
 @dataclass

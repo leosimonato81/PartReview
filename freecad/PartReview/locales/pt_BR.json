@@ -410,6 +410,7 @@
   "mo.col.global": "Erro global",
   "fig.boundary": "Apoios e cargas: regiões presas em roxo, regiões carregadas em laranja",
   "fig.boundary_legend": "Condições de contorno",
-  "fig.boundary_arrows": "Setas = direção da força. Apoio ou carga em várias faces ou arestas repete o número, um balão para cada uma visível.",
-  "fig.boundary_note": "Apoio ou carga em várias faces ou arestas repete o número, um balão para cada uma visível."
+  "fig.boundary_arrows": "Setas: direção de cada força.",
+  "fig.boundary_supports": "Em roxo (apoios): {items}.",
+  "fig.boundary_loads": "Em laranja (cargas): {items}."
 }

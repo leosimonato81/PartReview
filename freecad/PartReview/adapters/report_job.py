@@ -87,7 +87,8 @@ def _visible_leaders(views, is_visible):
 
 
 def _plan(result, surface, max_views, boundary_views):
-    """Hotspots (numbered order), result views and supports/loads views.
+    """Result hotspots (numbered order), result views, supports/loads views,
+    model radius and all hotspots (supports/loads included, for the arrows).
 
     Result images carry only result balloons; supports and loads get their own
     figure on a gray part (owner's request: colored balloons over the stress
@@ -130,7 +131,9 @@ def _plan(result, surface, max_views, boundary_views):
     boundary = []
     if surface is not None:
         boundary = cp.plan_boundary_views(spots, center, radius, is_visible, boundary_views)
-    return spots, selected, _visible_leaders(boundary, is_visible), radius
+    # Supports and loads are shown by color and arrows only (no balloons, owner's
+    # request): the numbered points of the report are results only.
+    return results, selected, boundary, radius, spots
 
 
 def _equilibrium(analysis, result):
@@ -209,7 +212,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
     zz, error_field = _error_estimate(analysis, result_obj, result, tets)
 
     progress(tr.t("progress.hotspots"), 0.3)
-    spots, views, boundary_views, radius = _plan(
+    spots, views, boundary_views, radius, all_spots = _plan(
         result, surface, views_for_level(config),
         1 if config.level is ReportLevel.QUICK else 2)
     progress(tr.t("progress.planning"), 0.4)
@@ -243,7 +246,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
                 vs.save_image(image_paths[len(boundary_views) + i], *IMAGE_SIZE)
             if boundary_views:  # last, because the mesh is hidden for them
                 vs.show_only([])
-                vs.add_overlay(boundary_scene.build(result, surface, spots, radius))
+                vs.add_overlay(boundary_scene.build(result, surface, all_spots, radius))
                 for i, view in enumerate(boundary_views):
                     progress(tr.t("progress.capture", n=len(shots) + i + 1, total=total),
                              0.4 + 0.5 * (len(shots) + i) / total)

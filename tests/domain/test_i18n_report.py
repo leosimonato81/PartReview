@@ -82,16 +82,16 @@ def make_inputs(yield_strength=None):
     spots = field_hotspots(stress, mesh, surface) + field_hotspots(disp, mesh, surface)
     spots += [constraint_hotspot(fixed), constraint_hotspot(load)]
     spots = order_hotspots(mark_singularities(spots, [fixed, load], 0.5))
+    boundary = cp.plan_boundary_views(spots, Vec3(3, 0.5, 0.5), 3.5, lambda p, d: True)
+    spots = [s for s in spots if s.kind not in cp.BOUNDARY_KINDS]  # numbered: results only
     center, radius = Vec3(3, 0.5, 0.5), 3.5
 
     def visible(p, d):
         return True
 
-    results = [s for s in spots if s.kind not in cp.BOUNDARY_KINDS]  # as report_job
-    views = [cp.plan_overview(FieldKind.VON_MISES, results, center, radius, visible)]
-    views += [cp.plan_target_view(s, center, radius, visible) for s in results]
+    views = [cp.plan_overview(FieldKind.VON_MISES, spots, center, radius, visible)]
+    views += [cp.plan_target_view(s, center, radius, visible) for s in spots]
     views = cp.select_views(views)
-    boundary = cp.plan_boundary_views(spots, center, radius, visible)
     config = ReportConfig(result_name="CCX_Results", title="Suporte do motor",
                           author="Leo", output_path="r.pdf")
     return ReportInputs(result=result, config=config, hotspots=spots, views=views,

@@ -12,12 +12,13 @@ All notable changes to PartReview. / Mudanças importantes do PartReview.
   applied; old results stay until the new solve succeeds. / Novo comando: refino
   adaptativo pelo erro, seguro e com explicação de por que parou.
 - **Report: supports and loads figure / Relatório: figura de apoios e cargas.**
-  Figure 1 now shows the part in gray with the held regions in purple, the
-  loaded regions in orange and arrows along each force; a second view is added
-  only for supports or loads hidden in the first. Result images keep only the
-  result balloons, so the colors of the stress map are no longer covered. /
-  A figura 1 mostra a peça em cinza, apoios em roxo, cargas em laranja e setas
-  na direção das forças; as imagens de resultado ficam só com os balões de
+  Figure 1 shows the part in gray with the held regions in purple, the loaded
+  regions in orange and arrows along each force, without balloons (the caption
+  names each support and load with its value); a second view is added only for
+  supports or loads hidden in the first. Result images keep only the result
+  balloons, and the numbered points are results only. / A figura 1 mostra a
+  peça em cinza, apoios em roxo, cargas em laranja e setas na direção das
+  forças, sem balões; as imagens de resultado ficam só com os balões de
   resultado.
 
 ## 1.5.1 — 2026-11-08

@@ -410,6 +410,7 @@
   "mo.col.global": "Global error",
   "fig.boundary": "Supports and loads: held regions in purple, loaded regions in orange",
   "fig.boundary_legend": "Boundary conditions",
-  "fig.boundary_arrows": "Arrows = force direction. A support or load on several faces or edges repeats its number, one balloon per visible one.",
-  "fig.boundary_note": "A support or load on several faces or edges repeats its number, one balloon per visible one."
+  "fig.boundary_arrows": "Arrows: direction of each force.",
+  "fig.boundary_supports": "In purple (supports): {items}.",
+  "fig.boundary_loads": "In orange (loads): {items}."
 }

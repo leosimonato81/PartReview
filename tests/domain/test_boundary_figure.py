@@ -33,10 +33,20 @@ def test_supports_and_loads_figure_comes_first_with_category_legend():
     first = figs[0]
     assert first.view_index == 0 and first.caption.startswith("Figura 1 — Apoios e cargas")
     assert [rgb for rgb, _ in first.legend.swatches] == [SUPPORT_RGB, LOAD_RGB]
-    assert {m.style for m in first.markers} == {"support", "load"}
-    assert "Setas = direção da força" in first.balloons
+    assert first.markers == ()  # colors and arrows only, no balloons (owner's request)
+    assert "Em roxo (apoios): Engaste." in first.balloons
+    assert "Em laranja (cargas): Força (12,00 N)." in first.balloons
+    assert "Setas: direção de cada força." in first.balloons
     # numbering follows the capture order: 1, 2, 3...
     assert [f.view_index for f in figs] == list(range(len(figs)))
+
+
+def test_numbered_points_are_results_only():
+    report = build_report(make_inputs(), Translator("pt_BR", strict=True))
+    from freecad.PartReview.domain.blocks import Table
+    points = [b for b in report.blocks if isinstance(b, Table) and b.header
+              and b.header[0] == "Nº"][0]
+    assert not any("Apoio" in row[1] or "Carga" in row[1] for row in points.rows)
 
 
 def test_result_figures_have_only_result_balloons():
