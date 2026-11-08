@@ -38,6 +38,80 @@ def _rss_mb(pid):
     return 0.0
 
 
+def gmsh_binary():
+    """Gmsh executable as configured in FreeCAD's FEM preferences, else from PATH."""
+    import shutil
+    params = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Fem/Gmsh")
+    custom = "" if params.GetBool("UseStandardGmshLocation", True) else \
+        params.GetString("gmshBinaryPath", "")
+    return shutil.which(custom) if custom else shutil.which("gmsh")
+
+
+def ccx_binary():
+    """CalculiX executable as FreeCAD would use it (same rule as femtools.ccxtools)."""
+    import shutil
+    custom = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Fem/Ccx").GetString(
+        "ccxBinaryPath", "")
+    return shutil.which(custom) if custom else shutil.which("ccx")
+
+
+def ccx_threads():
+    """OMP_NUM_THREADS as FreeCAD sets it for CalculiX."""
+    wanted = App.ParamGet("User parameter:BaseApp/Preferences/Mod/Fem/Ccx").GetInt(
+        "AnalysisNumCPUs", 1)
+    return wanted if wanted > 1 else (os.cpu_count() or 1)
+
+
+class WatchedProcess:
+    """A child process with time limit and memory watchdog, polled by the caller."""
+
+    def __init__(self, command, cwd, log_path, time_limit_s, memory_limit_mb, env=None):
+        self.command, self.cwd, self.log_path, self.env = command, cwd, log_path, env
+        self.time_limit, self.memory_limit = time_limit_s, memory_limit_mb
+        self.elapsed = 0.0
+        self.peak_mb = 0.0
+        self.returncode = None
+        self.stopped = ""  # "timeout" / "memory" / "cancelled" when killed
+        self._process = None
+        self._log = None
+        self._t0 = 0.0
+
+    def start(self):
+        self._log = open(self.log_path, "w")
+        self._process = subprocess.Popen(self.command, cwd=self.cwd, env=self.env,
+                                         stdout=self._log, stderr=subprocess.STDOUT)
+        self._t0 = time.monotonic()
+
+    def poll(self):
+        """True while running."""
+        if self._process is None or self.returncode is not None or self.stopped:
+            return False
+        self.elapsed = time.monotonic() - self._t0
+        self.peak_mb = max(self.peak_mb, _rss_mb(self._process.pid))
+        code = self._process.poll()
+        if code is None:
+            if self.elapsed > self.time_limit:
+                self.kill("timeout")
+            elif self.peak_mb > self.memory_limit:
+                self.kill("memory")
+            return not self.stopped
+        self.returncode = code
+        self._log.close()
+        return False
+
+    def kill(self, reason="cancelled"):
+        if self._process is not None and self._process.poll() is None:
+            self._process.kill()
+            self._process.wait()
+        self.stopped = reason
+        if self._log is not None and not self._log.closed:
+            self._log.close()
+
+    def log_text(self):
+        with open(self.log_path, errors="replace") as fh:
+            return fh.read()
+
+
 class GmshJob:
     """One Gmsh run for a Gmsh mesh object, polled by the caller."""
 
@@ -188,3 +262,84 @@ def remove_assistant_objects(doc):
     doc.commitTransaction()
     doc.recompute()
     return len(objs)
+
+
+class ProbeJob:
+    """CalculiX on a trial mesh of the user's part (generic support and load), to
+    measure solver memory and time on this computer. Uses the trial's own Gmsh
+    settings, re-meshed into a CalculiX .inp with only the volume."""
+
+    MESH, SOLVE, DONE, FAILED, CANCELLED = "mesh", "solve", "done", "failed", "cancelled"
+
+    def __init__(self, gmsh_job, time_limit_s, memory_limit_mb):
+        from ..domain import solver_probe as sp
+        self._sp = sp
+        self.workdir = os.path.dirname(gmsh_job.tools.temp_file_geo)
+        with open(gmsh_job.tools.temp_file_geo) as fh:
+            geo = fh.read()
+        with open(os.path.join(self.workdir, "probe.geo"), "w") as fh:
+            fh.write(sp.probe_geo(geo, "probe_mesh.inp"))
+        self.gmsh, self.ccx = gmsh_job.tools.gmsh_bin, ccx_binary()
+        if not self.ccx:
+            raise FileNotFoundError("ccx")
+        self.time_limit, self.memory_limit = time_limit_s, memory_limit_mb
+        self.env = dict(os.environ, OMP_NUM_THREADS=str(ccx_threads()))
+        self.state = None
+        self.process = None
+        self.nodes = 0
+        self.seconds = 0.0
+        self.peak_mb = 0.0
+        self.mesh_seconds = 0.0
+        self.reason = ""
+
+    @property
+    def elapsed(self):
+        return self.mesh_seconds + (self.process.elapsed if self.process else 0.0)
+
+    def start(self):
+        self.process = WatchedProcess([self.gmsh, "-", "probe.geo"], self.workdir,
+                                      os.path.join(self.workdir, "probe_gmsh.log"),
+                                      self.time_limit, self.memory_limit)
+        self.process.start()
+        self.state = self.MESH
+
+    def poll(self):
+        if self.state not in (self.MESH, self.SOLVE):
+            return self.state
+        if self.process.poll():
+            return self.state
+        if self.process.stopped or self.process.returncode != 0:
+            self.reason = self.process.stopped or "failed"
+            self.state = self.CANCELLED if self.reason == "cancelled" else self.FAILED
+            return self.state
+        if self.state == self.MESH:
+            self.mesh_seconds = self.process.elapsed
+            with open(os.path.join(self.workdir, "probe_mesh.inp")) as fh:
+                nodes = self._sp.parse_nodes(fh.read())
+            self.nodes = len(nodes)
+            with open(os.path.join(self.workdir, "probe.inp"), "w") as fh:
+                fh.write(self._sp.solver_deck("probe_mesh.inp", nodes))
+            self.process = WatchedProcess([self.ccx, "-i", "probe"], self.workdir,
+                                          os.path.join(self.workdir, "probe_ccx.log"),
+                                          self.time_limit, self.memory_limit, self.env)
+            self.process.start()
+            self.state = self.SOLVE
+            return self.state
+        if "Job finished" not in self.process.log_text():
+            self.reason = "failed"
+            self.state = self.FAILED
+            return self.state
+        self.seconds, self.peak_mb = self.process.elapsed, self.process.peak_mb
+        for name in ("probe.frd", "probe.dat", "probe.sta", "probe.cvg", "probe.12d",
+                     "probe_mesh.inp", "spooles.out"):  # results are not needed: keep disk free
+            path = os.path.join(self.workdir, name)
+            if os.path.isfile(path):
+                os.remove(path)
+        self.state = self.DONE
+        return self.state
+
+    def cancel(self):
+        if self.process is not None:
+            self.process.kill()
+        self.reason = "cancelled"
+        self.state = self.CANCELLED

@@ -2,10 +2,15 @@
 # SPDX-FileCopyrightText: 2026 Leonardo Simonato
 """Mesh assistant task panel (v1.5.0, decision 007). Thin: rules live in domain/.
 
-Flow: Analyse part -> Try the options (hidden document, real Gmsh runs, budget)
--> Create mesh (new Gmsh object in the user's document, undoable). Gmsh runs as a
-separate process polled by a timer, so the GUI never freezes (rules 8 and 11).
+Flow: Analyse part -> Try the options (hidden document: real Gmsh runs for 5 sizes,
+then CalculiX trials on the smaller meshes of THIS part on THIS computer) ->
+optional objective (fits in memory / solves within 1, 5 or 10 minutes) ->
+Create mesh (new Gmsh object in the user's document, undoable).
+Every external program runs as a separate, watched process polled by a timer, so
+the GUI never freezes (CLAUDE.md rules 8 and 11).
 """
+
+import time
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
@@ -14,6 +19,7 @@ from PySide6.QtGui import QColor  # type: ignore
 from PySide6.QtWidgets import (  # type: ignore
     QAbstractItemView,
     QApplication,
+    QComboBox,
     QDialogButtonBox,
     QFormLayout,
     QGroupBox,
@@ -35,26 +41,39 @@ from PySide6.QtWidgets import (  # type: ignore
 from .. import __version__
 from ..adapters import geometry_reader, mesh_runner
 from ..adapters.machine import machine_profile
+from ..domain import mesh_plan as mp
 from ..domain import mesh_texts as mt
 from ..domain.geometry_summary import find_issues
 from ..domain.i18n import Translator
-from ..domain.mesh_budget import BudgetStatus, check_budget, solver_memory_mb
-from ..domain.mesh_sizing import mesh_options, with_straight_edges
+from ..domain.mesh_budget import FITS_FRACTION, BudgetStatus
+from ..domain.mesh_sizing import (DEFAULT_LEVEL, MeshLevel, auto_option, estimate_nodes,
+                                  mesh_options, with_straight_edges)
+from ..domain.solver_model import SolverSample, format_duration
 from .report_dialog import ui_language
 
-GMSH_TIME_LIMIT_S = 300  # one Gmsh run; the spike's finest useful mesh took 13 s
-GMSH_MEMORY_SHARE = 0.7  # Gmsh may use up to 70 % of the memory free when it starts
+GMSH_TIME_LIMIT_S = 300  # one Gmsh run (the spike's 200 000-node mesh took 13 s)
+GMSH_MEMORY_SHARE = 0.7  # a Gmsh run may use up to 70 % of the free memory
+PROBE_TIME_LIMIT_S = 180  # one CalculiX trial is planned below 60 s; hard stop at 180 s
+PROBE_MEMORY_SHARE = 0.65  # hard stop for a CalculiX trial
+MAX_PROBES = 3
+AUTO_ATTEMPTS = 3  # size search for an objective (CLAUDE.md rule 6)
+GMSH_S_PER_NODE = 7e-5  # spike 8.0: 13.3 s for 198 000 nodes; replaced by measurements
 STATUS_COLORS = {BudgetStatus.FITS: QColor(46, 125, 50), BudgetStatus.TIGHT: QColor(178, 106, 0),
                  BudgetStatus.TOO_BIG: QColor(198, 40, 40)}
-COLUMNS = ("ma.col.option", "ma.col.size", "ma.col.nodes", "ma.col.memory", "ma.col.status",
-           "ma.col.gmsh")
+COLUMNS = ("ma.col.option", "ma.col.size", "ma.col.nodes", "ma.col.memory", "ma.col.time",
+           "ma.col.status", "ma.col.gmsh")
 
 
-class _Result:
-    """What one Gmsh run measured for one option."""
+class _Trial:
+    """A Gmsh run for one option (and, maybe, a CalculiX trial on it)."""
 
-    def __init__(self, option, job, check):
-        self.option, self.job, self.check = option, job, check
+    def __init__(self, option, job):
+        self.option, self.job = option, job
+        self.sample = None  # SolverSample when CalculiX was measured on this mesh
+
+    @property
+    def nodes(self):
+        return self.job.run.nodes
 
 
 class MeshAssistantPanel:
@@ -64,14 +83,22 @@ class MeshAssistantPanel:
         t = self.tr.t
         self.solid = None
         self.summary = None
-        self.options = []
-        self.results = {}  # MeshLevel -> _Result (or None when skipped/failed)
-        self.queue = []
+        self.options = []  # MeshOption shown in the table (5 levels + automatic)
+        self.trials = {}  # MeshLevel -> _Trial
+        self.skipped = set()  # levels not tried because they would be too big
+        self.tasks = []  # pending work: ("gmsh", option) / ("probe", level) / ...
+        self.task = None  # current (kind, payload)
         self.job = None
-        self.job_kind = ""
-        self.job_option = None
-        self.trial = None
+        self.trial_doc = None
         self.machine = machine_profile()
+        self.model = mp.part_model([])
+        self.run_started = 0.0
+        self.steps_done = 0
+        self.steps_total = 0
+        self.objective = None
+        self.auto_attempt = 0
+        self.auto_target = 0
+        self.probes_pending = False
 
         self.form = QWidget()
         self.form.setWindowTitle(t("ma.title"))
@@ -101,7 +128,10 @@ class MeshAssistantPanel:
         machine_layout = QVBoxLayout(self.machine_box)
         self.machine_label = QLabel()
         self.machine_label.setWordWrap(True)
+        self.model_label = QLabel()
+        self.model_label.setWordWrap(True)
         machine_layout.addWidget(self.machine_label)
+        machine_layout.addWidget(self.model_label)
         layout.addWidget(self.machine_box)
 
         self.options_box = QGroupBox(t("ma.group.options"))
@@ -116,23 +146,28 @@ class MeshAssistantPanel:
         self.table.itemSelectionChanged.connect(self._show_selected)
         self.reason_label = QLabel()
         self.reason_label.setWordWrap(True)
-        row = QHBoxLayout()
         self.test_button = QPushButton(t("ma.test"))
         self.test_button.setToolTip(t("ma.test_tip"))
         self.test_button.clicked.connect(self.test_options)
-        self.best_button = QPushButton(t("ma.best"))
-        self.best_button.clicked.connect(self.pick_best)
-        row.addWidget(self.test_button)
-        row.addWidget(self.best_button)
+        objective_row = QHBoxLayout()
+        self.objective_box = QComboBox()
+        for objective in mp.Objective:
+            self.objective_box.addItem(t("ma.objective." + objective.value), objective)
+        self.auto_button = QPushButton(t("ma.auto"))
+        self.auto_button.setToolTip(t("ma.auto_tip"))
+        self.auto_button.clicked.connect(self.auto_mesh)
+        objective_row.addWidget(QLabel(t("ma.objective")))
+        objective_row.addWidget(self.objective_box, 1)
+        objective_row.addWidget(self.auto_button)
         options_layout.addWidget(self.table)
         options_layout.addWidget(self.reason_label)
-        options_layout.addLayout(row)
+        options_layout.addWidget(self.test_button)
+        options_layout.addLayout(objective_row)
         layout.addWidget(self.options_box)
 
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
         self.progress = QProgressBar()
-        self.progress.setRange(0, 0)  # busy indicator: Gmsh does not report a percentage
         self.cancel_button = QPushButton(t("ma.cancel"))
         self.cancel_button.clicked.connect(self.cancel)
         progress_row = QHBoxLayout()
@@ -164,10 +199,9 @@ class MeshAssistantPanel:
         layout.addStretch(1)
 
         self.timer = QTimer()
-        self.timer.setInterval(150)
+        self.timer.setInterval(200)
         self.timer.timeout.connect(self._tick)
         self._show_machine()
-        self._set_busy(False)
         self._enable(False)
         self._preselect()
 
@@ -184,10 +218,9 @@ class MeshAssistantPanel:
     def accept(self):
         return self.reject()
 
-    # --- steps --------------------------------------------------------------------
+    # --- user actions ---------------------------------------------------------------
 
     def _preselect(self):
-        """Analyse right away when a solid is already selected."""
         if any(geometry_reader.is_meshable(o) for o in Gui.Selection.getSelection(self.doc.Name)):
             self.analyze()
 
@@ -204,8 +237,9 @@ class MeshAssistantPanel:
             self.summary = geometry_reader.summarize(self.solid)
         finally:
             QApplication.restoreOverrideCursor()
-        self._close_trial()
-        self.results = {}
+        self._close_trial_doc()
+        self.trials, self.skipped = {}, set()
+        self.model = mp.part_model([])
         self.options = mesh_options(self.summary)
         self.part_box.setTitle("%s: %s" % (t("ma.group.part"), self.summary.label))
         while self.part_form.rowCount():
@@ -225,7 +259,7 @@ class MeshAssistantPanel:
         self.machine = machine_profile()
         self._show_machine()
         self._fill_table()
-        self.table.selectRow(0)  # coarse is the default recommendation (owner's choice)
+        self._select_level(DEFAULT_LEVEL)
         self.status_label.setText("")
         self._enable(True)
 
@@ -233,41 +267,51 @@ class MeshAssistantPanel:
         if self.summary is None or self.job is not None:
             return
         self.machine = machine_profile()
-        self._show_machine()
-        if self.trial is None:
-            self.trial = mesh_runner.TrialDocument(geometry_reader.solid_shape(self.solid))
-        self.results = {}
+        if self.trial_doc is None:
+            self.trial_doc = mesh_runner.TrialDocument(geometry_reader.solid_shape(self.solid))
+        self.trials, self.skipped = {}, set()
+        self.model = mp.part_model([])
+        self.options = [o for o in self.options if o.level is not MeshLevel.AUTO]
         self._fill_table()
-        self.queue = list(self.options)
-        self._next_trial()
+        self._run([("gmsh", o) for o in self.options])
 
-    def pick_best(self):
-        """Finest tried option that fits with margin (never one with inverted elements)."""
-        best = None
-        for row, option in enumerate(self.options):
-            result = self.results.get(option.level)
-            if result and result.check.status is BudgetStatus.FITS and not result.job.run.inverted:
-                best = row
-        if best is None:
-            self.status_label.setText(self.tr.t("ma.best_none"))
+    def auto_mesh(self):
+        t = self.tr.t
+        if self.job is not None or self.summary is None:
             return
-        self.table.selectRow(best)
+        if not self.trials:
+            self.status_label.setText(t("ma.need_test"))
+            return
+        self.machine = machine_profile()
+        self.objective = self.objective_box.currentData()
+        self.auto_target = mp.target_nodes(self.model, self.machine.available_mb,
+                                           self.objective, FITS_FRACTION)
+        smallest = min(tr.nodes for tr in self.trials.values())
+        if self.auto_target < smallest:
+            self.status_label.setText(t("ma.auto_none", objective=self.objective_box.currentText()))
+            self._select_level(MeshLevel.VERY_COARSE)
+            return
+        law = mp.nodes_law([(tr.option.max_size, tr.nodes) for tr in self.trials.values()])
+        size = mp.size_for_nodes(law, self.auto_target)
+        self.options = [o for o in self.options if o.level is not MeshLevel.AUTO]
+        self.trials.pop(MeshLevel.AUTO, None)
+        self.auto_attempt = 1
+        self._run([("auto", auto_option(self.summary, size, "mesh.reason.objective"))])
 
     def create_mesh(self):
         t = self.tr.t
         option = self._selected_option()
         if option is None or self.job is not None:
             return
-        result = self.results.get(option.level)
-        if result is not None:
-            option = result.option  # keeps the straight-edge fix found in the trial
-            if result.check.status is BudgetStatus.TOO_BIG:
+        trial = self.trials.get(option.level)
+        if trial is not None:
+            option = trial.option  # keeps the straight-edge fix found in the trial
+            if self._status(trial) is BudgetStatus.TOO_BIG:
                 answer = QMessageBox.question(self.form, t("ma.title"), t("ma.confirm_too_big"))
                 if answer != QMessageBox.Yes:
                     return
         mesh = mesh_runner.create_mesh_object(self.doc, self.solid, option, __version__)
-        self._start(mesh_runner.GmshJob(mesh, GMSH_TIME_LIMIT_S, self._gmsh_memory_limit(),
-                                        load_into_object=True), "create", option)
+        self._run([("create", (option, mesh))])
 
     def remove_meshes(self):
         t = self.tr.t
@@ -279,65 +323,151 @@ class MeshAssistantPanel:
         if self.job is not None:
             self.job.cancel()
 
-    # --- Gmsh jobs ------------------------------------------------------------------
+    # --- task queue -----------------------------------------------------------------
 
-    def _gmsh_memory_limit(self):
-        return GMSH_MEMORY_SHARE * self.machine.available_mb
-
-    def _next_trial(self):
-        if not self.queue:
-            self.status_label.setText(self.tr.t("ma.tested"))
-            return
-        option = self.queue.pop(0)
-        self._start(self.trial.job(option, GMSH_TIME_LIMIT_S, self._gmsh_memory_limit()),
-                    "trial", option)
-
-    def _start(self, job, kind, option):
-        self.job, self.job_kind, self.job_option = job, kind, option
-        job.start()
+    def _run(self, tasks):
+        self.tasks = list(tasks)
+        self.run_started = time.monotonic()
+        self.steps_done = 0
+        self.probes_pending = tasks[0][0] == "gmsh"
+        self.steps_total = len(self.tasks) + (MAX_PROBES if self.probes_pending else 0)
         self._set_busy(True)
+        self._next_task()
         self.timer.start()
 
+    def _next_task(self):
+        if (self.probes_pending and self.trials
+                and not any(kind == "gmsh" for kind, _ in self.tasks)):
+            self.probes_pending = False  # all sizes meshed (or skipped): measure CalculiX
+            self._queue_probes()
+        while self.tasks:
+            kind, payload = self.tasks.pop(0)
+            if kind == "gmsh" and self._too_big_for_gmsh(payload):
+                self.skipped.add(payload.level)
+                self.steps_done += 1
+                continue
+            if kind == "probe":
+                trial = self.trials.get(payload)
+                if trial is None or not mp.probe_allowed(self.model, trial.nodes,
+                                                         self.machine.available_mb):
+                    continue
+            self.task = (kind, payload)
+            self.job = self._make_job(kind, payload)
+            self.job.start()
+            self._show_progress()
+            return
+        self._finished()
+
+    def _make_job(self, kind, payload):
+        gmsh_limit = GMSH_MEMORY_SHARE * self.machine.available_mb
+        if kind in ("gmsh", "auto"):
+            return self.trial_doc.job(payload, GMSH_TIME_LIMIT_S, gmsh_limit)
+        if kind == "probe":
+            return mesh_runner.ProbeJob(self.trials[payload].job, PROBE_TIME_LIMIT_S,
+                                        PROBE_MEMORY_SHARE * self.machine.available_mb)
+        option, mesh = payload
+        return mesh_runner.GmshJob(mesh, GMSH_TIME_LIMIT_S, gmsh_limit, load_into_object=True)
+
     def _tick(self):
-        t = self.tr.t
-        job = self.job
-        if job is None:
+        if self.job is None:
             self.timer.stop()
             return
-        state = job.poll()
-        level = t("ma.level." + self.job_option.level.value).lower()
-        if state == job.RUNNING:
-            self.status_label.setText(t("ma.running", level=level, seconds=int(job.elapsed)))
+        state = self.job.poll()
+        if state in ("running", "mesh", "solve"):
+            self._show_progress()
             return
-        self.timer.stop()
-        self.job = None
-        self._set_busy(False)
-        self.details.setPlainText("%s\n\n%s" % (mt.gmsh_settings(self.job_option, self.tr),
-                                                job.log_tail()))
-        if state != job.DONE:
-            self.queue = []
-            self.status_label.setText(
-                t("ma.cancelled") if state == job.CANCELLED else
-                t("ma.failed", level=level, reason=t("ma.reason." + state)))
+        kind, payload = self.task
+        job, self.job = self.job, None
+        self.steps_done += 1
+        if kind == "probe":
+            self._probe_done(payload, job)
+        elif state != job.DONE:
+            self._failed(kind, payload, job, state)
             return
-        if self.job_kind == "trial" and job.run.inverted and not self.job_option.straight_edges:
-            self.queue.insert(0, with_straight_edges(self.job_option))  # automatic fix
-            self._next_trial()
+        elif kind == "gmsh":
+            self._gmsh_done(payload, job)
+        elif kind == "auto":
+            self._auto_done(payload, job)
+        else:
+            self._created(payload, job)
             return
-        check = check_budget(job.run.nodes, self.machine)
-        if self.job_kind == "trial":
-            self.results[self.job_option.level] = _Result(self.job_option, job, check)
-            self._fill_table()
-            if check.status is BudgetStatus.TOO_BIG:
-                self.queue = []  # finer options would only be bigger
-                self._fill_table()
-            self._next_trial()
-            return
-        self._created(job, check)
+        self._next_task()
 
-    def _created(self, job, check):
+    def _gmsh_done(self, option, job):
+        if job.run.inverted and not option.straight_edges:
+            self.tasks.insert(0, ("gmsh", with_straight_edges(option)))  # automatic fix
+            return
+        self.trials[option.level] = _Trial(option, job)
+        self._fill_table()
+
+    def _queue_probes(self):
+        ordered = sorted(self.trials.values(), key=lambda tr: tr.nodes)
+        useful = [tr for tr in ordered if tr.nodes >= mp.PROBE_MIN_NODES]
+        chosen = useful[:MAX_PROBES] or ordered[-1:]  # tiny part: one trial, the finest
+        self.tasks += [("probe", tr.option.level) for tr in chosen]
+
+    def _probe_done(self, level, job):
+        if job.state == job.DONE:
+            self.trials[level].sample = SolverSample(job.nodes, job.seconds, job.peak_mb)
+            samples = [tr.sample for tr in self.trials.values() if tr.sample is not None]
+            self.model = mp.part_model(samples)
+            self._show_machine()
+            self._fill_table()
+        else:  # a probe that failed or hit a limit stops further probes (they are bigger)
+            self.tasks = [task for task in self.tasks if task[0] != "probe"]
+            self.details.setPlainText(job.process.log_text()[-2000:] if job.process else "")
+
+    def _auto_done(self, option, job):
         t = self.tr.t
-        mesh = job.mesh_obj
+        if job.run.inverted and not option.straight_edges:
+            self.tasks.insert(0, ("auto", with_straight_edges(option)))
+            return
+        nodes = job.run.nodes
+        if nodes > self.auto_target and self.auto_attempt < AUTO_ATTEMPTS:
+            self.auto_attempt += 1
+            smaller = (1.03 * nodes / self.auto_target) ** (1.0 / 3.0)  # 3 % below the target
+            self.tasks.insert(0, ("auto", auto_option(self.summary, option.max_size * smaller,
+                                                      "mesh.reason.objective")))
+            return
+        self.trials[MeshLevel.AUTO] = _Trial(option, job)
+        self.options = [o for o in self.options if o.level is not MeshLevel.AUTO] + [option]
+        self._fill_table()
+        self._select_level(MeshLevel.AUTO)
+        limit = mp.binding_limit(self.model, self.machine.available_mb, self.objective,
+                                 FITS_FRACTION)
+        self.status_label.setText("%s %s" % (t(
+            "ma.auto_done", objective=self.objective_box.currentText(),
+            size=mt.mm(self.tr, option.max_size), nodes=self.tr.integer(nodes),
+            seconds=format_duration(self.model.seconds(nodes))), t("ma.limit." + limit)))
+        self.tasks = []
+
+    def _failed(self, kind, payload, job, state):
+        t = self.tr.t
+        option = payload[0] if kind == "create" else payload
+        level = t("ma.level." + option.level.value).lower()
+        self.tasks = []
+        self._set_busy(False)
+        self.timer.stop()
+        self.details.setPlainText("%s\n\n%s" % (mt.gmsh_settings(option, self.tr), job.log_tail()))
+        self.status_label.setText(t("ma.cancelled") if state == job.CANCELLED else
+                                  t("ma.failed", level=level, reason=t("ma.reason." + state)))
+
+    def _finished(self):
+        t = self.tr.t
+        self.task = None
+        self._set_busy(False)
+        self.timer.stop()
+        if MeshLevel.AUTO not in self.trials or self.status_label.text() == "":
+            self.status_label.setText(t("ma.tested", elapsed=format_duration(
+                time.monotonic() - self.run_started)))
+
+    def _created(self, payload, job):
+        t = self.tr.t
+        option, mesh = payload
+        self._set_busy(False)
+        self.timer.stop()
+        nodes = job.run.nodes
+        status = mp.classify(self.model, nodes, self.machine.available_mb)
         inside = [a for a in mesh_runner.analyses(self.doc) if mesh in a.Group]
         busy = [a for a in mesh_runner.analyses(self.doc) if a not in inside
                 and mesh_runner.analysis_meshes(a)]
@@ -349,39 +479,69 @@ class MeshAssistantPanel:
         else:
             where = t("ma.created_at_root")
         self.status_label.setText("%s %s" % (
-            t("ma.created", label=mesh.Label, nodes=self.tr.integer(job.run.nodes),
-              status=mt.status_text(check, self.tr)), where))
+            t("ma.created", label=mesh.Label, nodes=self.tr.integer(nodes),
+              status=t("ma.status." + status.value)), where))
+        self.details.setPlainText("%s\n\n%s" % (mt.gmsh_settings(option, self.tr), job.log_tail()))
+
+    def _predicted_nodes(self, option):
+        known = [(tr.option.max_size, tr.nodes) for tr in self.trials.values()]
+        if len(known) >= 2:
+            return mp.nodes_law(known)(option.max_size)
+        return estimate_nodes(self.summary.volume, option.max_size, 2.0)
+
+    def _too_big_for_gmsh(self, option):
+        known = [(tr.option.max_size, tr.nodes) for tr in self.trials.values()]
+        if len(known) >= 2:
+            predicted = mp.nodes_law(known)(option.max_size)
+        else:
+            predicted = option.nodes_low
+        return predicted > mp.GMSH_MAX_NODES
 
     # --- view helpers ---------------------------------------------------------------
+
+    def _status(self, trial):
+        measured = trial.sample.peak_mb if trial.sample else None
+        return mp.classify(self.model, trial.nodes, self.machine.available_mb, measured)
 
     def _fill_table(self):
         t = self.tr.t
         self.table.setRowCount(len(self.options))
-        tried = set(self.results)
-        stopped = any(r.check.status is BudgetStatus.TOO_BIG for r in self.results.values())
         for row, option in enumerate(self.options):
-            result = self.results.get(option.level)
+            trial = self.trials.get(option.level)
             cells = [t("ma.level." + option.level.value), mt.mm(self.tr, option.max_size)]
             color = None
-            if result is not None:
-                nodes = result.job.run.nodes
-                status = mt.status_text(result.check, self.tr)
-                if result.option.straight_edges:
-                    status += t("ma.status.fixed")
-                cells += [self.tr.integer(nodes), "~" + mt.memory(self.tr, solver_memory_mb(nodes)),
-                          status, "%s s · %s" % (self.tr.number(result.job.elapsed, 2),
-                                                 mt.memory(self.tr, result.job.peak_mb))]
-                color = STATUS_COLORS[result.check.status]
+            if trial is not None:
+                nodes = trial.nodes
+                if trial.sample is not None:
+                    memory = "%s (%s)" % (mt.memory(self.tr, trial.sample.peak_mb), t("ma.measured"))
+                    seconds = "%s (%s)" % (format_duration(trial.sample.seconds), t("ma.measured"))
+                else:
+                    memory = "~" + mt.memory(self.tr, self.model.memory_mb(nodes))
+                    seconds = "~" + format_duration(self.model.seconds(nodes))
+                status = self._status(trial)
+                text = t("ma.status." + status.value)
+                if trial.option.straight_edges:
+                    text += t("ma.status.fixed")
+                cells += [self.tr.integer(nodes), memory, seconds, text,
+                          "%s · %s" % (format_duration(trial.job.elapsed),
+                                       mt.memory(self.tr, trial.job.peak_mb))]
+                color = STATUS_COLORS[status]
             else:
-                skipped = stopped and option.level not in tried
-                cells += [mt.nodes_estimate(option, self.tr), "", t("ma.status.skipped") if skipped
-                          else t("ma.status.not_tested"), ""]
-            for col, text in enumerate(cells):
-                item = QTableWidgetItem(text)
+                text = (t("ma.status.big_for_gmsh") if option.level in self.skipped
+                        else t("ma.status.not_tested"))
+                cells += [mt.nodes_estimate(option, self.tr), "", "", text, ""]
+            for col, value in enumerate(cells):
+                item = QTableWidgetItem(value)
                 item.setToolTip(mt.option_reason(option, self.summary, self.tr))
-                if color is not None and col == 4:
+                if color is not None and col == 5:
                     item.setForeground(color)
                 self.table.setItem(row, col, item)
+
+    def _select_level(self, level):
+        for row, option in enumerate(self.options):
+            if option.level is level:
+                self.table.selectRow(row)
+                return
 
     def _selected_option(self):
         rows = {i.row() for i in self.table.selectedItems()}
@@ -391,13 +551,57 @@ class MeshAssistantPanel:
         option = self._selected_option()
         if option is None:
             return
-        result = self.results.get(option.level)
-        shown = result.option if result is not None else option
+        trial = self.trials.get(option.level)
+        shown = trial.option if trial is not None else option
         self.reason_label.setText(mt.option_reason(option, self.summary, self.tr))
-        self.details.setPlainText(mt.gmsh_settings(shown, self.tr))
+        if self.job is None:
+            self.details.setPlainText(mt.gmsh_settings(shown, self.tr))
 
     def _show_machine(self):
+        t = self.tr.t
         self.machine_label.setText(mt.machine_text(self.machine, self.tr))
+        probes = [tr for tr in self.trials.values() if tr.sample is not None]
+        self.model_label.setText(
+            t("ma.model.measured", count=len(probes), error=int(round(100 * self.model.error)))
+            if self.model.measured else t("ma.model.reference"))
+
+    def _show_progress(self):
+        t = self.tr.t
+        kind, payload = self.task
+        if kind == "probe":
+            level, what_key = payload, "ma.what.probe"
+        elif kind == "create":
+            level, what_key = payload[0].level, "ma.what.create"
+        else:
+            level, what_key = payload.level, "ma.what." + kind
+        what = t(what_key, level=t("ma.level." + level.value).lower(), attempt=self.auto_attempt)
+        elapsed = time.monotonic() - self.run_started
+        self.progress.setRange(0, max(1, self.steps_total))
+        self.progress.setValue(min(self.steps_done, self.steps_total))
+        self.status_label.setText(t("ma.step", done=self.steps_done + 1,
+                                    total=max(self.steps_total, self.steps_done + 1), what=what,
+                                    elapsed=format_duration(elapsed),
+                                    remaining=format_duration(self._remaining())))
+
+    def _remaining(self):
+        known = [tr for tr in self.trials.values() if tr.job.elapsed > 0 and tr.nodes]
+        per_node = (sum(tr.job.elapsed for tr in known) / sum(tr.nodes for tr in known)
+                    if known else GMSH_S_PER_NODE)
+        pending_gmsh, pending_probes = [], []
+        for kind, payload in self.tasks:
+            if kind in ("gmsh", "auto"):
+                pending_gmsh.append(self._predicted_nodes(payload))
+            elif kind == "probe" and payload in self.trials:
+                pending_probes.append(self.trials[payload].nodes)
+        current = self.job.elapsed if self.job is not None else 0.0
+        current_left = 0.0
+        if self.task and self.task[0] == "probe" and self.task[1] in self.trials:
+            n = self.trials[self.task[1]].nodes
+            current_left = max(0.0, self.model.seconds(n) + per_node * n - current)
+        elif self.task and self.task[0] in ("gmsh", "auto"):
+            current_left = max(0.0, per_node * self._predicted_nodes(self.task[1]) - current)
+        return current_left + mp.remaining_seconds(per_node, pending_gmsh, self.model,
+                                                   pending_probes)
 
     def _select_issue(self, item):
         elements = item.data(Qt.UserRole)
@@ -410,25 +614,26 @@ class MeshAssistantPanel:
     def _set_busy(self, busy):
         self.progress.setVisible(busy)
         self.cancel_button.setVisible(busy)
-        for widget in (self.analyze_button, self.test_button, self.best_button,
-                       self.create_button, self.remove_button):
-            widget.setEnabled(not busy and (widget is self.analyze_button
-                                            or widget is self.remove_button
-                                            or self.summary is not None))
+        analysed = self.summary is not None
+        for widget in (self.test_button, self.auto_button, self.create_button,
+                       self.objective_box):
+            widget.setEnabled(not busy and analysed)
+        self.analyze_button.setEnabled(not busy)
+        self.remove_button.setEnabled(not busy)
 
     def _enable(self, analysed):
         for widget in (self.part_box, self.issues_box, self.options_box, self.details_box):
             widget.setVisible(analysed)
         self._set_busy(False)
 
-    def _close_trial(self):
-        if self.trial is not None:
-            self.trial.close()
-            self.trial = None
+    def _close_trial_doc(self):
+        if self.trial_doc is not None:
+            self.trial_doc.close()
+            self.trial_doc = None
 
     def _cleanup(self):
         if self.job is not None:
             self.job.cancel()
             self.job = None
         self.timer.stop()
-        self._close_trial()
+        self._close_trial_doc()

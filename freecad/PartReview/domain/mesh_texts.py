@@ -47,7 +47,8 @@ def machine_text(machine: MachineProfile, tr) -> str:
 def option_reason(option: MeshOption, summary: GeometrySummary, tr) -> str:
     return tr.t(option.reason_key, size=mm(tr, option.max_size),
                 t=mm(tr, summary.characteristic_thickness), d=mm(tr, summary.diagonal),
-                per={"coarse": 1, "medium": 2, "fine": 3}[option.level.value])
+                per={"very_coarse": "2/3", "coarse": 1, "medium": 2, "fine": 3,
+                     "very_fine": 4}.get(option.level.value, ""))
 
 
 def nodes_estimate(option: MeshOption, tr) -> str:

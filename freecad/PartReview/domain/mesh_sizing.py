@@ -3,8 +3,9 @@
 """Mesh options for a solid, from its geometry only (pure, no Qt).
 
 Starting points (practical FEM rules), not verdicts: each option says why.
+- very coarse: h = 1.5 t (quick look, stiffness only);
 - coarse: about 1 quadratic element across the characteristic thickness (h = t);
-- medium: about 2 (h = t/2); fine: about 3 (h = t/3);
+- medium: about 2 (h = t/2); fine: about 3 (h = t/3); very fine: about 4 (h = t/4);
 - chunky parts (t close to the part size) are capped by the bounding-box
   diagonal D: h <= D/10, D/20, D/30, so a solid block still gets a usable mesh.
 Always 2nd order (straight sides only as a fallback, see with_straight_edges) and
@@ -29,12 +30,17 @@ NODES_PER_TET = 1.75
 
 
 class MeshLevel(Enum):
+    VERY_COARSE = "very_coarse"
     COARSE = "coarse"
     MEDIUM = "medium"
     FINE = "fine"
+    VERY_FINE = "very_fine"
+    AUTO = "auto"  # size computed for an objective (memory or solve time)
 
 
-_DIVISOR = {MeshLevel.COARSE: 1, MeshLevel.MEDIUM: 2, MeshLevel.FINE: 3}
+_DIVISOR = {MeshLevel.VERY_COARSE: 2.0 / 3.0, MeshLevel.COARSE: 1, MeshLevel.MEDIUM: 2,
+            MeshLevel.FINE: 3, MeshLevel.VERY_FINE: 4}
+DEFAULT_LEVEL = MeshLevel.COARSE  # owner's choice
 _DIAGONAL_RATIO = 10.0
 
 
@@ -49,6 +55,14 @@ class MeshOption:
     nodes_low: int  # rough range before meshing (the real count comes from Gmsh)
     nodes_high: int
     straight_edges: bool = False  # -> SecondOrderLinear (fallback for inverted elements)
+
+
+def auto_option(summary: GeometrySummary, size: float, objective_key: str) -> MeshOption:
+    """Option with a size computed for an objective (see mesh_plan)."""
+    size = _round_size(size, 3)  # 3 digits: the search needs finer steps than the levels
+    n = estimate_nodes(summary.volume, size, 1.0)
+    return MeshOption(MeshLevel.AUTO, size, 0.0, CURVATURE, "2nd", objective_key,
+                      int(n * TET_FACTOR_LOW), int(n * TET_FACTOR_HIGH))
 
 
 def with_straight_edges(option: MeshOption) -> MeshOption:
@@ -68,18 +82,18 @@ def estimate_nodes(volume: float, size: float, factor: float) -> int:
     return int(volume * TETS_PER_UNIT_VOLUME / size ** 3 * factor * NODES_PER_TET)
 
 
-def _round_size(value: float) -> float:
-    """Two significant digits, so the numbers in the panel are easy to read."""
+def _round_size(value: float, significant: int = 2) -> float:
+    """Few significant digits, so the numbers in the panel are easy to read."""
     if value <= 0:
         return 0.0
-    digits = 1 - int(math.floor(math.log10(value)))
+    digits = significant - 1 - int(math.floor(math.log10(value)))
     return round(value, digits)
 
 
 def mesh_options(summary: GeometrySummary) -> list:
     t, diagonal = summary.characteristic_thickness, summary.diagonal
     options = []
-    for level in MeshLevel:
+    for level in _DIVISOR:
         k = _DIVISOR[level]
         by_thickness, by_size = t / k, diagonal / (_DIAGONAL_RATIO * k)
         size = _round_size(min(by_thickness, by_size))

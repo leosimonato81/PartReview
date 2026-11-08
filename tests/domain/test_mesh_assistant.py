@@ -48,8 +48,9 @@ def test_owner_part_options_match_the_spike_runs():
     sizes = {o.level: o.max_size for o in mesh_options(SHROUD)}
     # spike 8.0: 3 mm and 1.5 mm with curvature 12 ran (56k and 95k nodes);
     # ~1 mm needed > 4.5 GB on the reference PC.
-    assert sizes == {MeshLevel.COARSE: 3.0, MeshLevel.MEDIUM: 1.5, MeshLevel.FINE: 1.0}
-    coarse = mesh_options(SHROUD)[0]
+    assert sizes == {MeshLevel.VERY_COARSE: 4.5, MeshLevel.COARSE: 3.0, MeshLevel.MEDIUM: 1.5,
+                     MeshLevel.FINE: 1.0, MeshLevel.VERY_FINE: 0.76}
+    coarse = mesh_options(SHROUD)[1]
     assert coarse.curvature == 12 and coarse.order == "2nd" and coarse.min_size == 0.0
     assert coarse.nodes_low <= 56445 <= coarse.nodes_high
 
@@ -64,17 +65,18 @@ def test_rules_scale_with_the_part(scale):
 
 def test_chunky_parts_are_capped_by_the_diagonal():
     cube = mesh_options(box(100, 100, 100))
-    assert cube[0].reason_key == "mesh.reason.diagonal"
-    assert cube[0].max_size == pytest.approx(17, abs=0.5)  # D/10 = 17.3
+    assert cube[1].reason_key == "mesh.reason.diagonal"
+    assert cube[1].max_size == pytest.approx(17, abs=0.5)  # D/10 = 17.3
     plate = mesh_options(box(200, 100, 2))
-    assert plate[0].reason_key == "mesh.reason.thickness"
-    assert [o.max_size for o in plate] == [1.9, 0.97, 0.65]
+    assert plate[1].reason_key == "mesh.reason.thickness"
+    assert [o.max_size for o in plate][1:4] == [1.9, 0.97, 0.65]
 
 
 def test_options_get_finer_and_bigger():
     options = mesh_options(SHROUD)
-    assert options[0].max_size > options[1].max_size > options[2].max_size
-    assert options[0].nodes_high < options[1].nodes_high < options[2].nodes_high
+    assert len(options) == 5
+    for a, b in zip(options, options[1:]):
+        assert a.max_size > b.max_size and a.nodes_high < b.nodes_high
 
 
 LOG_COARSE = """Info    : Done meshing 2D (Wall 0.759963s, CPU 5.53424s)
@@ -102,16 +104,16 @@ def test_parse_gmsh_log():
 
 # Real node counts from the assistant tests in FreeCAD (curvature 12, 2nd order).
 @pytest.mark.parametrize("summary, level, nodes", [
-    (SHROUD, 0, 57285), (SHROUD, 1, 98723), (SHROUD, 2, 198495),
-    (box(1000, 1000, 1000), 0, 2492), (box(1000, 1000, 1000), 2, 41524),
-    (box(8000, 1000, 1000), 0, 1448), (box(8000, 1000, 1000), 2, 16277)])
+    (SHROUD, 1, 57285), (SHROUD, 2, 98723), (SHROUD, 3, 198495),
+    (box(1000, 1000, 1000), 1, 2492), (box(1000, 1000, 1000), 3, 41524),
+    (box(8000, 1000, 1000), 1, 1448), (box(8000, 1000, 1000), 3, 16277)])
 def test_real_node_counts_fall_in_the_estimated_range(summary, level, nodes):
     option = mesh_options(summary)[level]
     assert option.nodes_low <= nodes <= option.nodes_high
 
 
 def test_straight_edges_fallback_keeps_the_size():
-    coarse = mesh_options(SHROUD)[0]
+    coarse = mesh_options(SHROUD)[1]
     fixed = with_straight_edges(coarse)
     assert fixed.straight_edges and not coarse.straight_edges
     assert fixed.max_size == coarse.max_size and fixed.level is coarse.level
