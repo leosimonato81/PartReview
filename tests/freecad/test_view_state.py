@@ -58,6 +58,8 @@ def main():
     mesh = result.Mesh
 
     before = snapshot(doc, gui_doc)
+    scene = gui_doc.ActiveView.getSceneGraph()
+    children_before = scene.getNumChildren()
     try:
         with ViewState(doc) as vs:
             vs.show_only([mesh])
@@ -65,12 +67,19 @@ def main():
             ids = list(result.NodeNumbers)
             vs.color_nodes(mesh, ids, [(-1.0 if i % 2 else 1.0) for i in range(len(ids))])
             vs.apply_camera(cp.frame(Vec3(1, 1, -1), Vec3(0, 0, 0), 10.0, Vec3(0, 0, 0), 50.0))
+            from pivy import coin
+            vs.displace(mesh, ids, [v for v in result.DisplacementVectors], 1000.0)  # deformed
+            vs.add_overlay(coin.SoSeparator())  # temporary drawing (outline, supports/loads)
             raise Boom("error on purpose in the middle of a capture")
     except Boom:
         print("error raised and propagated: yes")
     after = snapshot(doc, gui_doc)
 
     diffs = [k for k in before if before[k] != after.get(k)]
+    if scene.getNumChildren() != children_before:
+        diffs.append("scene graph children")
+        before["scene graph children"] = children_before
+        after["scene graph children"] = scene.getNumChildren()
     if diffs:
         print("VIEWSTATE FAILED, differences:")
         for k in diffs:
