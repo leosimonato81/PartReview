@@ -171,6 +171,19 @@ def _deformed(view, displacement, radius):
                                  for t in view.targets))
 
 
+def _reactions(analysis, result):
+    """[(support label, reaction Vec3 in N)] from the CalculiX .dat totals."""
+    text = fem_reader.ccx_dat_text(analysis)
+    totals = parse_ccx_totals(text) if text else {}
+    out = []
+    for c in result.constraints:
+        if c.kind in (ConstraintKind.FIXED, ConstraintKind.DISPLACEMENT) and c.name:
+            total = totals.get(c.name.upper())
+            if total is not None:
+                out.append((c.label, total))
+    return out
+
+
 def _equilibrium(analysis, result):
     """Sum of applied forces vs CalculiX reactions (decision 004)."""
     if any(c.kind not in (ConstraintKind.FIXED, ConstraintKind.FORCE) for c in result.constraints):
@@ -312,6 +325,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
             tool_version=__version__, freecad_version=".".join(App.Version()[:3]),
             equilibrium=equilibrium, mesh_quality=quality, error_estimate=zz,
             error_field=error_field, error_view=error_view, boundary_views=boundary_views,
+            reactions=_reactions(analysis, result),
             regular_exclusion=(Quantity(exclusion, result.mesh.length_unit)
                                if exclusion and any(s.kind is HotspotKind.STRESS_REGULAR
                                                     for s in spots) else None),

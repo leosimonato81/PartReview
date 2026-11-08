@@ -58,3 +58,14 @@ def test_polymer_gets_rankine_and_the_lower_limit():
 def test_metal_keeps_von_mises_only():
     t = text(build_report(make_inputs(Quantity(250.0, "MPa")), Translator("pt_BR", strict=True)))
     assert "Rankine" not in t and "impressa em 3D" not in t
+
+
+def test_support_reactions_table():
+    from freecad.PartReview.domain.models import Vec3
+    inputs = make_inputs()
+    inputs.reactions = [("Engaste", Vec3(0.0, 0.0, 12.0))]
+    report = build_report(inputs, Translator("pt_BR", strict=True))
+    table = next(b for b in report.blocks if isinstance(b, Table) and b.header
+                 and b.header[0] == "Apoio")
+    assert table.rows[0][0] == "Engaste" and table.rows[0][3] == "12,0 N"
+    assert table.rows[0][4] == "12,0 N"

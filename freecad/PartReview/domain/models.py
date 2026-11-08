@@ -134,6 +134,7 @@ class Constraint:
     # Discretised CAD edges and vertices it acts on: line/point supports and loads.
     lines: tuple[tuple[Vec3, Vec3], ...] = field(default=(), repr=False)
     points: tuple[Vec3, ...] = field(default=(), repr=False)
+    name: str = ""  # internal object name (CalculiX node set = name in upper case)
 
     @property
     def on_edges_or_vertices(self) -> bool:

@@ -78,6 +78,8 @@ class ReportInputs:
     # Distance from supports/loads beyond which stress counts as "regular"
     # (the STRESS_REGULAR hotspot); None when not computed.
     regular_exclusion: Quantity | None = None
+    # Reaction force of each support from CalculiX: [(support label, Vec3 in N)].
+    reactions: list = field(default_factory=list)
     trace: Traceability | None = None  # step e
 
     def field(self, kind: FieldKind) -> ResultField | None:
@@ -206,6 +208,16 @@ def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
     header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"),
               tr.t("results.node"))
     return Table(header=header, rows=tuple(rows), widths=(0.36, 0.2, 0.32, 0.12))
+
+
+def _reactions(reactions, tr: Translator) -> Table:
+    """Force each support takes (what bolts and fixtures must hold)."""
+    rows = []
+    for label, f in reactions:
+        rows.append((label,) + tuple(tr.quantity(Quantity(v, "N"), 3) for v in _clean(f))
+                    + (tr.quantity(Quantity(g.length(f), "N"), 3),))
+    header = (tr.t("reactions.support"), "Fx", "Fy", "Fz", "|F|")
+    return Table(header=header, rows=tuple(rows), widths=(0.32, 0.17, 0.17, 0.17, 0.17))
 
 
 def _points(hotspots, tr: Translator, length_unit: str, figures, digits: int = 4,
@@ -425,6 +437,13 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
     res = inputs.result
     stress = res.get_field(FieldKind.VON_MISES)
     blocks = [_results(inputs, tr, fs, ctx.fs_regular, ctx.fs_tension)]
+    if inputs.reactions:
+        blocks.append(Paragraph(tr.t("reactions.intro")))
+        blocks.append(_reactions(inputs.reactions, tr))
+        eq = inputs.equilibrium
+        if eq is not None and eq.load_on_supports is not None \
+                and g.length(eq.load_on_supports) > 1e-9 * max(g.length(eq.applied), 1e-30):
+            blocks.append(Notice(tr.t("reactions.load_on_supports"), level="info"))
     if fs is not None and fs < 1.0:
         blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, result_digits(inputs)))))
     if fs is None and stress is not None:

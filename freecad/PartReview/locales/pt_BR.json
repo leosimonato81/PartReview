@@ -450,5 +450,8 @@
   "warn.sharp_corner": "O ponto {n} está num canto vivo interno (quina reentrante sem arredondamento). Pela teoria da elasticidade (Williams, 1952), ali a tensão é teoricamente infinita: o valor cresce com o refino da malha. Na peça real, o raio de arredondamento da quina define a tensão; modele o raio para obter um valor confiável.",
   "exec.sharp_corner": "A tensão máxima (ponto {n}) está num canto vivo interno: pode ser uma singularidade, que cresce com o refino da malha. Modele o raio real da quina para obter um valor confiável.",
   "warn.singularity_many": "Os pontos {n} estão sobre {label} (apoio ou carga). Tensões concentradas em apoios e cargas costumam crescer quando a malha é refinada (singularidade numérica) e não devem ser usadas sozinhas para dimensionar a peça.",
-  "warn.sharp_corner_many": "Os pontos {n} estão em cantos vivos internos (quinas reentrantes sem arredondamento). Pela teoria da elasticidade (Williams, 1952), ali a tensão é teoricamente infinita: o valor cresce com o refino da malha. Na peça real, o raio de arredondamento da quina define a tensão; modele o raio para obter um valor confiável."
+  "warn.sharp_corner_many": "Os pontos {n} estão em cantos vivos internos (quinas reentrantes sem arredondamento). Pela teoria da elasticidade (Williams, 1952), ali a tensão é teoricamente infinita: o valor cresce com o refino da malha. Na peça real, o raio de arredondamento da quina define a tensão; modele o raio para obter um valor confiável.",
+  "reactions.intro": "Reações nos apoios: a força que cada apoio exerce sobre a peça, calculada pelo solver. É a carga que parafusos, pinos e fixações precisam suportar (com sinal oposto).",
+  "reactions.support": "Apoio",
+  "reactions.load_on_supports": "Parte da carga foi aplicada em nós que também estão presos: o solver não a conta nas reações acima (ela vai direto ao apoio). O equilíbrio da seção de qualidade já a inclui."
 }

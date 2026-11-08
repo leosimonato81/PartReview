@@ -317,7 +317,7 @@ def read_constraints(analysis, unit_system):
         lines, points = _reference_lines_points(obj)
         constraints.append(Constraint(kind, obj.Label, _references(obj), magnitude, direction,
                                       geometry=_reference_triangles(obj), lines=lines,
-                                      points=points))
+                                      points=points, name=obj.Name))
     return tuple(constraints)
 
 
