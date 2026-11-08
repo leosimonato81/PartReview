@@ -2,6 +2,45 @@
 
 All notable changes to PartReview. / Mudanças importantes do PartReview.
 
+## 1.5.0 — 2026-11-08
+
+**Mesh assistant / Assistente de malha** (new command):
+- Analyses the solid before any mesh exists: size, volume, characteristic
+  thickness (t = 2V/A), and warnings for walls much thinner than the part
+  (likely modelling leftovers), small radii, and supports or loads on edges or
+  vertices. / Analisa a peça antes de existir malha e avisa sobre detalhes que
+  atrapalham (paredes finíssimas, raios pequenos, apoios em arestas).
+- Five mesh options relative to the part (very coarse to very fine), always
+  2nd order with curvature sizing; recommendation with the reason (about
+  2 elements across the wall by default); local refinement on small support
+  and load faces. / Cinco opções de malha e recomendação justificada.
+- "Try the options": real Gmsh runs in a hidden document and CalculiX trials
+  on small meshes of the part, to measure memory and solve time on THIS
+  computer (nothing assumed from another machine; each computer keeps its own
+  measurements). Fit status ✔/⚠/✖ against the free memory; objectives: finest
+  mesh that fits, or solve within ~1, 5 or 10 minutes. / Mede o seu
+  computador na sua peça; objetivos de memória ou tempo.
+- Gmsh and CalculiX always run as separate, watched processes (time limit,
+  memory watchdog, progress with elapsed/remaining time, Cancel). Creates a
+  new Gmsh mesh object (undoable); removes only what it created. / Sempre em
+  processos vigiados, com cancelar; cria uma malha nova, desfazível.
+
+**Check before solving / Conferir antes de calcular** (new command): estimates
+CalculiX memory for a mesh against the free memory.
+
+**Report / Relatório:**
+- Balloons rebuilt: anchored on the part (never in the air), one per visible
+  face or edge, placed on the image background without covering the result or
+  crossing leaders; black = result, orange = load, purple = support. / Balões
+  refeitos: na peça, um por face, no fundo da imagem, sem cruzar.
+- Supports and loads on edges or vertices are flagged as singular (the report
+  used to say "no alerts" with the maximum stress sitting on an edge support).
+  / Apoios e cargas em arestas/vértices geram alerta de singularidade.
+- FreeCAD's logo is the default cover logo the first time; an empty field means
+  no logo; the fields of the last report are remembered in PartReview's own
+  file, also after FreeCAD is closed. / Logo do FreeCAD como padrão; campos
+  lembrados entre sessões.
+
 ## 1.4.0 — 2026-11-07
 
 - Equilibrium check: loads applied on nodes that are also fixed are added back

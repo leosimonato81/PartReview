@@ -1,14 +1,26 @@
 # PartReview
 
-**PT-BR** — Workbench do FreeCAD que gera relatórios profissionais de
-resultados FEM já calculados no FreeCAD (CalculiX, análise estática linear):
-vistas automáticas nos pontos críticos, resumo executivo, qualidade da malha,
-checagem de equilíbrio, erro estimado e exportação em PDF, HTML e CSV.
+**PT-BR** — Workbench do FreeCAD para análises FEM (CalculiX, estática linear)
+do começo ao fim, sem travar o seu computador:
 
-**EN** — FreeCAD workbench that creates professional reports of FEM results
-already computed in FreeCAD (CalculiX, linear static analysis): automatic views
-of the critical spots, executive summary, mesh quality, equilibrium check,
-estimated error, and PDF, HTML and CSV export.
+1. **Assistente de malha** — analisa a peça, avisa sobre detalhes que atrapalham
+   a malha, testa malhas de várias finuras **medindo o seu computador** e cria a
+   malha recomendada (ou a melhor para um objetivo de memória ou de tempo).
+2. **Conferir antes de calcular** — diz se o CalculiX deve caber na memória livre.
+3. **Relatório FEM** — relatório profissional do resultado: vistas automáticas
+   com balões, resumo executivo, qualidade da malha, checagem de equilíbrio,
+   erro estimado, alertas de singularidade; PDF, HTML e CSV.
+
+**EN** — FreeCAD workbench for FEM analyses (CalculiX, linear static) from start
+to finish, without freezing your computer:
+
+1. **Mesh assistant** — analyses the part, warns about details that hurt the
+   mesh, tries meshes of several sizes **measuring your computer**, and creates
+   the recommended mesh (or the best one for a memory or time objective).
+2. **Check before solving** — tells whether CalculiX should fit in free memory.
+3. **FEM report** — professional report of the result: automatic views with
+   balloons, executive summary, mesh quality, equilibrium check, estimated
+   error, singularity alerts; PDF, HTML and CSV.
 
 ## Instalação / Installation
 
@@ -94,6 +106,53 @@ To uninstall, delete the PartReview folder inside `Mod`.
 - Testes no FreeCAD / FreeCAD tests: `tests/freecad/` (`test_view_state.py`,
   `run_report_headless.py`, `inspect_fem_reader.py`)
 
+## Assistente de malha / Mesh assistant
+
+Use **antes** de calcular, normalmente num modelo que ainda não tem malha.
+Use it **before** solving, usually on a model that has no mesh yet.
+
+1. Selecione a peça (um sólido) e clique em **Assistente de malha**. O painel
+   abre ao lado, em passos numerados.
+2. **1 · Peça:** dimensões, volume e a *espessura característica*
+   (t = 2·volume/área; todas as sugestões partem dela, por isso servem para
+   peças de qualquer tamanho). **Avisos de geometria:** paredes muito mais finas
+   que a peça (provável sobra de modelagem), furos e raios pequenos, e apoios ou
+   cargas em arestas ou vértices (tensão teoricamente infinita ali). Clique duas
+   vezes num aviso para selecionar a face na tela.
+3. **2 · Seu computador:** memória total e livre, núcleos e o que já foi medido
+   neste computador.
+4. **3 · Escolha da malha:** clique em **Testar as opções**. O assistente gera
+   cinco malhas (muito grossa a muito fina) num documento oculto — o seu arquivo
+   não muda — e roda o CalculiX em malhas de ensaio pequenas **da sua peça, no
+   seu computador**, para medir memória e tempo. Cada opção mostra nós, memória
+   e tempo total previstos e um selo ✔ cabe / ⚠ no limite / ✖ não cabe. A
+   recomendada leva ★ (normalmente a média: cerca de 2 elementos na espessura).
+   Ou escolha um **objetivo** (a malha mais fina que cabe na memória, ou cálculo
+   em até ~1, 5 ou 10 minutos) e clique em **Gerar malha automática**.
+5. **4 · Criar a malha:** cria um objeto de malha Gmsh **novo** (nada do que já
+   existe é alterado; Ctrl+Z desfaz), com refino local nas faces pequenas de
+   apoio e carga. **Remover malhas do assistente** apaga só o que ele criou.
+6. Gere a malha (se ainda não estiver gerada) e calcule pelo Workbench FEM.
+
+**Segurança / Safety:** o Gmsh e o CalculiX sempre rodam como processos
+separados, com tempo limite, vigia de memória, barra de progresso com tempo
+decorrido e restante, e botão Cancelar. Nada é previsto a partir de outro
+computador: a memória do CalculiX depende da malha (antes de medir aparece como
+faixa) e o tempo depende do computador (aparece "a medir" até o primeiro ensaio).
+Cada computador guarda o que mediu em `<dados do usuário>/PartReview/` e começa
+a próxima peça já com uma estimativa. / Gmsh and CalculiX always run as separate
+processes with a time limit, a memory watchdog, progress (elapsed and remaining
+time) and Cancel. Nothing is predicted from another computer: CalculiX memory
+depends on the mesh (a band before measuring) and time depends on the computer
+("to be measured" until the first trial). Each computer keeps what it measured.
+
+## Conferir antes de calcular / Check before solving
+
+Selecione a malha (ou deixe a única do documento) e clique em **Conferir antes
+de calcular**: o PartReview estima a memória do CalculiX para essa malha e
+compara com a memória livre agora (✔ / ⚠ / ✖), dizendo até quantos nós cabem com
+folga. / Estimates CalculiX memory for the mesh against the free memory now.
+
 ## Como gerar o relatório FEM
 
 1. Abra o documento com um resultado FEM já calculado (CalculiX).
@@ -104,8 +163,11 @@ To uninstall, delete the PartReview folder inside `Mod`.
    FreeCAD), título, autor, empresa, logo e, se quiser, o limite de escoamento
    (ex.: `250 MPa`) para obter o fator de segurança. O logo (SVG, PNG ou JPG)
    aparece centralizado embaixo da capa; o diálogo mostra uma prévia e avisa se
-   uma imagem pequena pode sair borrada na impressão (SVG sai sempre nítido). O
-   último logo usado é lembrado para o próximo relatório.
+   uma imagem pequena pode sair borrada na impressão (SVG sai sempre nítido). Na
+   primeira vez o campo vem com o logo do FreeCAD; deixe-o vazio para um
+   relatório sem logo. Empresa, autor, logo, aparência, nível, idioma, unidades e
+   exportações do último relatório são lembrados, também depois de fechar o
+   FreeCAD.
 5. Opcional: em **Aparência e textos fixos**, escolha a cor de destaque (padrão:
    preto) e os textos de abertura e de responsabilidade. Com cores claras, os
    títulos usam automaticamente um tom mais escuro da mesma cor, para manter o
@@ -119,7 +181,10 @@ To uninstall, delete the PartReview folder inside `Mod`.
 
 O que o relatório traz: capa com logo; sumário; **resumo executivo** com o
 veredito montado a partir dos dados; vistas automáticas com balões numerados
-e legenda; resumo da análise; resultados com unidade e local; pontos de
+e legenda (balões no fundo da imagem, sem cobrir o resultado e sem linhas
+cruzadas: preto = resultado, laranja = carga, roxo = apoio; um balão por face ou
+aresta visível); alertas de singularidade (tensão máxima sobre apoio ou carga, e
+apoios ou cargas em arestas e vértices); resumo da análise; resultados com unidade e local; pontos de
 interesse; **qualidade da malha, checagem de equilíbrio e erro estimado**
 (Zienkiewicz–Zhu, com mapa do erro local); premissas e limitações;
 **rastreabilidade** (versões, SHA-256 do arquivo, configurações do solver e

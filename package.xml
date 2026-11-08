@@ -5,8 +5,8 @@
 
     <name>PartReview</name>
     <description>Professional reports of FreeCAD FEM results: automatic views, mesh quality, equilibrium check, estimated error, PDF/HTML/CSV export.</description>
-    <version>1.4.0</version>
-    <date>2026-11-07</date>
+    <version>1.5.0</version>
+    <date>2026-11-08</date>
 
     <freecadmin>1.1.0</freecadmin>
     <pythonmin>3.11</pythonmin>
