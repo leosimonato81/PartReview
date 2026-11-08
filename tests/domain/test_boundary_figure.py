@@ -104,3 +104,40 @@ def test_triangles_on_finds_the_end_face_only():
         assert all(pos[n].x == 0.0 for n in surface.triangles[t])
     on_face = [t for t, tri in enumerate(surface.triangles) if all(pos[n].x == 0.0 for n in tri)]
     assert sorted(found) == on_face  # neighbors touching the edge are not taken
+
+
+def test_spread_points_covers_a_face_and_respects_the_spacing():
+    from freecad.PartReview.domain.geometry import spread
+    grid = [Vec3(x, y, 0.0) for x in range(11) for y in range(11)]
+    chosen = spread(grid, 5, 1.0)
+    assert len(chosen) == 5 and grid[chosen[0]] == Vec3(5, 5, 0)  # starts at the middle
+    assert {grid[i] for i in chosen[1:]} == {Vec3(0, 0, 0), Vec3(10, 0, 0), Vec3(0, 10, 0),
+                                             Vec3(10, 10, 0)}  # then the far corners
+    assert len(spread(grid, 9, 20.0)) == 1  # a small face: one arrow
+    assert spread([], 3, 1.0) == []
+
+
+def test_interior_triangles_avoid_the_face_border():
+    from freecad.PartReview.domain.surface import interior
+    n = 4  # 4 x 4 squares, two triangles each; node id = 10 * i + j
+    tris = []
+    for i in range(n):
+        for j in range(n):
+            a, b, c, d = 10 * i + j, 10 * (i + 1) + j, 10 * (i + 1) + j + 1, 10 * i + j + 1
+            tris += [(a, b, c), (a, c, d)]
+    inner = interior(range(len(tris)), tris)
+    assert inner
+    for t in inner:  # no node on the outer ring of the grid
+        assert all(0 < k // 10 < n and 0 < k % 10 < n for k in tris[t])
+    assert interior([0, 1], tris) == [0, 1]  # one square: no interior, keep all
+
+
+def test_supports_and_loads_figure_is_optional_and_never_in_the_quick_summary():
+    from freecad.PartReview.domain.models import ReportConfig, ReportLevel
+    c = ReportConfig()
+    for level, wanted in ((ReportLevel.QUICK, False), (ReportLevel.STANDARD, True),
+                          (ReportLevel.FULL, True)):
+        c.level = level
+        assert c.includes_boundary is wanted
+    c.level, c.show_boundary = ReportLevel.FULL, False
+    assert c.includes_boundary is False

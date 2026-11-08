@@ -107,7 +107,6 @@
   "report.level.quick": "Resumo rápido",
   "report.level.standard": "Intermediário",
   "report.level.full": "Completo",
-  "report.level": "Nível do relatório",
   "report.company": "Empresa",
   "config.error.level": "Nível de relatório inválido.",
   "config.error.logo": "Arquivo de logo não encontrado (foi apagado ou movido?).",
@@ -207,7 +206,7 @@
   "trace.mesher": "Gerador de malha",
   "trace.mesher_settings": "Configuração da malha",
   "trace.report": "Relatório",
-  "trace.report_value": "nível {level}; idioma {language}; unidades {units}",
+  "trace.report_value": "idioma {language}; unidades {units}",
   "warn.unsaved": "O documento tinha alterações não salvas quando o relatório foi gerado: o SHA-256 acima é do arquivo salvo em disco, que pode ser diferente do que foi analisado.",
   "template.error.name": "Dê um nome ao template.",
   "template.error.color": "Cor inválida (use #rrggbb).",
@@ -412,5 +411,8 @@
   "fig.boundary_legend": "Condições de contorno",
   "fig.boundary_arrows": "Setas: direção de cada força.",
   "fig.boundary_supports": "Em roxo (apoios): {items}.",
-  "fig.boundary_loads": "Em laranja (cargas): {items}."
+  "fig.boundary_loads": "Em laranja (cargas): {items}.",
+  "ui.figures": "Figuras",
+  "ui.show_boundary": "Incluir figura de apoios e cargas",
+  "ui.show_boundary_tip": "Mostra a peça em cinza com os apoios em roxo e as cargas em laranja, para quem lê o relatório sem ter feito a análise. Não entra no Resumo rápido."
 }

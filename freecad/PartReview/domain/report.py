@@ -505,8 +505,7 @@ def _section_trace(ctx: FemContext, tr: Translator, level) -> list:
                      tr.list_sep.join("%s = %s" % kv for kv in t.mesher_settings)))
     config = ctx.inputs.config
     rows.append((tr.t("trace.report"), tr.t(
-        "trace.report_value", level=tr.t("report.level." + config.level.value),
-        language=config.language, units=tr.t("note.units." + config.unit_system.value))))
+        "trace.report_value", language=config.language, units=tr.t("note.units." + config.unit_system.value))))
     blocks = [Table(header=(), rows=tuple(rows), widths=(0.3, 0.7))]
     if t.unsaved_changes:
         blocks.append(Notice(tr.t("warn.unsaved")))
@@ -623,8 +622,6 @@ def _cover(inputs: ReportInputs, tr: Translator) -> Cover:
         info=tuple(info),
         company=config.company,
         logo_path=config.logo_path,
-        level_label=tr.t("report.level." + config.level.value),
-        level_caption=tr.t("report.level"),
         full_page=config.level is not ReportLevel.QUICK,
     )
 

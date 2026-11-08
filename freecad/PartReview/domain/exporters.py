@@ -138,8 +138,7 @@ def render_html(doc, image_uris, logo_uri: str = "", language: str = "pt_BR") ->
     parts.append("<h1>%s</h1>" % _e(cover.title))
     if cover.subtitle:
         parts.append('<div class="subtitle">%s</div>' % _e(cover.subtitle))
-    rows = list(cover.info) + ([(cover.level_caption, cover.level_label)]
-                               if cover.level_label else [])
+    rows = list(cover.info)
     parts.append(_table(Table((), tuple(rows), (0.3, 0.7))))
     if logo and cover.full_page:  # full cover: centered at the bottom (same as the PDF)
         parts.append('<div class="logo-center">%s</div>' % logo)

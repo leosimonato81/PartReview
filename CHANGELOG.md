@@ -15,8 +15,12 @@ All notable changes to PartReview. / Mudanças importantes do PartReview.
   Figure 1 shows the part in gray with the held regions in purple, the loaded
   regions in orange and arrows along each force, without balloons (the caption
   names each support and load with its value); a second view is added only for
-  supports or loads hidden in the first. Result images keep only the result
-  balloons, and the numbered points are results only. / A figura 1 mostra a
+  supports or loads hidden in the first. Forces are drawn as a few thin
+  arrows spread over each loaded face. The figure is optional (a check box in
+  the report dialog, remembered) and never in the quick summary. Result images
+  keep only the result balloons, and the numbered points are results only.
+- The report no longer prints its level ("Report level") on the cover or in
+  the traceability table. / O relatório não mostra mais o "nível do relatório". / A figura 1 mostra a
   peça em cinza, apoios em roxo, cargas em laranja e setas na direção das
   forças, sem balões; as imagens de resultado ficam só com os balões de
   resultado.

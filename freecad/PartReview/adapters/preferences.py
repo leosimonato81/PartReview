@@ -42,7 +42,7 @@ def last_report_fields():
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
         return (ReportTemplate.from_dict(data["fields"]), bool(data.get("csv")),
-                bool(data.get("html")))
+                bool(data.get("html")), bool(data.get("boundary", True)))
     except (OSError, ValueError, KeyError, TypeError) as err:
         App.Console.PrintWarning("PartReview: last report settings ignored (%s): %s\n"
                                  % (path, err))
@@ -51,11 +51,12 @@ def last_report_fields():
 
 def remember_report_fields(config) -> None:
     """Called after a report is generated: company, author, logo (also an empty one),
-    look, level, language, units and exports come back next time (title, result,
+    look, level, language, units, exports and the supports/loads figure come back next time (title, result,
     output and yield do not). Written atomically, right away."""
     path = _file()
     data = {"fields": ReportTemplate.from_config("last", config).to_dict(),
-            "csv": config.export_csv, "html": config.export_html}
+            "csv": config.export_csv, "html": config.export_html,
+            "boundary": config.show_boundary}
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp = path + ".tmp"

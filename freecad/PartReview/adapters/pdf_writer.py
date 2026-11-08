@@ -374,8 +374,6 @@ def _layout_full_cover(layout, cover, x0, style):
     layout.add(_line_op(x0, y + mm(4), x0 + mm(40), y + mm(4), style.accent, 1.2))
     y = mm(170)
     rows = list(cover.info)
-    if cover.level_label:
-        rows.append((cover.level_caption, cover.level_label))
     label_w = mm(45)
     for label, value in rows:
         h = max(style.height(style.bold, label, label_w),
@@ -407,8 +405,6 @@ def _layout_compact_cover(layout, cover, x0, style):
     lines += ["%s: %s" % (k, v) for k, v in cover.info]
     if cover.company:
         lines.append(cover.company)
-    if cover.level_label:
-        lines.append("%s: %s" % (cover.level_caption, cover.level_label))
     for text in lines:
         h = style.height(style.body, text, text_w)
         layout.add(_text_op(style.body, text, QRectF(title_x, layout.y, text_w, h), MUTED))

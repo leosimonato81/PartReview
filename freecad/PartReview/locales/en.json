@@ -107,7 +107,6 @@
   "report.level.quick": "Quick summary",
   "report.level.standard": "Intermediate",
   "report.level.full": "Complete",
-  "report.level": "Report level",
   "report.company": "Company",
   "config.error.level": "Invalid report level.",
   "config.error.logo": "Logo file not found (was it deleted or moved?).",
@@ -207,7 +206,7 @@
   "trace.mesher": "Mesher",
   "trace.mesher_settings": "Mesh settings",
   "trace.report": "Report",
-  "trace.report_value": "level {level}; language {language}; units {units}",
+  "trace.report_value": "language {language}; units {units}",
   "warn.unsaved": "The document had unsaved changes when the report was created: the SHA-256 above is of the file saved on disk, which may differ from what was analysed.",
   "template.error.name": "Give the template a name.",
   "template.error.color": "Invalid colour (use #rrggbb).",
@@ -412,5 +411,8 @@
   "fig.boundary_legend": "Boundary conditions",
   "fig.boundary_arrows": "Arrows: direction of each force.",
   "fig.boundary_supports": "In purple (supports): {items}.",
-  "fig.boundary_loads": "In orange (loads): {items}."
+  "fig.boundary_loads": "In orange (loads): {items}.",
+  "ui.figures": "Figures",
+  "ui.show_boundary": "Include supports and loads figure",
+  "ui.show_boundary_tip": "Shows the part in gray with supports in purple and loads in orange, for readers who did not run the analysis. Not in the Quick summary."
 }

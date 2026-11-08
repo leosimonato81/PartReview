@@ -239,13 +239,16 @@ class ReportDialog(QDialog):
         out.addRow(t("ui.output"), self._with_button(self.output_edit, self._browse))
         self.csv_check = QCheckBox(t("ui.export_csv"))
         self.html_check = QCheckBox(t("ui.export_html"))
-        for check in (self.csv_check, self.html_check):
+        self.boundary_check = QCheckBox(t("ui.show_boundary"))
+        self.boundary_check.setToolTip(t("ui.show_boundary_tip"))
+        for check in (self.csv_check, self.html_check, self.boundary_check):
             check.toggled.connect(self._sync)
         exports = QHBoxLayout()
         exports.addWidget(self.html_check)
         exports.addWidget(self.csv_check)
         exports.addStretch(1)
         out.addRow(t("ui.export"), exports)
+        out.addRow(t("ui.figures"), self.boundary_check)
         layout.addLayout(out)
         layout.addStretch(1)
 
@@ -274,9 +277,10 @@ class ReportDialog(QDialog):
         if last is None:
             self.config.logo_path = preferences.freecad_logo_path()
         else:
-            fields, csv, html = last
+            fields, csv, html, boundary = last
             fields.apply_to(self.config)
             self.config.export_csv, self.config.export_html = csv, html
+            self.config.show_boundary = boundary
             if self.config.logo_path and not os.path.isfile(self.config.logo_path):
                 self._last_logo_missing = self.config.logo_path
                 self.config.logo_path = ""
@@ -355,6 +359,7 @@ class ReportDialog(QDialog):
             self.intro_edit.setPlainText(c.intro_text)
             self.csv_check.setChecked(c.export_csv)
             self.html_check.setChecked(c.export_html)
+            self.boundary_check.setChecked(c.show_boundary)
             self.disclaimer_edit.setPlainText(c.disclaimer_text)
         finally:
             self._loading = False
@@ -379,6 +384,9 @@ class ReportDialog(QDialog):
         c.disclaimer_text = self.disclaimer_edit.toPlainText().strip()
         c.export_csv = self.csv_check.isChecked()
         c.export_html = self.html_check.isChecked()
+        c.show_boundary = self.boundary_check.isChecked()
+        # The quick summary never has it: the box stays visible but greyed out.
+        self.boundary_check.setEnabled(c.level is not ReportLevel.QUICK)
         self.level_desc.setText(self.tr_ui.t("ui.level_desc." + c.level.value))
         self._show_color()
 

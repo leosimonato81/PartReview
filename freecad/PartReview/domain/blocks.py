@@ -89,8 +89,6 @@ class Cover:
     info: tuple[tuple[str, str], ...]  # (label, value) rows
     company: str = ""  # user text
     logo_path: str = ""
-    level_label: str = ""  # e.g. "Completo"
-    level_caption: str = ""  # e.g. "Nível do relatório"
     full_page: bool = True  # False: compact header on the first content page
 
 

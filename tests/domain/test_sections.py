@@ -77,14 +77,14 @@ def test_fem_report_levels(level, has_points, has_toc, full_cover):
     assert any(isinstance(b, Table) for b in doc.blocks)
 
 
-def test_cover_keeps_user_texts_and_names_the_level():
+def test_cover_keeps_user_texts_without_the_level():
     inputs = make_inputs()
     inputs.config.company = "Oficina São José Ltda."
     doc = build_report(inputs, Translator("pt_BR", strict=True))
     assert doc.cover.title == "Suporte do motor"
     assert doc.cover.subtitle == "Relatório de análise estrutural (FEM)"
     assert doc.cover.company == "Oficina São José Ltda."
-    assert doc.cover.level_label == "Completo"
+    assert not any("Completo" in v for _, v in doc.cover.info)  # no report level (owner)
     assert doc.header_text == "Suporte do motor"
 
 

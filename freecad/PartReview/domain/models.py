@@ -181,6 +181,12 @@ class ReportConfig:
     disclaimer_text: str = ""  # user text shown with the assumptions
     export_csv: bool = False  # nodal values next to the PDF
     export_html: bool = False  # HTML version of the report next to the PDF
+    # Supports-and-loads figure (owner: optional, not in the quick summary).
+    show_boundary: bool = True
+
+    @property
+    def includes_boundary(self) -> bool:
+        return self.show_boundary and self.level is not ReportLevel.QUICK
 
     def extra_output(self, extension: str) -> str:
         """Path of an extra export: the PDF path with another extension."""

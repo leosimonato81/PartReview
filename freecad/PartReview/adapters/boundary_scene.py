@@ -7,19 +7,19 @@ removes afterwards: nothing in the user's document is touched (no colors, no
 visibility, no new objects).
 """
 
-import math
-
 from pivy import coin  # type: ignore
 
 from ..domain import geometry as g
 from ..domain.colors import LOAD_RGB, PART_RGB, SUPPORT_RGB
-from ..domain.hotspots import HotspotKind
 from ..domain.models import ConstraintKind
-from ..domain.surface import feature_edges, triangles_on
+from ..domain.surface import feature_edges, interior, triangles_on
 
 EDGE_RGB = (70, 70, 70)
-ARROW_RGB = (40, 40, 40)  # dark: readable on the orange load faces and on gray
-ARROW_LENGTH = 0.28  # of the model radius
+ARROW_RGB = (35, 35, 35)  # dark: readable on the orange load faces and on gray
+ARROW_LENGTH = 0.12  # of the model radius
+ARROW_RADIUS = 0.0045  # shaft radius, of the model radius (head: 2.6x wider)
+ARROW_SPACING = 0.2  # minimum distance between arrows of one load, of the radius
+ARROWS_PER_LOAD = 4
 SUPPORT_KINDS = (ConstraintKind.FIXED, ConstraintKind.DISPLACEMENT)
 
 
@@ -99,7 +99,7 @@ def _arrow(tail, tip, color, radius):
     if length <= 0:
         return None
     d = g.normalize(axis)
-    head = min(0.4 * length, 6.0 * radius)
+    head = min(0.35 * length, 8.0 * radius)
     sep = coin.SoSeparator()
     sep.addChild(_material(color))
     turn = coin.SoTransform()
@@ -121,25 +121,16 @@ def _arrow(tail, tip, color, radius):
     move.translation.setValue(0, shaft_len + head / 2.0, 0)
     cone_sep.addChild(move)
     cone = coin.SoCone()
-    cone.bottomRadius = 2.5 * radius
+    cone.bottomRadius = 2.6 * radius
     cone.height = head
     cone_sep.addChild(cone)
     sep.addChild(cone_sep)
     return sep
 
 
-def _outward(point, surface, positions):
-    """Outward normal of the mesh surface node closest to ``point`` (or None)."""
-    best, best_d = None, math.inf
-    for node, normal in surface.normals.items():
-        d = g.distance(positions[node], point)
-        if d < best_d:
-            best, best_d = normal, d
-    return best
-
-
-def build(result, surface, hotspots, model_radius):
-    """Coin root of the supports-and-loads scene (mesh coordinates)."""
+def build(result, surface, model_radius):
+    """Coin root of the supports-and-loads scene (mesh coordinates) and a
+    function ``show_arrows(labels)`` that keeps only those loads' arrows."""
     positions = result.mesh.node_positions
     ids = sorted({i for tri in surface.triangles for i in tri})
     where = {node: k for k, node in enumerate(ids)}
@@ -151,13 +142,17 @@ def build(result, surface, hotspots, model_radius):
     color_of = {}  # triangle index -> color (supports win over loads)
     segments = {SUPPORT_RGB: [], LOAD_RGB: []}
     dots = {SUPPORT_RGB: [], LOAD_RGB: []}
+    force_triangles = {}  # force constraint label -> its mesh triangles
     for c in sorted(result.constraints, key=lambda c: c.kind in SUPPORT_KINDS):
         if c.kind not in SUPPORT_KINDS and c.kind not in (ConstraintKind.FORCE,
                                                          ConstraintKind.PRESSURE):
             continue
         color = SUPPORT_RGB if c.kind in SUPPORT_KINDS else LOAD_RGB
-        for t in triangles_on(c.geometry, surface.triangles, positions, tolerance):
+        on = triangles_on(c.geometry, surface.triangles, positions, tolerance)
+        for t in on:
             color_of[t] = color
+        if c.kind is ConstraintKind.FORCE:
+            force_triangles[c.label] = sorted(on)
         segments[color] += list(c.lines)
         dots[color] += list(c.points)
 
@@ -176,22 +171,39 @@ def build(result, surface, hotspots, model_radius):
         if dots[color]:
             root.addChild(_dots(dots[color], color, 0.02 * model_radius))
 
-    # One arrow per load anchor, along the force: pushing arrows end on the
-    # part, pulling arrows start on it (outward side), so none hides inside.
+    # Forces as in FEM programs: a few thin arrows spread over each loaded face
+    # (or along the loaded edges), all the same size. A pushing arrow ends on the
+    # surface, a pulling one starts on it, so none is hidden inside the part.
     length = ARROW_LENGTH * model_radius
-    by_label = {c.label: c for c in result.constraints if c.kind is ConstraintKind.FORCE}
-    for spot in hotspots:
-        c = by_label.get(spot.label) if spot.kind is HotspotKind.LOAD else None
-        if c is None or c.direction is None or g.length(c.direction) == 0:
+    arrows = {}
+    for c in result.constraints:
+        if c.kind is not ConstraintKind.FORCE or c.direction is None \
+                or g.length(c.direction) == 0:
             continue
         d = g.normalize(c.direction)
-        for anchor in spot.anchors:
-            normal = _outward(anchor, surface, positions)
+        group = coin.SoSwitch()  # shown only in views where this load is visible
+        group.whichChild = coin.SO_SWITCH_ALL
+        arrows[c.label] = group
+        root.addChild(group)
+        places = []  # (point, outward normal or None)
+        for t in interior(force_triangles.get(c.label, ()), surface.triangles):
+            tri = [positions[i] for i in surface.triangles[t]]
+            n = g.cross(g.sub(tri[1], tri[0]), g.sub(tri[2], tri[0]))
+            places.append((g.centroid(tri), g.normalize(n) if g.length(n) > 0 else None))
+        places += [(g.centroid(seg), None) for seg in c.lines]
+        places += [(p, None) for p in c.points]
+        places = places[::max(1, len(places) // 2000)]  # sampling cost bound
+        for k in g.spread([p for p, _ in places], ARROWS_PER_LOAD, ARROW_SPACING * model_radius):
+            point, normal = places[k]
             if normal is not None and g.dot(d, normal) > 0:
-                tail, tip = anchor, g.add(anchor, g.scale(d, length))
+                tail, tip = point, g.add(point, g.scale(d, length))
             else:
-                tail, tip = g.sub(anchor, g.scale(d, length)), anchor
-            arrow = _arrow(tail, tip, ARROW_RGB, 0.018 * model_radius)
+                tail, tip = g.sub(point, g.scale(d, length)), point
+            arrow = _arrow(tail, tip, ARROW_RGB, ARROW_RADIUS * model_radius)
             if arrow is not None:
-                root.addChild(arrow)
-    return root
+                group.addChild(arrow)
+    def show_arrows(labels):
+        for label, group in arrows.items():
+            group.whichChild = coin.SO_SWITCH_ALL if label in labels else coin.SO_SWITCH_NONE
+
+    return root, show_arrows

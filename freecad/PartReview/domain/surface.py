@@ -169,3 +169,21 @@ def triangles_on(geometry, triangles, positions: Mapping[int, Vec3], tolerance: 
                 found.add(t)
                 break
     return found
+
+
+def interior(selected, triangles) -> list[int]:
+    """Of the ``selected`` triangle indices, those not touching the region's border.
+
+    The border is made of the edges used by only one selected triangle. Arrows
+    placed on interior triangles do not stick out past the face's edges. Falls
+    back to ``selected`` when the region is too narrow to have an interior.
+    """
+    count = {}
+    for t in selected:
+        a, b, c = triangles[t]
+        for u, v in ((a, b), (b, c), (c, a)):
+            key = (min(u, v), max(u, v))
+            count[key] = count.get(key, 0) + 1
+    border = {n for edge, k in count.items() if k == 1 for n in edge}
+    inner = [t for t in selected if not border.intersection(triangles[t])]
+    return inner or list(selected)

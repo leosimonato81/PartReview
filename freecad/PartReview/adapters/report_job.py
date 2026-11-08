@@ -87,8 +87,8 @@ def _visible_leaders(views, is_visible):
 
 
 def _plan(result, surface, max_views, boundary_views):
-    """Result hotspots (numbered order), result views, supports/loads views,
-    model radius and all hotspots (supports/loads included, for the arrows).
+    """Result hotspots (numbered order), result views, supports/loads views and
+    the model radius.
 
     Result images carry only result balloons; supports and loads get their own
     figure on a gray part (owner's request: colored balloons over the stress
@@ -133,7 +133,7 @@ def _plan(result, surface, max_views, boundary_views):
         boundary = cp.plan_boundary_views(spots, center, radius, is_visible, boundary_views)
     # Supports and loads are shown by color and arrows only (no balloons, owner's
     # request): the numbered points of the report are results only.
-    return results, selected, boundary, radius, spots
+    return results, selected, boundary, radius
 
 
 def _equilibrium(analysis, result):
@@ -212,9 +212,9 @@ def generate_fem_report(doc, config, progress=_no_progress):
     zz, error_field = _error_estimate(analysis, result_obj, result, tets)
 
     progress(tr.t("progress.hotspots"), 0.3)
-    spots, views, boundary_views, radius, all_spots = _plan(
+    spots, views, boundary_views, radius = _plan(
         result, surface, views_for_level(config),
-        1 if config.level is ReportLevel.QUICK else 2)
+        2 if config.includes_boundary else 0)
     progress(tr.t("progress.planning"), 0.4)
     error_view = None
     if error_field is not None and views and config.level is not ReportLevel.QUICK:
@@ -246,8 +246,11 @@ def generate_fem_report(doc, config, progress=_no_progress):
                 vs.save_image(image_paths[len(boundary_views) + i], *IMAGE_SIZE)
             if boundary_views:  # last, because the mesh is hidden for them
                 vs.show_only([])
-                vs.add_overlay(boundary_scene.build(result, surface, all_spots, radius))
+                scene, show_arrows = boundary_scene.build(result, surface, radius)
+                vs.add_overlay(scene)
                 for i, view in enumerate(boundary_views):
+                    # arrows of a load hidden in this view would float over the part
+                    show_arrows({t.label for t in view.targets})
                     progress(tr.t("progress.capture", n=len(shots) + i + 1, total=total),
                              0.4 + 0.5 * (len(shots) + i) / total)
                     vs.apply_camera(view.camera)
