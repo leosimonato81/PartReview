@@ -6,7 +6,6 @@ import pytest
 from freecad.PartReview.domain import solver_probe as sp
 from freecad.PartReview.domain.mesh_plan import (
     Objective,
-    REFERENCE,
     nodes_law,
     part_model,
     probe_allowed,
@@ -55,7 +54,9 @@ def test_part_model_from_probes():
     assert model.measured and model.memory_mb(56445) == pytest.approx(1029, rel=1e-6)
     one = part_model(OWNER[:1])  # one point: reference exponent through it
     assert one.memory_mb(56445) == pytest.approx(1029, rel=1e-6) and one.error == 0.4
-    assert part_model([]) is REFERENCE
+    prior = part_model([])
+    assert not prior.measured and not prior.time_known  # time unknown before measuring
+    assert prior.memory_low(56445) < 1100 < prior.memory_mb(56445)  # band, safe side up
     tiny = part_model([SolverSample(3000, 0.4, 60.0)])  # below the fit threshold
     assert tiny.measured
 
@@ -136,3 +137,34 @@ def test_options_carry_a_local_refinement_size():
     from freecad.PartReview.domain.mesh_sizing import mesh_options
     for option in mesh_options(SHROUD):
         assert option.local_size == pytest.approx(option.max_size / 2, rel=0.1)
+
+
+def test_this_computer_is_measured_not_assumed():
+    from freecad.PartReview.domain.mesh_plan import machine_time_law
+    from freecad.PartReview.domain.solver_model import REFERENCE_TIME, speed_factor
+    slow = [SolverSample(n, 2.0 * REFERENCE_TIME(n), 1000.0) for n in (30000, 60000)]
+    assert speed_factor(slow) == pytest.approx(2.0)
+    law = machine_time_law(slow)
+    assert law(80000) == pytest.approx(2.0 * REFERENCE_TIME(80000))
+    known = part_model([], machine_time=law)
+    assert known.time_known and known.seconds(80000) == pytest.approx(law(80000))
+
+
+def test_first_probe_is_limited_by_memory_only():
+    prior = part_model([])
+    assert probe_allowed(prior, 30000, 4000.0)  # time unknown: the watchdog protects
+    assert not probe_allowed(prior, 200000, 4000.0)  # memory is machine-independent
+
+
+def test_hopeless_uses_the_optimistic_memory():
+    from freecad.PartReview.domain.mesh_plan import is_hopeless
+    prior = part_model([])
+    assert not is_hopeless(prior, 95129, 3000.0, 1.7)  # thin part ran with 2.1 GB
+    assert is_hopeless(prior, 600000, 3000.0, 1.7)
+
+
+def test_total_time_scales_freecad_overhead_with_speed():
+    from freecad.PartReview.domain.mesh_plan import total_seconds
+    model = part_model(OWNER)
+    fast = total_seconds(model, 57299, solver_seconds=11.4, speed=0.5)
+    assert fast == pytest.approx(11.4 + 0.5 * 9.7, abs=0.2)

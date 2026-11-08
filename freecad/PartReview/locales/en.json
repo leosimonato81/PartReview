@@ -330,11 +330,10 @@
   "ma.auto": "Generate automatic mesh",
   "ma.auto_tip": "Computes the largest node count that meets the objective (with the model's error margin) and searches the element size that gives that mesh, generating trial meshes.",
   "ma.need_test": "Click Try the options first: the objective uses the measurements of this part.",
-  "ma.model.reference": "Solve forecast: reference (i5 9th gen PC, 8 GB), not measured on this part yet. Click Try the options.",
-  "ma.model.measured": "Solve forecast measured on this part on this computer: {count} CalculiX trial(s), accuracy ±{error} %.",
+  "ma.model.measured": "Measured on this part, on this computer: {count} CalculiX trial(s), accuracy ±{error} %.",
   "ma.step": "Step {done} of {total} · {what} · elapsed {elapsed} · remaining ~{remaining}",
   "ma.what.gmsh": "{level} mesh (Gmsh)",
-  "ma.what.probe": "CalculiX trial on the {level} mesh",
+  "ma.what.probe": "CalculiX trial {n} on this part",
   "ma.what.auto": "automatic mesh, attempt {attempt} (Gmsh)",
   "ma.what.create": "generating the {level} mesh in your document",
   "ma.auto_done": "Automatic mesh for \"{objective}\": {size}, {nodes} nodes, solve ~{seconds}. It is selected: click Create mesh.",
@@ -357,5 +356,10 @@
   "ma.group.numbers": "Show all the numbers",
   "ma.card.nodes": "{nodes}k nodes",
   "ma.card.not_tested": "not tried",
-  "fig.marker_colors": "Balloons: black = result; orange (round tip) = load; purple (square tip) = support. A load or support on several faces or edges repeats its number, one balloon per visible one."
+  "fig.marker_colors": "Balloons: black = result; orange (round tip) = load; purple (square tip) = support. A load or support on several faces or edges repeats its number, one balloon per visible one.",
+  "ma.time_unknown": "to be measured",
+  "ma.model.prior": "This computer has not been measured yet: memory is shown as a band (from thin-walled to compact parts) and time as \"to be measured\". Click Try the options: CalculiX runs on your part, on this computer.",
+  "ma.model.machine": "Time estimated from this computer's earlier measurements ({count} trial(s), {date}); this part's memory is still a band. Try the options to measure this part.",
+  "ma.need_time": "This computer's solve time has not been measured yet: click Try the options before using a time objective.",
+  "ma.what.probe_gmsh": "trial mesh {n} (Gmsh)"
 }

@@ -11,6 +11,7 @@ the GUI never freezes (CLAUDE.md rules 8 and 11).
 """
 
 import time
+from dataclasses import replace
 
 import FreeCAD as App  # type: ignore
 import FreeCADGui as Gui  # type: ignore
@@ -44,6 +45,7 @@ from PySide6.QtWidgets import (  # type: ignore
 
 from .. import __version__
 from ..adapters import geometry_reader, mesh_runner
+from ..adapters import machine_calibration
 from ..adapters.machine import machine_profile
 from ..domain import mesh_plan as mp
 from ..domain import mesh_texts as mt
@@ -52,7 +54,7 @@ from ..domain.i18n import Translator
 from ..domain.mesh_budget import FITS_FRACTION, TIGHT_FRACTION, BudgetStatus
 from ..domain.mesh_sizing import (DEFAULT_LEVEL, MeshLevel, auto_option, estimate_nodes,
                                   mesh_options, with_straight_edges)
-from ..domain.solver_model import SolverSample, format_duration
+from ..domain.solver_model import SolverSample, format_duration, speed_factor
 from .report_dialog import ui_language
 
 GMSH_TIME_LIMIT_S = 300  # one Gmsh run (the spike's 200 000-node mesh took 13 s)
@@ -126,7 +128,8 @@ class MeshAssistantPanel:
         self.job = None
         self.trial_doc = None
         self.machine = machine_profile()
-        self.model = mp.part_model([])
+        self.machine_samples, self.machine_date = machine_calibration.load(self.machine)
+        self.model = self._prior()
         self.run_started = 0.0
         self.steps_done = 0
         self.steps_total = 0
@@ -134,6 +137,7 @@ class MeshAssistantPanel:
         self.auto_attempt = 0
         self.auto_target = 0
         self.probes_pending = False
+        self.probe_samples = []  # CalculiX trials of this part on this computer
         self.fixing = False
         self.refine = ()  # faces refined locally: supports, loads, small radii
         self.recommended = None  # (MeshLevel, reason key) after a test
@@ -304,7 +308,8 @@ class MeshAssistantPanel:
             QApplication.restoreOverrideCursor()
         self._close_trial_doc()
         self.trials, self.skipped = {}, set()
-        self.model = mp.part_model([])
+        self.model = self._prior()
+        self.probe_samples = []
         self.options = mesh_options(self.summary)
         self.part_box.setTitle("%s: %s" % (t("ma.group.part"), self.summary.label))
         while self.part_form.rowCount():
@@ -356,7 +361,8 @@ class MeshAssistantPanel:
         if self.trial_doc is None:
             self.trial_doc = mesh_runner.TrialDocument(geometry_reader.solid_shape(self.solid))
         self.trials, self.skipped = {}, set()
-        self.model = mp.part_model([])
+        self.model = self._prior()
+        self.probe_samples = []
         self.options = [o for o in self.options if o.level is not MeshLevel.AUTO]
         self.recommended = None
         self.test_run = True
@@ -372,6 +378,9 @@ class MeshAssistantPanel:
             return
         self.machine = machine_profile()
         self.objective = self.objective_box.currentData()
+        if mp.OBJECTIVE_SECONDS[self.objective] is not None and not self.model.time_known:
+            self.status_label.setText(t("ma.need_time"))
+            return
         self.auto_target = mp.target_nodes(self.model, self.machine.available_mb,
                                            self.objective, FITS_FRACTION)
         smallest = min(tr.nodes for tr in self.trials.values())
@@ -423,7 +432,7 @@ class MeshAssistantPanel:
         self.run_started = time.monotonic()
         self.steps_done = 0
         self.probes_pending = tasks[0][0] == "gmsh"
-        self.steps_total = len(self.tasks) + (MAX_PROBES if self.probes_pending else 0)
+        self.steps_total = len(self.tasks) + (2 * MAX_PROBES if self.probes_pending else 0)
         self._set_busy(True)
         self._next_task()
         self.timer.start()
@@ -441,11 +450,10 @@ class MeshAssistantPanel:
                 self.skipped.add(payload.level)
                 self.steps_done += 1
                 continue
-            if kind == "probe":
-                trial = self.trials.get(payload)
-                if trial is None or not mp.probe_allowed(self.model, trial.nodes,
-                                                         self.machine.available_mb):
-                    continue
+            if kind == "probe_gmsh" and not mp.probe_allowed(self.model, payload[0],
+                                                             self.machine.available_mb):
+                self.tasks = [task for task in self.tasks if task[0] != "probe_gmsh"]
+                continue  # bigger trials would only be heavier
             self.task = (kind, payload)
             self.job = self._make_job(kind, payload)
             self.job.start()
@@ -457,8 +465,10 @@ class MeshAssistantPanel:
         gmsh_limit = GMSH_MEMORY_SHARE * self.machine.available_mb
         if kind in ("gmsh", "auto"):
             return self.trial_doc.job(payload, GMSH_TIME_LIMIT_S, gmsh_limit, self.refine)
+        if kind == "probe_gmsh":
+            return self.trial_doc.job(payload[1], GMSH_TIME_LIMIT_S, gmsh_limit, ())
         if kind == "probe":
-            return mesh_runner.ProbeJob(self.trials[payload].job, PROBE_TIME_LIMIT_S,
+            return mesh_runner.ProbeJob(payload, PROBE_TIME_LIMIT_S,
                                         PROBE_MEMORY_SHARE * self.machine.available_mb)
         option, mesh = payload
         return mesh_runner.GmshJob(mesh, GMSH_TIME_LIMIT_S, gmsh_limit, load_into_object=True)
@@ -476,6 +486,11 @@ class MeshAssistantPanel:
         self.steps_done += 1
         if kind == "probe":
             self._probe_done(payload, job)
+        elif kind == "probe_gmsh":
+            if state == job.DONE:
+                self.tasks.insert(0, ("probe", job))  # now solve it with CalculiX
+            else:
+                self.tasks = [task for task in self.tasks if task[0] != "probe_gmsh"]
         elif state != job.DONE:
             self._failed(kind, payload, job, state)
             return
@@ -498,20 +513,24 @@ class MeshAssistantPanel:
         self._fill_table()
 
     def _queue_probes(self):
-        ordered = sorted(self.trials.values(), key=lambda tr: tr.nodes)
-        useful = [tr for tr in ordered if tr.nodes >= mp.PROBE_MIN_NODES]
-        chosen = useful[:MAX_PROBES] or ordered[-1:]  # tiny part: one trial, the finest
-        self.tasks += [("probe", tr.option.level) for tr in chosen]
+        """CalculiX trials on small dedicated meshes of this part (no curvature
+        refinement): they fit on any computer and measure THIS part on THIS computer."""
+        for target in mp.PROBE_TARGETS[:MAX_PROBES]:
+            size = mp.probe_size(self.summary.volume, target)
+            option = replace(auto_option(self.summary, size, "mesh.reason.objective"),
+                             curvature=0, local_size=0.0, straight_edges=True)
+            self.tasks.append(("probe_gmsh", (target, option)))
 
-    def _probe_done(self, level, job):
+    def _probe_done(self, gmsh_job, job):
         if job.state == job.DONE:
-            self.trials[level].sample = SolverSample(job.nodes, job.seconds, job.peak_mb)
-            samples = [tr.sample for tr in self.trials.values() if tr.sample is not None]
-            self.model = mp.part_model(samples)
+            sample = SolverSample(job.nodes, job.seconds, job.peak_mb)
+            self.probe_samples.append(sample)
+            machine_calibration.save(self.machine, [sample])  # this computer learns
+            self.model = mp.part_model(self.probe_samples)
             self._show_machine()
             self._fill_table()
         else:  # a probe that failed or hit a limit stops further probes (they are bigger)
-            self.tasks = [task for task in self.tasks if task[0] != "probe"]
+            self.tasks = [task for task in self.tasks if task[0] not in ("probe", "probe_gmsh")]
             self.details.setPlainText(job.process.log_text()[-2000:] if job.process else "")
 
     def _auto_done(self, option, job):
@@ -565,6 +584,7 @@ class MeshAssistantPanel:
         levels = [o.level for o in self.options if o.level is not MeshLevel.AUTO]
         statuses = {lv: self._status(self.trials[lv]) for lv in levels if lv in self.trials}
         seconds = {lv: self._total_seconds(self.trials[lv]) for lv in statuses}
+        seconds = {lv: s for lv, s in seconds.items() if s is not None}  # unknown: not fast
         level, key = mp.recommend(statuses, seconds)
         self.recommended = (level, key)
         self._fill_table()
@@ -575,12 +595,15 @@ class MeshAssistantPanel:
         self.recommend_label.setText(t(
             "ma.recommend.box", level=t("ma.level." + level.value),
             size=mt.mm(self.tr, trial.option.max_size), nodes=self.tr.integer(trial.nodes),
-            seconds=format_duration(self._total_seconds(trial)),
+            seconds=(t("ma.time_unknown") if self._total_seconds(trial) is None
+                     else format_duration(self._total_seconds(trial))),
             status=t("ma.status." + statuses[level].value), why=t(key)))
 
     def _total_seconds(self, trial):
-        solver = trial.sample.seconds if trial.sample is not None else None
-        return mp.total_seconds(self.model, trial.nodes, solver)
+        """None while this computer's speed is unknown."""
+        if not self.model.time_known:
+            return None
+        return mp.total_seconds(self.model, trial.nodes, None, self._speed())
 
     def _created(self, payload, job):
         t = self.tr.t
@@ -620,13 +643,22 @@ class MeshAssistantPanel:
         if len(known) < 2:
             return option.nodes_low > mp.GMSH_MAX_NODES
         predicted = mp.nodes_law(known)(option.max_size)
-        hopeless = self.model.memory_mb(predicted) > 2 * TIGHT_FRACTION * self.machine.available_mb
+        hopeless = mp.is_hopeless(self.model, predicted, self.machine.available_mb,
+                                  2 * TIGHT_FRACTION)
         return predicted > mp.GMSH_MAX_NODES or hopeless
 
     # --- view helpers ---------------------------------------------------------------
 
+    def _prior(self):
+        """Before probing this part: memory band, time from THIS computer's history."""
+        law = mp.machine_time_law(self.machine_samples) if self.machine_samples else None
+        return mp.part_model([], law)
+
+    def _speed(self):
+        return speed_factor(self.probe_samples or self.machine_samples)
+
     def _status(self, trial):
-        measured = trial.sample.peak_mb if trial.sample else None
+        measured = None  # options are predicted from the probes, never assumed
         return mp.classify(self.model, trial.nodes, self.machine.available_mb, measured)
 
     def _fill_table(self):
@@ -641,11 +673,13 @@ class MeshAssistantPanel:
             color = None
             if trial is not None:
                 nodes = trial.nodes
-                if trial.sample is not None:
-                    memory = "%s (%s)" % (mt.memory(self.tr, trial.sample.peak_mb), t("ma.measured"))
+                if self.model.memory_low is not None:  # not measured: band of shapes
+                    memory = "~%s – %s" % (mt.memory(self.tr, self.model.memory_low(nodes)),
+                                           mt.memory(self.tr, self.model.memory_mb(nodes)))
                 else:
                     memory = "~" + mt.memory(self.tr, self.model.memory_mb(nodes))
-                seconds = "~" + format_duration(self._total_seconds(trial))
+                total = self._total_seconds(trial)
+                seconds = t("ma.time_unknown") if total is None else "~" + format_duration(total)
                 status = self._status(trial)
                 text = t("ma.status." + status.value)
                 if trial.fixed:
@@ -718,21 +752,27 @@ class MeshAssistantPanel:
     def _show_machine(self):
         t = self.tr.t
         self.machine_label.setText(mt.machine_text(self.machine, self.tr))
-        probes = [tr for tr in self.trials.values() if tr.sample is not None]
-        self.model_label.setText(
-            t("ma.model.measured", count=len(probes), error=int(round(100 * self.model.error)))
-            if self.model.measured else t("ma.model.reference"))
+        probes = self.probe_samples
+        if self.model.measured:
+            text = t("ma.model.measured", count=len(probes),
+                     error=int(round(100 * self.model.error)))
+        elif self.machine_samples:
+            text = t("ma.model.machine", count=len(self.machine_samples), date=self.machine_date)
+        else:
+            text = t("ma.model.prior")
+        self.model_label.setText(text)
 
     def _show_progress(self):
         t = self.tr.t
         kind, payload = self.task
-        if kind == "probe":
-            level, what_key = payload, "ma.what.probe"
+        if kind in ("probe", "probe_gmsh"):
+            level, what_key = MeshLevel.AUTO, "ma.what." + kind
         elif kind == "create":
             level, what_key = payload[0].level, "ma.what.create"
         else:
             level, what_key = payload.level, "ma.what." + kind
-        what = t(what_key, level=t("ma.level." + level.value).lower(), attempt=self.auto_attempt)
+        what = t(what_key, level=t("ma.level." + level.value).lower(), attempt=self.auto_attempt,
+                 n=len(self.probe_samples) + 1)
         elapsed = time.monotonic() - self.run_started
         self.progress.setRange(0, max(1, self.steps_total))
         self.progress.setValue(min(self.steps_done, self.steps_total))
@@ -749,19 +789,17 @@ class MeshAssistantPanel:
         for kind, payload in self.tasks:
             if kind in ("gmsh", "auto"):
                 pending_gmsh.append(self._predicted_nodes(payload))
-            elif kind == "probe" and payload in self.trials:
-                pending_probes.append(self.trials[payload].nodes)
+            elif kind == "probe_gmsh":
+                pending_probes.append(payload[0])
         current = self.job.elapsed if self.job is not None else 0.0
         current_left = 0.0
-        if self.task and self.task[0] == "probe" and self.task[1] in self.trials:
-            n = self.trials[self.task[1]].nodes
-            current_left = max(0.0, self.model.seconds(n) + per_node * n - current)
+        if self.task and self.task[0] == "probe":
+            n = self.task[1].run.nodes
+            current_left = max(0.0, self.model.seconds(n) - current)
         elif self.task and self.task[0] in ("gmsh", "auto"):
             current_left = max(0.0, per_node * self._predicted_nodes(self.task[1]) - current)
         if self.probes_pending:  # probes are queued after the meshes: count them already
-            sizes = sorted(self._predicted_nodes(o) for o in self.options
-                           if o.level is not MeshLevel.AUTO)
-            pending_probes += [n for n in sizes if n >= mp.PROBE_MIN_NODES][:MAX_PROBES]
+            pending_probes += list(mp.PROBE_TARGETS[:MAX_PROBES])
         # only probes the safety rule will actually run
         pending_probes = [n for n in pending_probes
                           if mp.probe_allowed(self.model, n, self.machine.available_mb)]

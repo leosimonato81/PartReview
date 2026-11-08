@@ -13,7 +13,8 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from .solver_model import REFERENCE, PowerLaw, SolverModel, fit_model, fit_power_law
+from .solver_model import (MEMORY_HIGH, MEMORY_LOW, REFERENCE_TIME, PowerLaw, SolverModel,
+                           fit_model, fit_power_law, prior_model, speed_factor)
 
 PROBE_MIN_NODES = 15000  # below this the solver's fixed memory dominates the fit
 PROBE_MAX_SECONDS = 60.0  # a probe may be predicted up to 60 s (with margin)
@@ -33,34 +34,52 @@ OBJECTIVE_SECONDS = {Objective.MEMORY: None, Objective.MIN_1: 60.0, Objective.MI
                      Objective.MIN_10: 600.0}
 
 
-def part_model(samples) -> SolverModel:
-    """Solver law for this part on this computer from the probes made so far."""
+def part_model(samples, machine_time: PowerLaw | None = None) -> SolverModel:
+    """Solver law for this part on this computer from the probes made so far.
+
+    No probe yet: memory band from two measured shapes (machine-independent) and the
+    time this computer showed on earlier parts, if any (``machine_time``)."""
     useful = [s for s in samples if s.nodes >= PROBE_MIN_NODES]
     if len(useful) >= 2:
         return fit_model(useful)
-    if samples:  # one point: keep the reference exponents, rescale through the point
+    if samples:  # one point: keep the known exponents, rescale through the point
         s = max(samples, key=lambda x: x.nodes)
-        memory = PowerLaw(s.peak_mb / s.nodes ** REFERENCE.memory.exponent,
-                          REFERENCE.memory.exponent)
-        time = PowerLaw(max(s.seconds, 0.05) / s.nodes ** REFERENCE.time.exponent,
-                        REFERENCE.time.exponent)
+        memory = PowerLaw(s.peak_mb / s.nodes ** MEMORY_HIGH.exponent, MEMORY_HIGH.exponent)
+        time = PowerLaw(max(s.seconds, 0.05) / s.nodes ** REFERENCE_TIME.exponent,
+                        REFERENCE_TIME.exponent)
         return SolverModel(memory, time, ONE_POINT_ERROR, tuple(samples), True)
-    return REFERENCE
+    return prior_model(machine_time)
+
+
+def machine_time_law(samples) -> PowerLaw:
+    """This computer's time law: reference exponent, scale from its own trials."""
+    k = speed_factor(samples)
+    return PowerLaw(REFERENCE_TIME.coeff * k, REFERENCE_TIME.exponent)
 
 
 PROBE_PLANNING_ERROR = 0.25  # planning margin for probes; the watchdog is the hard stop
 
 
 def probe_allowed(model: SolverModel, nodes: int, free_mb: float) -> bool:
+    """Memory is checked always (it does not depend on the computer); time only once
+    this computer's speed is known; before that the watchdog's time limit protects."""
     margin = 1.0 + min(model.error, PROBE_PLANNING_ERROR)
-    return (model.seconds(nodes) * margin <= PROBE_MAX_SECONDS
-            and model.memory_mb(nodes) * margin <= PROBE_MEMORY_SHARE * free_mb)
+    if model.memory_mb(nodes) * margin > PROBE_MEMORY_SHARE * free_mb:
+        return False
+    return not model.time_known or model.seconds(nodes) * margin <= PROBE_MAX_SECONDS
 
 
 def target_nodes(model: SolverModel, free_mb: float, objective: Objective,
                  memory_share: float) -> int:
     return model.safe_max_nodes(memory_mb=memory_share * free_mb,
                                 seconds=OBJECTIVE_SECONDS[objective])
+
+
+def is_hopeless(model: SolverModel, nodes: float, free_mb: float, share: float) -> bool:
+    """Clearly too big to solve here: even the optimistic memory exceeds ``share``x the
+    free memory (used to skip Gmsh trials that cannot be useful)."""
+    low = model.memory_low(nodes) if model.memory_low is not None else model.memory_mb(nodes)
+    return low > share * free_mb
 
 
 def binding_limit(model: SolverModel, free_mb: float, objective: Objective,
@@ -72,6 +91,19 @@ def binding_limit(model: SolverModel, free_mb: float, objective: Objective,
     by_memory = model.safe_max_nodes(memory_mb=memory_share * free_mb)
     by_time = model.safe_max_nodes(seconds=seconds)
     return "time" if by_time < by_memory else "memory"
+
+
+PROBE_TARGETS = (20000, 35000, 55000)  # nodes of the CalculiX trial meshes
+PROBE_TET_FACTOR = 2.0  # real/formula nodes without curvature sizing (spike 8.0: 1.9)
+
+
+def probe_size(volume: float, target_nodes: int) -> float:
+    """Element size of a CalculiX trial mesh (no curvature refinement) for about
+    ``target_nodes`` nodes: trial meshes are small on purpose, so the first
+    measurement fits on any computer, whatever the part's tiny details."""
+    from .mesh_sizing import NODES_PER_TET, TETS_PER_UNIT_VOLUME
+    return (volume * TETS_PER_UNIT_VOLUME * NODES_PER_TET * PROBE_TET_FACTOR
+            / target_nodes) ** (1.0 / 3.0)
 
 
 def nodes_law(trials) -> PowerLaw:
@@ -110,15 +142,18 @@ def classify(model: SolverModel, nodes: int, free_mb: float, measured_mb=None):
 
 
 # FreeCAD around CalculiX: write the input (constraint node search) and load the
-# result. Measured on the owner's model, 57 299 nodes, reference PC: 2.9 s + 6.8 s.
+# result. Measured on the reference PC (57 299 nodes): 2.9 s + 6.8 s. On another
+# computer it is scaled by that computer's measured speed factor.
 FREECAD_OVERHEAD_S_PER_NODE = (2.9 + 6.8) / 57299.0
 RECOMMEND_FINE_SECONDS = 120.0  # recommend "fine" when it fits and solves within 2 min
 
 
-def total_seconds(model: SolverModel, nodes: int, solver_seconds: float | None = None) -> float:
-    """What the user waits for after clicking solve in FreeCAD (order of magnitude)."""
+def total_seconds(model: SolverModel, nodes: int, solver_seconds: float | None = None,
+                  speed: float = 1.0) -> float:
+    """What the user waits for after clicking solve in FreeCAD (order of magnitude);
+    ``speed``: this computer's speed factor (FreeCAD's own part scales with it)."""
     solver = model.seconds(nodes) if solver_seconds is None else solver_seconds
-    return solver + FREECAD_OVERHEAD_S_PER_NODE * nodes
+    return solver + FREECAD_OVERHEAD_S_PER_NODE * speed * nodes
 
 
 def recommend(statuses: dict, seconds: dict):

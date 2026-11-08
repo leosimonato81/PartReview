@@ -18,11 +18,12 @@ def test_power_law_fit_is_exact_on_a_power_law():
     assert law.inverse(law(5e4)) == pytest.approx(5e4, abs=1)  # rounds down: safe side
 
 
-def test_reference_model_reproduces_spike_runs():
-    assert REFERENCE.memory_mb(56445) == pytest.approx(1029, rel=1e-6)
-    assert REFERENCE.seconds(95129) == pytest.approx(27.6, rel=1e-6)
-    assert REFERENCE.memory_mb(183059) > 4500  # the run that froze the PC
-    assert not REFERENCE.measured and REFERENCE.error == 0.5
+def test_prior_memory_band_covers_both_measured_shapes():
+    from freecad.PartReview.domain.solver_model import MEMORY_HIGH, MEMORY_LOW
+    assert MEMORY_LOW(56445) == pytest.approx(1029, rel=1e-6)  # thin-walled part
+    assert MEMORY_HIGH(53626) == pytest.approx(2570, rel=1e-6)  # compact block
+    assert MEMORY_LOW(183059) > 4500  # the run that froze the PC is too big anyway
+    assert not REFERENCE.measured and not REFERENCE.time_known and REFERENCE.error == 0.5
 
 
 def test_error_margin_comes_from_the_residuals():

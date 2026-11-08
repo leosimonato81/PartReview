@@ -330,11 +330,10 @@
   "ma.auto": "Gerar malha automática",
   "ma.auto_tip": "Calcula o maior número de nós que atende o objetivo (com a margem de erro do modelo) e procura o tamanho de elemento que dá essa malha, gerando malhas de ensaio.",
   "ma.need_test": "Clique em Testar as opções primeiro: o objetivo usa as medições desta peça.",
-  "ma.model.reference": "Previsão do cálculo: referência (PC i5 9ª geração, 8 GB), ainda não medida nesta peça. Clique em Testar as opções.",
-  "ma.model.measured": "Previsão do cálculo medida nesta peça neste computador: {count} ensaio(s) do CalculiX, precisão ±{error} %.",
+  "ma.model.measured": "Medido nesta peça, neste computador: {count} ensaio(s) do CalculiX, precisão ±{error} %.",
   "ma.step": "Etapa {done} de {total} · {what} · decorrido {elapsed} · restante ~{remaining}",
   "ma.what.gmsh": "malha {level} (Gmsh)",
-  "ma.what.probe": "ensaio do CalculiX na malha {level}",
+  "ma.what.probe": "ensaio {n} do CalculiX nesta peça",
   "ma.what.auto": "malha automática, tentativa {attempt} (Gmsh)",
   "ma.what.create": "gerando a malha {level} no seu documento",
   "ma.auto_done": "Malha automática para \"{objective}\": {size}, {nodes} nós, cálculo ~{seconds}. Ela está selecionada: clique em Criar malha.",
@@ -357,5 +356,10 @@
   "ma.group.numbers": "Ver todos os números",
   "ma.card.nodes": "{nodes} mil nós",
   "ma.card.not_tested": "não testada",
-  "fig.marker_colors": "Balões: preto = resultado; laranja (ponta redonda) = carga; roxo (ponta quadrada) = apoio. Carga ou apoio em várias faces ou arestas repete o número, um balão para cada uma visível."
+  "fig.marker_colors": "Balões: preto = resultado; laranja (ponta redonda) = carga; roxo (ponta quadrada) = apoio. Carga ou apoio em várias faces ou arestas repete o número, um balão para cada uma visível.",
+  "ma.time_unknown": "a medir",
+  "ma.model.prior": "Este computador ainda não foi medido: a memória aparece como faixa (de peças de paredes finas a peças maciças) e o tempo como \"a medir\". Clique em Testar as opções: o CalculiX roda na sua peça, neste computador.",
+  "ma.model.machine": "Tempo estimado pelas medições anteriores deste computador ({count} ensaio(s), {date}); a memória desta peça ainda é uma faixa. Testar as opções mede esta peça.",
+  "ma.need_time": "O tempo de cálculo deste computador ainda não foi medido: clique em Testar as opções antes de usar um objetivo de tempo.",
+  "ma.what.probe_gmsh": "malha de ensaio {n} (Gmsh)"
 }
