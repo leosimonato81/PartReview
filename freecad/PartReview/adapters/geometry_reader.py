@@ -23,6 +23,16 @@ def is_meshable(obj):
     return not shape.isNull() and bool(shape.Solids)
 
 
+def document_solids(doc):
+    """Final solids of the document (what a user would mesh), in tree order.
+
+    A solid used as input by another one (a Cut's tool and base, the features of a
+    PartDesign Body) is left out: only the end result of each modelling chain."""
+    found = [o for o in doc.Objects if not o.TypeId.startswith("Fem::") and is_meshable(o)]
+    chosen = set(id(o) for o in found)
+    return [o for o in found if not any(id(p) in chosen for p in o.InList)]
+
+
 def _radius(surface):
     for attribute in ("Radius", "MinorRadius"):
         value = getattr(surface, attribute, None)

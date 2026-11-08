@@ -167,15 +167,23 @@ class MeshAssistantPanel:
         self.form.setWindowTitle(t("ma.title"))
         layout = QVBoxLayout(self.form)
 
-        intro = QLabel(t("ma.intro"))
-        intro.setWordWrap(True)
-        self.analyze_button = _button(t("ma.analyze"), QStyle.SP_FileDialogContentsView,
-                                      self.analyze, primary=True)
-        layout.addWidget(intro)
-        layout.addWidget(self.analyze_button)
-
+        # Step 1: the part is chosen from a list of the document's solids (obvious),
+        # or taken from the 3D selection; changing it analyses it at once.
         self.part_box = QGroupBox(t("ma.group.part"))
-        self.part_form = QFormLayout(self.part_box)
+        part_layout = QVBoxLayout(self.part_box)
+        pick_label = QLabel("<b>%s</b>" % t("ma.pick"))
+        self.part_combo = QComboBox()
+        self.part_combo.setMinimumHeight(32)
+        self.part_combo.setToolTip(t("ma.pick_tip"))
+        self.analyze_button = _button(t("ma.use_selection"), QStyle.SP_ArrowDown,
+                                      self.use_selection, tip=t("ma.use_selection_tip"))
+        pick_row = QHBoxLayout()
+        pick_row.addWidget(self.part_combo, 1)
+        pick_row.addWidget(self.analyze_button)
+        self.part_form = QFormLayout()
+        part_layout.addWidget(pick_label)
+        part_layout.addLayout(pick_row)
+        part_layout.addLayout(self.part_form)
         layout.addWidget(self.part_box)
 
         self.issues_box = QGroupBox(t("ma.group.issues"))
@@ -308,19 +316,59 @@ class MeshAssistantPanel:
     # --- user actions ---------------------------------------------------------------
 
     def _preselect(self):
-        if any(geometry_reader.is_meshable(o) for o in Gui.Selection.getSelection(self.doc.Name)):
+        """Fill the part list; pick the 3D selection, or the only solid, and analyse."""
+        t = self.tr.t
+        self.part_combo.blockSignals(True)
+        self.part_combo.clear()
+        self.part_combo.addItem(t("ma.pick_placeholder"), None)
+        for obj in geometry_reader.document_solids(self.doc):
+            bb = obj.Shape.BoundBox
+            self.part_combo.addItem("%s  (%s × %s × %s mm)" % (
+                obj.Label, self.tr.number(bb.XLength, 3), self.tr.number(bb.YLength, 3),
+                self.tr.number(bb.ZLength, 3)), obj.Name)
+        self.part_combo.blockSignals(False)
+        self.part_combo.currentIndexChanged.connect(self._part_chosen)
+        selected = [o for o in Gui.Selection.getSelection(self.doc.Name)
+                    if geometry_reader.is_meshable(o)]
+        if selected:
+            self._choose(selected[0])
+        elif self.part_combo.count() == 2:  # one solid in the document
+            self.part_combo.setCurrentIndex(1)
+        elif self.part_combo.count() == 1:
+            self.status_label.setText(t("ma.no_solid"))
+
+    def _choose(self, obj):
+        index = self.part_combo.findData(obj.Name)
+        if index < 0:  # not a final solid (e.g. an intermediate feature): add it
+            self.part_combo.addItem(obj.Label, obj.Name)
+            index = self.part_combo.count() - 1
+        if index == self.part_combo.currentIndex():
             self.analyze()
+        else:
+            self.part_combo.setCurrentIndex(index)  # -> _part_chosen -> analyze
+
+    def _part_chosen(self, *_):
+        if self.part_combo.currentData():
+            self.analyze()
+
+    def use_selection(self):
+        selected = [o for o in Gui.Selection.getSelection(self.doc.Name)
+                    if geometry_reader.is_meshable(o)]
+        if not selected:
+            self.status_label.setText(self.tr.t("ma.no_solid"))
+            return
+        self._choose(selected[0])
 
     def analyze(self):
         t = self.tr.t
-        solids = [o for o in Gui.Selection.getSelection(self.doc.Name)
-                  if geometry_reader.is_meshable(o)]
-        if not solids:
+        name = self.part_combo.currentData()
+        obj = self.doc.getObject(name) if name else None
+        if obj is None or self.job is not None:
             self.status_label.setText(t("ma.no_solid"))
             return
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            self.solid = solids[0]
+            self.solid = obj
             self.summary = geometry_reader.summarize(self.solid)
         finally:
             QApplication.restoreOverrideCursor()
@@ -840,11 +888,11 @@ class MeshAssistantPanel:
                        self.objective_box):
             widget.setEnabled(not busy and analysed)
         self.analyze_button.setEnabled(not busy)
+        self.part_combo.setEnabled(not busy)
         self.remove_button.setEnabled(not busy)
 
     def _enable(self, analysed):
-        for widget in (self.part_box, self.issues_box, self.options_box, self.details_box,
-                       self.create_title):
+        for widget in (self.issues_box, self.options_box, self.details_box, self.create_title):
             widget.setVisible(analysed)
         self._set_busy(False)
 

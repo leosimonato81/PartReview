@@ -258,9 +258,7 @@
   "ma.command": "Assistente de malha",
   "ma.command_tip": "Analisa a peça, testa malhas grossa, média e fina e mostra se este computador aguenta o cálculo, antes de criar a malha FEM.",
   "ma.title": "Assistente de malha",
-  "ma.intro": "Selecione um sólido na árvore ou na tela e clique em Analisar peça.",
-  "ma.analyze": "Analisar peça",
-  "ma.no_solid": "Selecione um sólido (peça) para analisar.",
+  "ma.no_solid": "Escolha a peça na lista do passo 1 (ou selecione-a na tela e clique em “Usar a selecionada na tela”).",
   "ma.group.part": "1 · Peça",
   "ma.group.issues": "Avisos de geometria",
   "ma.group.machine": "2 · Seu computador",
@@ -363,5 +361,10 @@
   "ma.need_time": "O tempo de cálculo deste computador ainda não foi medido: clique em Testar as opções antes de usar um objetivo de tempo.",
   "ma.what.probe_gmsh": "malha de ensaio {n} (Gmsh)",
   "ma.group.auto": "Ou deixe o assistente escolher",
-  "ma.remove_tip": "Apaga só as malhas e regiões de refino criadas pelo assistente neste documento. Ctrl+Z desfaz."
+  "ma.remove_tip": "Apaga só as malhas e regiões de refino criadas pelo assistente neste documento. Ctrl+Z desfaz.",
+  "ma.pick": "Qual peça você vai calcular?",
+  "ma.pick_tip": "Todas as peças (sólidos finais) do documento. Ao escolher uma, ela é analisada na hora.",
+  "ma.pick_placeholder": "— escolha a peça na lista —",
+  "ma.use_selection": "Usar a selecionada na tela",
+  "ma.use_selection_tip": "Clique na peça na tela ou na árvore e depois aqui."
 }

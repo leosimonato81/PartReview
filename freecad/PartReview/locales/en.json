@@ -258,9 +258,7 @@
   "ma.command": "Mesh assistant",
   "ma.command_tip": "Analyses the part, tries coarse, medium and fine meshes and shows whether this computer can handle the analysis, before creating the FEM mesh.",
   "ma.title": "Mesh assistant",
-  "ma.intro": "Select a solid in the tree or in the view and click Analyse part.",
-  "ma.analyze": "Analyse part",
-  "ma.no_solid": "Select a solid (part) to analyse.",
+  "ma.no_solid": "Pick the part from the list in step 1 (or select it in the view and click “Use the one selected in the view”).",
   "ma.group.part": "1 · Part",
   "ma.group.issues": "Geometry warnings",
   "ma.group.machine": "2 · Your computer",
@@ -363,5 +361,10 @@
   "ma.need_time": "This computer's solve time has not been measured yet: click Try the options before using a time objective.",
   "ma.what.probe_gmsh": "trial mesh {n} (Gmsh)",
   "ma.group.auto": "Or let the assistant choose",
-  "ma.remove_tip": "Deletes only the meshes and refinement regions created by the assistant in this document. Ctrl+Z undoes."
+  "ma.remove_tip": "Deletes only the meshes and refinement regions created by the assistant in this document. Ctrl+Z undoes.",
+  "ma.pick": "Which part will you analyse?",
+  "ma.pick_tip": "All parts (final solids) of the document. Choosing one analyses it at once.",
+  "ma.pick_placeholder": "— pick the part from the list —",
+  "ma.use_selection": "Use the one selected in the view",
+  "ma.use_selection_tip": "Click the part in the view or in the tree, then here."
 }
