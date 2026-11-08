@@ -267,12 +267,19 @@ class ReportDialog(QDialog):
 
         # Remember the logo of the last report (repetitive analyses); a template
         # chosen afterwards still replaces it.
-        last_logo = preferences.last_logo_path()
+        # Fields of the last report come back (repetitive analyses); the first time,
+        # FreeCAD's own logo is the default. A template chosen afterwards still wins.
         self._last_logo_missing = ""
-        if last_logo and os.path.isfile(last_logo):
-            self.config.logo_path = last_logo
-        elif last_logo:
-            self._last_logo_missing = last_logo
+        last = preferences.last_report_fields()
+        if last is None:
+            self.config.logo_path = preferences.freecad_logo_path()
+        else:
+            fields, csv, html = last
+            fields.apply_to(self.config)
+            self.config.export_csv, self.config.export_html = csv, html
+            if self.config.logo_path and not os.path.isfile(self.config.logo_path):
+                self._last_logo_missing = self.config.logo_path
+                self.config.logo_path = ""
 
         self._load_widgets_from_config()
         self._reload_templates()
@@ -346,6 +353,8 @@ class ReportDialog(QDialog):
             self.company_edit.setText(c.company)
             self.logo_edit.setText(c.logo_path)
             self.intro_edit.setPlainText(c.intro_text)
+            self.csv_check.setChecked(c.export_csv)
+            self.html_check.setChecked(c.export_html)
             self.disclaimer_edit.setPlainText(c.disclaimer_text)
         finally:
             self._loading = False
@@ -501,7 +510,7 @@ class ReportDialog(QDialog):
         finally:
             progress.close()
 
-        preferences.remember_logo_path(run_config.logo_path)
+        preferences.remember_report_fields(run_config)
         QMessageBox.information(self, t("ui.dialog_title"),
                                 t("ui.done_many", paths="\n".join(written)))
         QDesktopServices.openUrl(QUrl.fromLocalFile(written[0]))
