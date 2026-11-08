@@ -420,5 +420,8 @@
   "exec.safety_regular": "Safety factor away from supports and loads",
   "exec.regular": "Farther than {distance} from supports and loads, the highest von Mises stress is {value} (point {n}). Near idealised supports and loads the stress depends on how they were modelled (Saint-Venant's principle); away from them, this is the model's reference value.",
   "fig.hidden": "Points of this quantity hidden from this angle: {items}.",
-  "fig.see": "see figure {figures}"
+  "fig.see": "see figure {figures}",
+  "ui.logo_reset": "Default",
+  "ui.logo_reset_tip": "Back to FreeCAD's logo. To make the report without a logo, leave the field empty.",
+  "ui.logo_empty": "empty = report without a logo"
 }

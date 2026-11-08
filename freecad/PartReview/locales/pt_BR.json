@@ -420,5 +420,8 @@
   "exec.safety_regular": "Fator de segurança fora de apoios e cargas",
   "exec.regular": "A mais de {distance} de apoios e cargas, a maior tensão de von Mises é {value} (ponto {n}). Perto de apoios e cargas idealizados a tensão depende de como eles foram modelados (princípio de Saint-Venant); longe deles, este é o valor de referência do modelo.",
   "fig.hidden": "Pontos desta grandeza escondidos neste ângulo: {items}.",
-  "fig.see": "ver figura {figures}"
+  "fig.see": "ver figura {figures}",
+  "ui.logo_reset": "Padrão",
+  "ui.logo_reset_tip": "Volta ao logo do FreeCAD. Para gerar sem logo, deixe o campo em branco.",
+  "ui.logo_empty": "em branco = relatório sem logo"
 }

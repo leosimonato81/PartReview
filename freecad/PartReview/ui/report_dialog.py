@@ -191,7 +191,13 @@ class ReportDialog(QDialog):
         form.addRow(t("ui.title"), self.title_edit)
         form.addRow(t("ui.author"), self.author_edit)
         form.addRow(t("ui.company"), self.company_edit)
-        form.addRow(t("ui.logo"), self._with_button(self.logo_edit, self._browse_logo))
+        logo_field = self._with_button(self.logo_edit, self._browse_logo)
+        reset_logo = QPushButton(t("ui.logo_reset"))
+        reset_logo.setToolTip(t("ui.logo_reset_tip"))
+        reset_logo.clicked.connect(self._reset_logo)
+        logo_field.layout().addWidget(reset_logo)
+        self.logo_edit.setPlaceholderText(t("ui.logo_empty"))
+        form.addRow(t("ui.logo"), logo_field)
         self.logo_preview = QLabel()
         self.logo_preview.setFixedSize(72, 36)
         self.logo_preview.setAlignment(Qt.AlignCenter)
@@ -411,6 +417,11 @@ class ReportDialog(QDialog):
                                               self.tr_ui.t("ui.logo_filter"))
         if path:
             self.logo_edit.setText(path)
+
+    def _reset_logo(self):
+        """Back to FreeCAD's logo (the default)."""
+        self._last_logo_missing = ""
+        self.logo_edit.setText(preferences.freecad_logo_path())
 
     def _pick_color(self):
         color = QColorDialog.getColor(QColor(self.config.accent_color or DEFAULT_ACCENT_HEX), self,

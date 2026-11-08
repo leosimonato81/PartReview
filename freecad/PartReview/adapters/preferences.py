@@ -27,13 +27,38 @@ def _file():
     return os.path.join(App.getUserAppDataDir(), "PartReview", "last_report.json")
 
 
+# The same logo is compiled into FreeCAD's GUI (Qt resource) on every system
+# (Linux, Windows, macOS, AppImage, Flatpak...): copied once to our own folder
+# when the installation has no loose file.
+_FREECAD_LOGO_RESOURCE = ":/icons/freecad.svg"
+
+
 def freecad_logo_path() -> str:
+    """FreeCAD's own logo as a file path ("" only if FreeCAD has none at all)."""
     base = App.getResourceDir()
     for relative in _FREECAD_LOGOS:
         path = os.path.join(base, relative)
         if os.path.isfile(path):
             return path
-    return ""
+    copy = os.path.join(App.getUserAppDataDir(), "PartReview", "freecad_logo.svg")
+    if os.path.isfile(copy):
+        return copy
+    try:
+        from PySide6.QtCore import QFile  # GUI side only; imported here on purpose
+        resource = QFile(_FREECAD_LOGO_RESOURCE)
+        if not resource.open(QFile.ReadOnly):
+            return ""
+        data = bytes(resource.readAll())
+        resource.close()
+        os.makedirs(os.path.dirname(copy), exist_ok=True)
+        tmp = copy + ".tmp"
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, copy)
+        return copy
+    except (ImportError, OSError) as err:
+        App.Console.PrintWarning("PartReview: FreeCAD logo not available (%s)\n" % err)
+        return ""
 
 
 # Fields of the last report in this FreeCAD session (module memory: gone on exit).
