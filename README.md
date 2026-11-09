@@ -6,7 +6,7 @@ do começo ao fim, sem travar o seu computador:
 1. **Assistente de malha** — analisa a peça, avisa sobre detalhes que atrapalham
    a malha, testa malhas de várias finuras **medindo o seu computador** e cria a
    malha recomendada (ou a melhor para um objetivo de memória ou de tempo).
-2. **Otimizar malha pelo erro** — roda o seu cálculo, mede o erro estimado e
+2. **Otimizar malha pelo erro (beta)** — roda o seu cálculo, mede o erro estimado e
    refina a malha só onde ele é alto, até a meta (ex.: 5 %) ou o limite do PC.
 3. **Relatório FEM** — relatório para quem não fez a análise: vistas
    automáticas que nunca escondem o ponto mais crítico, forma deformada, tensão
@@ -20,7 +20,7 @@ to finish, without freezing your computer:
 1. **Mesh assistant** — analyses the part, warns about details that hurt the
    mesh, tries meshes of several sizes **measuring your computer**, and creates
    the recommended mesh (or the best one for a memory or time objective).
-2. **Optimise mesh by the error** — solves your analysis, measures the
+2. **Optimise mesh by the error (beta)** — solves your analysis, measures the
    estimated error and refines the mesh only where it is high, up to the target
    (e.g. 5 %) or the computer's limit.
 3. **FEM report** — a report for readers who did not run the analysis:
@@ -160,7 +160,11 @@ time) and Cancel. Nothing is predicted from another computer: CalculiX memory
 depends on the mesh (a band before measuring) and time depends on the computer
 ("to be measured" until the first trial). Each computer keeps what it measured.
 
-## Otimizar malha pelo erro / Optimise mesh by the error
+## Otimizar malha pelo erro / Optimise mesh by the error (beta)
+
+> **Beta:** funciona e foi validada em exemplos, mas ainda está em
+> aperfeiçoamento; confira os resultados. / Works and was validated on
+> examples, but is still being refined; check the results.
 
 Depois de criar a malha com o assistente (ela fica na análise), clique em
 **Otimizar malha pelo erro**, escolha a meta de erro estimado (10, **5** ou 2 %)

@@ -79,6 +79,11 @@ class MeshOptimizerPanel:
         self.form = QWidget()
         self.form.setWindowTitle(t("mo.title"))
         layout = QVBoxLayout(self.form)
+        beta = QLabel(t("mo.beta"))  # still being refined: say so up front
+        beta.setWordWrap(True)
+        beta.setStyleSheet("QLabel { background: #fff3cd; color: #664d03; "
+                           "border: 1px solid #e0c060; border-radius: 4px; padding: 6px; }")
+        layout.addWidget(beta)
         intro = QLabel(t("mo.intro"))
         intro.setWordWrap(True)
         layout.addWidget(intro)

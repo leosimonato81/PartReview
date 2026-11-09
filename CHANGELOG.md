@@ -8,7 +8,8 @@ Improvement release: a report written for professionals who did not run the
 analysis. / Versão de melhoria: relatório para profissionais que não fizeram a
 análise.
 
-**Optimise mesh by the error / Otimizar malha pelo erro** (new command):
+**Optimise mesh by the error / Otimizar malha pelo erro** (new command, **beta**:
+marked as such in the menu and in its panel):
 - Solves the analysis with the FEM workbench's CalculiX, estimates the error
   per element (ZZ) and refines only the CAD faces where it is high, aiming at
   the error away from supports (Saint-Venant), until the target, the memory or
