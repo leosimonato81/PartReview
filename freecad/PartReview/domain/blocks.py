@@ -63,10 +63,6 @@ class Figure:
     markers: tuple[Marker, ...]
     image_size: tuple[int, int]
     balloons: str = ""  # what each numbered balloon in this figure is
-    # Orientation and size drawn on the image: world axes (label, du, dv) and a
-    # scale bar (label, length in pixels). Empty: not drawn.
-    axes: tuple = ()
-    scale: tuple = ()
 
 
 @dataclass(frozen=True)

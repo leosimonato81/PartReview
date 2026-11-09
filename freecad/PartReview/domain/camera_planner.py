@@ -298,27 +298,6 @@ def select_views(views, max_views: int = 8, angle_tolerance: float = 25.0) -> li
     return kept
 
 
-def axes_2d(camera: CameraSpec) -> list[tuple[str, float, float]]:
-    """World X, Y, Z as seen in the image: (label, du, dv) with |(du, dv)| <= 1
-    (shorter when the axis points toward the viewer); v grows downward."""
-    out = []
-    for label, axis in (("X", Vec3(1, 0, 0)), ("Y", Vec3(0, 1, 0)), ("Z", Vec3(0, 0, 1))):
-        out.append((label, g.dot(axis, camera.right), -g.dot(axis, camera.up)))
-    return out
-
-
-def scale_bar(camera: CameraSpec, width: int, height: int, share: float = 0.18):
-    """(length in model units, length in pixels) of a round scale bar
-    (1, 2 or 5 x 10^k) about ``share`` of the image width (orthographic view)."""
-    px_per_unit = height / camera.height
-    raw = share * width / px_per_unit
-    if raw <= 0:
-        return 0.0, 0.0
-    power = 10.0 ** math.floor(math.log10(raw))
-    length = next(step * power for step in (5.0, 2.0, 1.0) if step * power <= raw)
-    return length, length * px_per_unit
-
-
 def recenter(camera: CameraSpec, target: Vec3, points, width: int, height: int,
              keep: float = 0.35) -> CameraSpec:
     """Shift a close-up so the part fills the frame, keeping ``target`` within
