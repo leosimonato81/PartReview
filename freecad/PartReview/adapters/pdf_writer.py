@@ -46,6 +46,8 @@ MUTED = QColor(110, 110, 110)
 RULE = QColor(200, 200, 200)
 WARNING = QColor(214, 130, 0)
 INFO = QColor(40, 110, 190)
+OK = QColor(46, 125, 50)
+NOTICE_COLORS = {"warning": WARNING, "info": INFO, "ok": OK}
 FONT_FAMILY = "Sans Serif"
 
 
@@ -500,7 +502,7 @@ def layout_document(doc, image_paths, style, page_w, page_h):
                 layout.y += h + mm(1.2)
             layout.y += mm(GAP_MM - 1.2)
         elif isinstance(block, Notice):
-            color = WARNING if block.level == "warning" else INFO
+            color = NOTICE_COLORS.get(block.level, INFO)
             inner = layout.width - mm(5)
             h = style.height(style.body, block.text, inner) + mm(3)
             layout.ensure(h)

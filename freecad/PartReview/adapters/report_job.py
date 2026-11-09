@@ -26,6 +26,7 @@ from ..domain.hotspots import (
     gradient_hotspot,
     HotspotKind,
     mark_singularities,
+    regular_peak,
     regular_stress_hotspot,
 )
 from ..domain.i18n import Translator
@@ -111,6 +112,7 @@ def _plan(result, surface, max_views, boundary_views):
             return True
         spots = []
         exclusion = None
+        principal_regular = None
     else:
         is_visible = RayVisibility(mesh.node_positions, surface.triangles,
                                    epsilon=0.05 * surface.mean_edge_length)
@@ -131,6 +133,9 @@ def _plan(result, surface, max_views, boundary_views):
                                              exclusion, corners)
             if regular is not None:
                 spots.append(regular)
+        principal = result.get_field(FieldKind.PRINCIPAL_MAX)
+        principal_regular = (regular_peak(principal, mesh, surface, result.constraints,
+                                          exclusion, corners) if principal is not None else None)
         spots += [h for h in (constraint_hotspot(c) for c in result.constraints) if h]
         spots = order_hotspots(drop_redundant(
             mark_singularities(spots, result.constraints, tolerance, corners)))
@@ -154,7 +159,7 @@ def _plan(result, surface, max_views, boundary_views):
         boundary = cp.plan_boundary_views(spots, center, radius, is_visible, boundary_views)
     # Supports and loads are shown by color only (no balloons, owner's
     # request): the numbered points of the report are results only.
-    return results, selected, boundary, radius, exclusion
+    return results, selected, boundary, radius, exclusion, principal_regular
 
 
 def _deformed(view, displacement, radius):
@@ -266,7 +271,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
     zz, error_field = _error_estimate(analysis, result_obj, result, tets)
 
     progress(tr.t("progress.hotspots"), 0.3)
-    spots, views, boundary_views, radius, exclusion = _plan(
+    spots, views, boundary_views, radius, exclusion, principal_regular = _plan(
         result, surface, views_for_level(config),
         2 if config.includes_boundary else 0)
     progress(tr.t("progress.planning"), 0.4)
@@ -331,7 +336,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
             tool_version=__version__, freecad_version=".".join(App.Version()[:3]),
             equilibrium=equilibrium, mesh_quality=quality, error_estimate=zz,
             error_field=error_field, error_view=error_view, boundary_views=boundary_views,
-            reactions=_reactions(analysis, result),
+            reactions=_reactions(analysis, result), regular_principal=principal_regular,
             convergence=optimizer.read_history(analysis, result.mesh.node_count),
             regular_exclusion=(Quantity(exclusion, result.mesh.length_unit)
                                if exclusion and any(s.kind is HotspotKind.STRESS_REGULAR

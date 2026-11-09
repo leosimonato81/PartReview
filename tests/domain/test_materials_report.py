@@ -50,8 +50,9 @@ def text(report):
 
 def test_polymer_gets_rankine_and_the_lower_limit():
     t = text(build_report(pla_inputs(), Translator("pt_BR", strict=True)))
-    assert "Limite usado: resistência à tração" in t
-    assert "critério de Rankine" in t and "3,30" in t  # 26,4 / 8 = 3,3
+    # limit = UTS (lower than the card's yield); Rankine: 26,4 / 8 = 3,30
+    assert "menor que o escoamento do cartão" in t
+    assert "Rankine (tensão principal máxima)" in t and "3,30" in t
     assert "impressa em 3D" in t and "fluência" in t
 
 

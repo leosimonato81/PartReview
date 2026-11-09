@@ -28,6 +28,7 @@ from .blocks import (  # noqa: F401  (re-exported for callers and tests)
     Table,
 )
 from .camera_planner import PlannedView, project
+from .design_check import DesignCheck, design_check, parse_required
 from .hotspots import Hotspot
 from .i18n import Translator
 from .models import (
@@ -79,6 +80,9 @@ class ReportInputs:
     # Distance from supports/loads beyond which stress counts as "regular"
     # (the STRESS_REGULAR hotspot); None when not computed.
     regular_exclusion: Quantity | None = None
+    # Largest principal stress away from supports, loads and sharp corners (same
+    # rule as STRESS_REGULAR); None when unknown. Rankine design value of polymers.
+    regular_principal: Quantity | None = None
     # Reaction force of each support from CalculiX: [(support label, Vec3 in N)].
     reactions: list = field(default_factory=list)
     # Passes of "Optimise mesh by the error" that produced this mesh (quality.ConvergencePass).
@@ -172,8 +176,7 @@ def _summary(inputs: ReportInputs, tr: Translator) -> Table:
     return Table(header=(), rows=tuple(rows), widths=(0.25, 0.75))
 
 
-def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
-             fs_regular: float | None = None, fs_tension: float | None = None) -> Table:
+def _results(inputs: ReportInputs, tr: Translator) -> Table:
     res, m = inputs.result, inputs.result.mesh
     d = result_digits(inputs)
     rows = []
@@ -195,19 +198,6 @@ def _results(inputs: ReportInputs, tr: Translator, fs: float | None,
             if key == "results.vm_max" and regular is not None:
                 rows.append((tr.t("results.vm_regular"), tr.quantity(regular.peak_value, d),
                              tr.point(regular.center, m.length_unit), str(regular.peak_node)))
-    if inputs.yield_strength is not None:
-        source = tr.t("results.yield_source." + inputs.yield_source) if inputs.yield_source else ""
-        label = "results.uts_used" if inputs.yield_source == "material_uts" else "results.yield"
-        rows.append((tr.t(label), tr.quantity(inputs.yield_strength, 4), source, ""))
-    if fs is not None:
-        rows.append((tr.t("results.safety"), tr.number(fs, d), "", ""))
-    if fs_regular is not None:
-        rows.append((tr.t("results.safety_regular"), tr.number(fs_regular, d), "", ""))
-    if fs_tension is not None:
-        mat = _material(inputs)
-        rows.append((tr.t("results.ultimate"), tr.quantity(mat.ultimate_strength, 4),
-                     tr.t("results.yield_source.material"), ""))
-        rows.append((tr.t("results.safety_tension"), tr.number(fs_tension, d), "", ""))
     header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"),
               tr.t("results.node"))
     return Table(header=header, rows=tuple(rows), widths=(0.36, 0.2, 0.32, 0.12))
@@ -369,46 +359,92 @@ class FemContext:
     inputs: ReportInputs
     numbers: dict  # hotspot -> balloon number
     figures: list
-    fs: float | None
-    fs_regular: float | None = None  # safety factor with the regular (away) stress
-    fs_tension: float | None = None  # polymers: tensile strength / max principal stress
+    check: DesignCheck | None = None  # design safety factor (None: no material limit)
 
 
 def prepare_fem(inputs: ReportInputs, tr: Translator) -> FemContext:
     hotspots = list(inputs.hotspots)
     numbers = {spot: n for n, spot in enumerate(hotspots, start=1)}
-    res = inputs.result
-    stress = res.get_field(FieldKind.VON_MISES)
-    fs = None
-    if inputs.yield_strength is not None and stress is not None:
-        fs = safety_factor(inputs.yield_strength, stress.maximum(res.mesh).value)
-    regular = next((h for h in hotspots if h.kind is HotspotKind.STRESS_REGULAR), None)
-    fs_regular = None
-    if inputs.yield_strength is not None and regular is not None:
-        fs_regular = safety_factor(inputs.yield_strength, regular.peak_value)
     figures = [_figure(index, view, inputs, numbers, tr)  # capture order = figure order
                for index, view in enumerate(list(inputs.boundary_views) + list(inputs.views))]
     figures = _note_hidden(figures, inputs, numbers, tr)
-    return FemContext(inputs, numbers, figures, fs, fs_regular, _fs_tension(inputs))
+    return FemContext(inputs, numbers, figures, _design_check(inputs))
+
+
+def _design_check(inputs: ReportInputs) -> DesignCheck | None:
+    res = inputs.result
+    stress = res.get_field(FieldKind.VON_MISES)
+    if stress is None or inputs.yield_strength is None:
+        return None
+    peak = stress.maximum(res.mesh).value
+    regular = next((h for h in inputs.hotspots if h.kind is HotspotKind.STRESS_REGULAR), None)
+    smax = next((h for h in inputs.hotspots if h.kind is HotspotKind.STRESS_MAX), None)
+    if regular is not None:
+        design = regular.peak_value
+    elif smax is not None and not (smax.singularity_near or smax.sharp_corner):
+        design = peak  # the maximum itself is away from supports, loads and corners
+    else:
+        design = None  # unknown: the peak is used (safe side)
+    principal = res.get_field(FieldKind.PRINCIPAL_MAX)
+    mat = _material(inputs)
+    try:
+        required = parse_required(inputs.config.required_safety)
+    except ValueError:
+        required = None  # the dialog refuses it; a script may still pass it
+    return design_check(inputs.yield_strength, inputs.yield_source, design, peak,
+                        family=mat.family if mat is not None else "other",
+                        ultimate=mat.ultimate_strength if mat is not None else None,
+                        s1_design=inputs.regular_principal,
+                        s1_peak=principal.maximum(res.mesh).value if principal else None,
+                        required=required)
 
 
 def _material(inputs: ReportInputs):
     return inputs.result.materials[0] if len(inputs.result.materials) == 1 else None
 
 
-def _fs_tension(inputs: ReportInputs) -> float | None:
-    """Rankine (maximum principal stress) check for polymers: less ductile than
-    metals, they tend to break in tension, so the largest principal stress is
-    compared with the tensile strength (in addition to von Mises)."""
-    mat = _material(inputs)
-    principal = inputs.result.get_field(FieldKind.PRINCIPAL_MAX)
-    if mat is None or mat.family != "polymer" or mat.ultimate_strength is None \
-            or principal is None:
-        return None
-    sigma1 = principal.maximum(inputs.result.mesh).value
-    if sigma1.value <= 0 or sigma1.unit != mat.ultimate_strength.unit:
-        return None
-    return mat.ultimate_strength.value / sigma1.value
+def _criterion_name(c, tr: Translator) -> str:
+    return tr.t("check.crit." + c.key)
+
+
+def _where_design(c, tr: Translator) -> str:
+    return tr.t("check.where_regular" if c.design_is_regular else "check.where_peak")
+
+
+def _criteria_table(check: DesignCheck, tr: Translator, d: int) -> Table:
+    """Each criterion: limit, design stress and peak stress with their factors."""
+    rows = []
+    for c in check.criteria:
+        name = _criterion_name(c, tr)
+        if c is check.governing and len(check.criteria) > 1:
+            name += " — " + tr.t("check.governs")
+        limit = tr.quantity(c.limit, 4)
+        if c.limit_source:
+            limit += " (%s)" % tr.t("results.yield_source." + c.limit_source)
+        design = tr.quantity(c.design_stress, d)
+        if not c.design_is_regular:
+            design += " (%s)" % tr.t("check.where_peak")
+        rows.append((name, limit, design, tr.number(c.fs_design, d),
+                     tr.quantity(c.peak_stress, d), tr.number(c.fs_peak, d)))
+    header = tuple(tr.t("check.col." + k) for k in
+                   ("criterion", "limit", "design", "fs_design", "peak", "fs_peak"))
+    return Table(header=header, rows=tuple(rows), widths=(0.22, 0.2, 0.17, 0.12, 0.17, 0.12))
+
+
+def _conclusion(ctx: FemContext, tr: Translator) -> Notice | None:
+    """The verdict in one block, first thing in the report."""
+    check = ctx.check
+    if check is None:
+        if ctx.inputs.result.get_field(FieldKind.VON_MISES) is None:
+            return None
+        return Notice(tr.t("check.none"), level="info")
+    d = result_digits(ctx.inputs)
+    c = check.governing
+    values = dict(fs=tr.number(check.fs, d), criterion=_criterion_name(c, tr),
+                  where=_where_design(c, tr),
+                  required=tr.number(check.required, 3) if check.required else "")
+    level = {"meets": "ok", "fails": "warning", "exceeds": "warning", "number": "info"}
+    return Notice(tr.t("check." + check.status, **values), level=level[check.status])
 
 
 def _note_hidden(figures, inputs: ReportInputs, numbers, tr: Translator) -> list:
@@ -445,10 +481,13 @@ def _section_summary(ctx: FemContext, tr: Translator, level) -> list:
 
 
 def _section_results(ctx: FemContext, tr: Translator, level) -> list:
-    inputs, fs = ctx.inputs, ctx.fs
+    inputs, check = ctx.inputs, ctx.check
     res = inputs.result
     stress = res.get_field(FieldKind.VON_MISES)
-    blocks = [_results(inputs, tr, fs, ctx.fs_regular, ctx.fs_tension)]
+    blocks = [_results(inputs, tr)]
+    if check is not None:
+        blocks.append(Paragraph(tr.t("check.intro")))
+        blocks.append(_criteria_table(check, tr, result_digits(inputs)))
     detailed = level is not ReportLevel.QUICK  # the quick summary keeps the main table
     mat = _material(inputs)
     if inputs.yield_source == "user" and mat is not None and mat.ultimate_strength is not None \
@@ -465,8 +504,6 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
         if eq is not None and eq.load_on_supports is not None \
                 and g.length(eq.load_on_supports) > 1e-9 * max(g.length(eq.applied), 1e-30):
             blocks.append(Notice(tr.t("reactions.load_on_supports"), level="info"))
-    if fs is not None and fs < 1.0:
-        blocks.append(Notice(tr.t("warn.safety_low", fs=tr.number(fs, result_digits(inputs)))))
     if detailed and inputs.yield_strength is not None and stress is not None and res.elements \
             and stress.unit == inputs.yield_strength.unit:
         shares = volume_above(res.elements, res.mesh.node_positions,
@@ -485,7 +522,7 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
             blocks.append(Paragraph(tr.t("volume.intro")))
             blocks.append(Table(header=(tr.t("volume.stress"), tr.t("volume.share")),
                                 rows=rows, widths=(0.6, 0.4)))
-    if fs is None and stress is not None:
+    if check is None and stress is not None:
         blocks.append(Notice(tr.t("warn.no_yield"), level="info"))
     if inputs.max_on_surface is False and stress is not None:
         blocks.append(Notice(tr.t("warn.max_inside", node=stress.maximum(res.mesh).node_id),
@@ -549,7 +586,7 @@ def _alerts(ctx: FemContext) -> int:
     inputs = ctx.inputs
     count = sum(1 for h in inputs.hotspots if h.singularity_near or h.sharp_corner)
     count += sum(1 for c in inputs.result.constraints if c.on_edges_or_vertices)
-    if ctx.fs is not None and ctx.fs < 1.0:
+    if ctx.check is not None and ctx.check.status in ("fails", "exceeds"):
         count += 1
     if inputs.equilibrium is not None and inputs.equilibrium.status is EquilibriumStatus.IMBALANCE:
         count += 1
@@ -579,30 +616,23 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
         dmax = _first(ctx, HotspotKind.DISPLACEMENT_MAX)
         value = tr.quantity(disp.maximum(res.mesh).value, d)
         rows.append((tr.t("results.disp_max"), " ".join(p for p in (value, _where(ctx, tr, dmax)) if p)))
-    if ctx.fs is not None:
-        source = tr.t("results.yield_source." + inputs.yield_source) if inputs.yield_source else ""
-        value_key = ("exec.safety_value_uts" if inputs.yield_source == "material_uts"
-                     else "exec.safety_value")
-        rows.append((tr.t("exec.safety"), tr.t(value_key, fs=tr.number(ctx.fs, d),
-                                                 limit=tr.quantity(inputs.yield_strength, 4),
-                                                 source=source)))
-        if ctx.fs_regular is not None:
-            # The maximum may be a singularity: both factors, and which one governs.
-            rows.append((tr.t("exec.safety_regular"), tr.number(ctx.fs_regular, d)))
-            key = "exec.fs_regular_ok" if ctx.fs_regular >= 1.0 else "exec.fs_regular_low"
-            sentences.append(tr.t(key, fs_regular=tr.number(ctx.fs_regular, d),
-                                  fs=tr.number(ctx.fs, d)))
-        else:
-            key = "exec.fs_ok" if ctx.fs >= 1.0 else "exec.fs_low"
-            sentences.append(tr.t(key, fs=tr.number(ctx.fs, d)))
+    check = ctx.check
+    peak_note = False  # the singular peak is already explained by exec.peak_fs
+    if check is not None:
+        c = check.governing
+        rows.append((tr.t("exec.design_fs"), tr.t("exec.design_fs_value", fs=tr.number(check.fs, d),
+                                                  criterion=_criterion_name(c, tr),
+                                                  where=_where_design(c, tr))))
+        if check.required is not None:
+            rows.append((tr.t("exec.required_fs"), tr.number(check.required, 3)))
+        if c.design_is_regular and c.fs_peak < c.fs_design and smax is not None \
+                and (smax.singularity_near or smax.sharp_corner):
+            sentences.append(tr.t("exec.peak_fs", n=ctx.numbers[smax], fs=tr.number(c.fs_peak, d),
+                                  value=tr.quantity(c.peak_stress, d)))
+            peak_note = True
     elif stress is not None:
-        rows.append((tr.t("exec.safety"), tr.t("exec.safety_none")))
-        sentences.append(tr.t("exec.no_yield"))
-    if ctx.fs_tension is not None:
-        rows.append((tr.t("exec.safety_tension"), tr.number(ctx.fs_tension, d)))
-        key = "exec.tension_ok" if ctx.fs_tension >= 1.0 else "exec.tension_low"
-        sentences.append(tr.t(key, fs=tr.number(ctx.fs_tension, d)))
-    if smax is not None and smax.singularity_near:
+        rows.append((tr.t("exec.design_fs"), tr.t("exec.safety_none")))
+    if smax is not None and smax.singularity_near and not peak_note:
         sentences.append(tr.t("exec.singular", n=ctx.numbers[smax], label=smax.singularity_near))
     elif smax is not None and smax.sharp_corner:
         sentences.append(tr.t("exec.sharp_corner", n=ctx.numbers[smax]))
@@ -626,6 +656,9 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     alerts = _alerts(ctx)
     rows.append((tr.t("exec.alerts"), str(alerts) if alerts else tr.t("exec.alerts_none")))
     blocks = [Table(header=(), rows=tuple(rows), widths=(0.36, 0.64))]
+    conclusion = _conclusion(ctx, tr)
+    if conclusion is not None:
+        blocks.insert(0, conclusion)
     if inputs.config.intro_text:
         blocks.insert(0, Paragraph(inputs.config.intro_text))  # user text, never translated
     if sentences:

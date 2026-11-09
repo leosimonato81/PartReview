@@ -11,6 +11,7 @@
 #   PARTREVIEW_OUT   output PDF path
 #   PARTREVIEW_LANG  pt_BR (default) or en
 #   PARTREVIEW_YIELD optional yield strength, e.g. "250 MPa"
+#   PARTREVIEW_REQUIRED_FS optional required safety factor, e.g. "2"
 #   PARTREVIEW_UNITS mpa_mm (default) or freecad_schema
 #   PARTREVIEW_TITLE optional report title
 #   PARTREVIEW_LEVEL quick, standard or full (default)
@@ -57,6 +58,7 @@ def main():
         language=os.environ.get("PARTREVIEW_LANG", "pt_BR"),
         output_path=os.environ.get("PARTREVIEW_OUT", default_out),
         yield_strength=os.environ.get("PARTREVIEW_YIELD", ""),
+        required_safety=os.environ.get("PARTREVIEW_REQUIRED_FS", ""),
         unit_system=UnitSystem(os.environ.get("PARTREVIEW_UNITS", "mpa_mm")),
         title=os.environ.get("PARTREVIEW_TITLE", ""),
         level=ReportLevel(os.environ.get("PARTREVIEW_LEVEL", "full")),

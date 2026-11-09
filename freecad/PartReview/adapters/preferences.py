@@ -3,8 +3,9 @@
 """What the report dialog remembers (owner's rules, 2026-11-08).
 
 - The fields of the last report (company, author, look, level, language, units,
-  exports, supports/loads figure, yield strength) are remembered only while
-  FreeCAD stays open: kept in memory, forgotten when FreeCAD closes.
+  exports, supports/loads figure, yield strength, required safety factor) are
+  remembered only while FreeCAD stays open: kept in memory, forgotten when
+  FreeCAD closes.
 - The logo is the exception: when the user changes it from the default
   (FreeCAD's logo), including to no logo, it is remembered across sessions,
   in PartReview's own file written at once (never in FreeCAD's user.cfg, which
@@ -67,7 +68,8 @@ _session = None
 
 def last_report_fields():
     """(template with the fields of the last report, csv, html, boundary, yield
-    strength) of this FreeCAD session, or None when no report was made yet."""
+    strength, required safety factor) of this FreeCAD session, or None when no
+    report was made yet."""
     return _session
 
 
@@ -98,7 +100,8 @@ def remember_report_fields(config) -> None:
     never remembered."""
     global _session
     _session = (ReportTemplate.from_config("last", config), config.export_csv,
-                config.export_html, config.show_boundary, config.yield_strength)
+                config.export_html, config.show_boundary, config.yield_strength,
+                config.required_safety)
     path = _file()
     try:
         if config.logo_path == freecad_logo_path():

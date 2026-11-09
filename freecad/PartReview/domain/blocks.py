@@ -28,7 +28,7 @@ class BulletList:
 @dataclass(frozen=True)
 class Notice:
     text: str
-    level: str = "warning"  # "warning" or "info"
+    level: str = "warning"  # "warning", "info" or "ok"
 
 
 @dataclass(frozen=True)

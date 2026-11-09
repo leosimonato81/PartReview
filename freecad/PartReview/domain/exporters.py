@@ -74,6 +74,7 @@ padding:.35em .5em;text-align:left;vertical-align:top;white-space:pre-line}
 th{background:%(l)s}.kv td:first-child{color:#555;width:34%%}
 .notice{border-left:5px solid #d68200;padding:.4em .8em;margin:.6em 0;background:#fff8ec}
 .notice.info{border-color:#286ebe;background:#f1f6fc}
+.notice.ok{border-color:#2e7d32;background:#eef7ee}
 figure{margin:1.2em 0}.fig{display:flex;gap:1em;align-items:stretch}
 .fig img{width:80%%;border:1px solid #ccc}.legend{display:flex;flex-direction:column;font-size:.8em}
 .legend .sw{display:inline-block;width:14px;height:14px;border:1px solid #888;vertical-align:middle}.legend .bar{display:flex;flex:1;gap:.4em;min-height:200px}.legend .grad{width:16px;
@@ -153,7 +154,7 @@ def render_html(doc, image_uris, logo_uri: str = "", language: str = "pt_BR") ->
         elif isinstance(block, Paragraph):
             parts.append("<p>%s</p>" % _e(block.text))
         elif isinstance(block, Notice):
-            cls = "notice" if block.level == "warning" else "notice info"
+            cls = {"warning": "notice", "ok": "notice ok"}.get(block.level, "notice info")
             parts.append('<div class="%s">%s</div>' % (cls, _e(block.text)))
         elif isinstance(block, BulletList):
             parts.append("<ul>%s</ul>" % "".join("<li>%s</li>" % _e(i) for i in block.items))

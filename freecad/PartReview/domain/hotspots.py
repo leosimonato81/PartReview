@@ -176,6 +176,22 @@ def regular_stress_hotspot(field: ResultField, mesh: MeshInfo, surface: Surface,
     return None
 
 
+def regular_peak(field: ResultField, mesh: MeshInfo, surface: Surface, constraints,
+                 exclusion: float, corners=()) -> Quantity | None:
+    """Highest surface value of ``field`` farther than ``exclusion`` from every
+    support, load and sharp re-entrant edge (same rule as regular_stress_hotspot,
+    but the value itself, also when it is the global maximum). None when no
+    node is that far."""
+    values = {n: v for n, v in zip(field.node_ids, field.values) if n in surface.nodes}
+    positions = mesh.node_positions
+    for node in sorted(values, key=values.__getitem__, reverse=True):
+        p = positions[node]
+        if all(distance_to_constraint(p, c) > exclusion for c in constraints) \
+                and not near_segments(p, corners, exclusion):
+            return Quantity(values[node], field.unit)
+    return None
+
+
 def gradient_hotspot(field: ResultField, mesh: MeshInfo, surface: Surface,
                      top_fraction: float = 0.02) -> Hotspot | None:
     """Region where the field changes fastest along the surface."""

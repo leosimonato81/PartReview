@@ -181,9 +181,12 @@ class ReportDialog(QDialog):
         self.logo_edit = QLineEdit()
         self.yield_edit = QLineEdit()
         self.yield_edit.setPlaceholderText(t("ui.yield_hint"))
+        self.required_edit = QLineEdit()
+        self.required_edit.setPlaceholderText(t("ui.required_fs_hint"))
+        self.required_edit.setToolTip(t("ui.required_fs_tip"))
         self.output_edit = QLineEdit(self._default_output())
         for edit in (self.title_edit, self.author_edit, self.company_edit, self.logo_edit,
-                     self.yield_edit, self.output_edit):
+                     self.yield_edit, self.required_edit, self.output_edit):
             edit.textChanged.connect(self._sync)
         form.addRow(t("ui.result"), self.result_box)
         form.addRow(t("ui.language"), self.language_box)
@@ -211,6 +214,7 @@ class ReportDialog(QDialog):
         form.addRow("", logo_row)
         self.logo_edit.textChanged.connect(self._update_logo_info)
         form.addRow(t("ui.yield"), self.yield_edit)
+        form.addRow(t("ui.required_fs"), self.required_edit)
         layout.addLayout(form)
 
         # --- look and fixed texts (templates)
@@ -281,11 +285,12 @@ class ReportDialog(QDialog):
         self._last_logo_missing = ""
         last = preferences.last_report_fields()
         if last is not None:
-            fields, csv, html, boundary, yield_strength = last
+            fields, csv, html, boundary, yield_strength, required = last
             fields.apply_to(self.config)
             self.config.export_csv, self.config.export_html = csv, html
             self.config.show_boundary = boundary
             self.config.yield_strength = yield_strength
+            self.config.required_safety = required
         logo = preferences.remembered_logo()
         self.config.logo_path = preferences.freecad_logo_path() if logo is None else logo
         if self.config.logo_path and not os.path.isfile(self.config.logo_path):
@@ -368,6 +373,7 @@ class ReportDialog(QDialog):
             self.html_check.setChecked(c.export_html)
             self.boundary_check.setChecked(c.show_boundary)
             self.yield_edit.setText(c.yield_strength)
+            self.required_edit.setText(c.required_safety)
             self.disclaimer_edit.setPlainText(c.disclaimer_text)
         finally:
             self._loading = False
@@ -387,6 +393,7 @@ class ReportDialog(QDialog):
         c.company = self.company_edit.text().strip()
         c.logo_path = self.logo_edit.text().strip()
         c.yield_strength = self.yield_edit.text().strip()
+        c.required_safety = self.required_edit.text().strip()
         c.output_path = self.output_edit.text().strip()
         c.intro_text = self.intro_edit.toPlainText().strip()
         c.disclaimer_text = self.disclaimer_edit.toPlainText().strip()

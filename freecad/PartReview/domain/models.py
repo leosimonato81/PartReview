@@ -192,6 +192,9 @@ class ReportConfig:
     notes: str = ""
     output_path: str = ""
     yield_strength: str = ""  # optional, as typed by the user, e.g. "250 MPa"
+    # Optional safety factor the design must reach, as typed ("2", "1,5"); with it
+    # the conclusion says "meets / does not meet" (no threshold is ever assumed).
+    required_safety: str = ""
     max_views: int = 8
     level: ReportLevel = ReportLevel.FULL
     company: str = ""  # user text: never translated
@@ -227,6 +230,11 @@ class ReportConfig:
             errors.append("config.error.level")
         if self.accent_color and not (len(self.accent_color) == 7 and self.accent_color[0] == "#"):
             errors.append("template.error.color")
+        from .design_check import parse_required  # it imports this module
+        try:
+            parse_required(self.required_safety)
+        except ValueError:
+            errors.append("config.error.required_safety")
         if not 2 <= self.max_views <= 12:
             errors.append("config.error.max_views")
         if not self.output_path:

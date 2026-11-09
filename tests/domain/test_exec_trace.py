@@ -51,15 +51,17 @@ def test_executive_summary_states_verdict_from_data():
     doc = build_report(inputs, Translator("pt_BR", strict=True))
     text = text_of(section(doc, "fem.executive"))
     assert "10,0 MPa — ponto 1" in text
-    assert "0,500" in text and "o material escoaria" in text
-    assert "singularidade" in text  # the max sits on a load face in this model
+    assert "ULTRAPASSA O LIMITE" in text and "0,500" in text and "o material escoaria" in text
+    # the max sits on a load face and no regular point is known: the peak is used
+    # (safe side), labelled as such, and the singularity is still explained
+    assert "no máximo da peça" in text and "singularidade" in text
 
 
 def test_executive_summary_without_yield_does_not_conclude():
     doc = build_report(make_inputs(), Translator("en", strict=True))
     text = text_of(section(doc, "fem.executive"))
     assert "not computed: yield strength not given" in text
-    assert "does not conclude whether the material yields" in text
+    assert "No conclusion on strength" in text
 
 
 def test_assumptions_follow_solver_settings_and_list_what_is_not_assessed():
