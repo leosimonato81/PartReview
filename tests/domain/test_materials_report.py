@@ -95,3 +95,15 @@ def test_volume_table_appears_with_a_yield_strength():
     table = next(b for b in report.blocks if isinstance(b, Table) and b.header
                  and b.header[0] == "Tensão de von Mises")
     assert [r[0] for r in table.rows][0].startswith("≥ 50 % do limite")
+
+
+def test_material_card_checks_density_and_missing_tensile_strength():
+    inputs = make_inputs(Quantity(13.0, "MPa"))
+    petg = Material("PETG", Quantity(2000.0, "MPa"), 0.35, Quantity(1.25e10, "kg/m^3"),
+                    None, None, family="polymer")  # density with a wrong unit, no UTS
+    inputs.result = replace(inputs.result, materials=(petg,))
+    t = build_report(inputs, Translator("pt_BR", strict=True))
+    notices = [b.text for b in t.blocks if hasattr(b, "level")]
+    assert any("Densidade de PETG fora do usual" in n for n in notices)
+    assert "Rankine (tração) não avaliado" in text(t)
+    assert "PLA, ABS, PETG" in text(t)

@@ -177,30 +177,31 @@ def _summary(inputs: ReportInputs, tr: Translator) -> Table:
 
 
 def _results(inputs: ReportInputs, tr: Translator) -> Table:
+    """Main values and where they are (minimums and node ids: CSV only)."""
     res, m = inputs.result, inputs.result.mesh
     d = result_digits(inputs)
     rows = []
     regular = next((h for h in inputs.hotspots if h.kind is HotspotKind.STRESS_REGULAR), None)
-    for kind, max_key, min_key in ((FieldKind.VON_MISES, "results.vm_max", "results.vm_min"),
-                                   (FieldKind.DISPLACEMENT, "results.disp_max", "results.disp_min")):
-        f = res.get_field(kind)
-        if f is None:
-            continue
-        for key, nv in ((max_key, f.maximum(m)), (min_key, f.minimum(m))):
-            rows.append((tr.t(key), tr.quantity(nv.value, d), tr.point(nv.position, m.length_unit),
-                         str(nv.node_id)))
-            if key == "results.vm_min":
-                p = res.get_field(FieldKind.PRINCIPAL_MAX)
-                if p is not None:
-                    nv1 = p.maximum(m)
-                    rows.append((tr.t("results.principal_max"), tr.quantity(nv1.value, d),
-                                 tr.point(nv1.position, m.length_unit), str(nv1.node_id)))
-            if key == "results.vm_max" and regular is not None:
-                rows.append((tr.t("results.vm_regular"), tr.quantity(regular.peak_value, d),
-                             tr.point(regular.center, m.length_unit), str(regular.peak_node)))
-    header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"),
-              tr.t("results.node"))
-    return Table(header=header, rows=tuple(rows), widths=(0.36, 0.2, 0.32, 0.12))
+    stress = res.get_field(FieldKind.VON_MISES)
+    if stress is not None:
+        nv = stress.maximum(m)
+        rows.append((tr.t("results.vm_max"), tr.quantity(nv.value, d),
+                     tr.point(nv.position, m.length_unit)))
+        if regular is not None:
+            rows.append((tr.t("results.vm_regular"), tr.quantity(regular.peak_value, d),
+                         tr.point(regular.center, m.length_unit)))
+    principal = res.get_field(FieldKind.PRINCIPAL_MAX)
+    if principal is not None:
+        nv = principal.maximum(m)
+        rows.append((tr.t("results.principal_max"), tr.quantity(nv.value, d),
+                     tr.point(nv.position, m.length_unit)))
+    disp = res.get_field(FieldKind.DISPLACEMENT)
+    if disp is not None:
+        nv = disp.maximum(m)
+        rows.append((tr.t("results.disp_max"), tr.quantity(nv.value, d),
+                     tr.point(nv.position, m.length_unit)))
+    header = (tr.t("results.quantity"), tr.t("results.value"), tr.t("results.location"))
+    return Table(header=header, rows=tuple(rows), widths=(0.45, 0.2, 0.35))
 
 
 def _share(tr: Translator, value: float) -> str:
@@ -480,6 +481,11 @@ def _section_summary(ctx: FemContext, tr: Translator, level) -> list:
     return [_summary(ctx.inputs, tr)]
 
 
+# Densities of solids lie between ~10 kg/m³ (aerogels) and ~22 600 kg/m³ (osmium):
+# outside, the card most likely has the wrong unit.
+DENSITY_RANGE = (10.0, 25000.0)
+
+
 def _section_results(ctx: FemContext, tr: Translator, level) -> list:
     inputs, check = ctx.inputs, ctx.check
     res = inputs.result
@@ -497,6 +503,10 @@ def _section_results(ctx: FemContext, tr: Translator, level) -> list:
         blocks.append(Notice(tr.t("warn.yield_above_uts",
                                   limit=tr.quantity(inputs.yield_strength, 4),
                                   uts=tr.quantity(mat.ultimate_strength, 4))))
+    if mat is not None and mat.density is not None and mat.density.unit == "kg/m^3" \
+            and not DENSITY_RANGE[0] <= mat.density.value <= DENSITY_RANGE[1]:
+        blocks.append(Notice(tr.t("warn.density", name=mat.name,
+                                  value=tr.quantity(mat.density, 3)), level="info"))
     if inputs.reactions and detailed:
         blocks.append(Paragraph(tr.t("reactions.intro")))
         blocks.append(_reactions(inputs.reactions, tr))
@@ -636,10 +646,6 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
         sentences.append(tr.t("exec.singular", n=ctx.numbers[smax], label=smax.singularity_near))
     elif smax is not None and smax.sharp_corner:
         sentences.append(tr.t("exec.sharp_corner", n=ctx.numbers[smax]))
-    if regular is not None and inputs.regular_exclusion is not None:
-        sentences.append(tr.t("exec.regular", n=ctx.numbers[regular],
-                              value=tr.quantity(regular.peak_value, d),
-                              distance=tr.quantity(inputs.regular_exclusion, 2)))
     eq = inputs.equilibrium
     if eq is not None:
         rows.append((tr.t("quality.equilibrium"), tr.t("eq.status." + eq.status.value)))
@@ -648,8 +654,17 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     zz = inputs.error_estimate
     if zz is not None and zz.available:
         rows.append((tr.t("quality.error"), tr.number(100 * zz.relative_error, 3) + " %"))
-        key = "exec.error" if level is not ReportLevel.QUICK else "exec.error_quick"
-        sentences.append(tr.t(key, eta=tr.number(100 * zz.relative_error, 3)))
+        eta = 100 * zz.relative_error
+        local = None
+        if regular is not None and inputs.error_field is not None:
+            local = dict(zip(inputs.error_field.node_ids,
+                             inputs.error_field.values)).get(regular.peak_node)
+        if local is not None and local < eta:  # the error sits at the supports
+            sentences.append(tr.t("exec.error_split", eta=tr.number(eta, 3),
+                                  n=ctx.numbers[regular], local=tr.number(local, 2)))
+        else:
+            key = "exec.error" if level is not ReportLevel.QUICK else "exec.error_quick"
+            sentences.append(tr.t(key, eta=tr.number(eta, 3)))
     q = inputs.mesh_quality
     if q is not None and q.invalid_elements:
         sentences.append(tr.t("exec.invalid", n=q.invalid_elements))
@@ -708,46 +723,44 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
         if inputs.yield_source == "material_uts":
             blocks.append(Paragraph(tr.t("assume.uts_used")))
         return blocks + [units]
+    rows = []
+
+    def row(key, **values):  # (assumption, what would be better)
+        rows.append((tr.t("assume.%s" % key, **values), tr.t("assume.%s.better" % key)))
+
     trace = inputs.trace
-    assumed = []
     if res.analysis_type == "static":
-        assumed.append(tr.t("assume.static"))
+        row("static")
     if trace is not None and trace.setting("GeometricalNonlinearity") == "linear":
-        assumed.append(tr.t("assume.small_displacements"))
+        row("small_displacements")
     if trace is None or trace.setting("MaterialNonlinearity") in ("linear", ""):
-        for mat in res.materials:
-            assumed.append(tr.t("assume.linear_material", name=mat.name,
-                                e=tr.quantity(mat.youngs_modulus, 4),
-                                nu=tr.number(mat.poisson_ratio, 2)
-                                if mat.poisson_ratio is not None else "—"))
+        for m in res.materials:
+            row("linear_material", name=m.name, e=tr.quantity(m.youngs_modulus, 4),
+                nu=tr.number(m.poisson_ratio, 2) if m.poisson_ratio is not None else "—")
     mat = _material(inputs)
     if mat is not None and mat.family == "metal":
-        assumed.append(tr.t("assume.criterion_metal"))
+        row("criterion_metal")
     elif mat is not None and mat.family == "polymer":
-        assumed.append(tr.t("assume.criterion_polymer"))
-        assumed.append(tr.t("assume.printed"))
-        assumed.append(tr.t("assume.polymer_time"))
+        row("criterion_polymer" if mat.ultimate_strength is not None else "no_uts")
+        row("printed")
+        row("polymer_time")
     if inputs.yield_source == "material_uts":
-        assumed.append(tr.t("assume.uts_used"))
+        row("uts_used")
     if any(c.kind is ConstraintKind.FIXED for c in res.constraints):
-        assumed.append(tr.t("assume.fixed"))
+        row("fixed")
     if any(c.kind is ConstraintKind.FORCE for c in res.constraints):
-        assumed.append(tr.t("assume.force"))
-    blocks = [Paragraph(tr.t("assume.intro")), BulletList(tuple(assumed))]
-    not_assessed = [tr.t("assume.not." + k) for k in
-                    ("fatigue", "buckling", "contact", "plasticity", "dynamics", "thermal",
-                     "manufacturing", "boundary")]
-    blocks += [Paragraph(tr.t("assume.not_intro")), BulletList(tuple(not_assessed))]
-    dependence = [tr.t("assume.mesh")]
-    singular = sum(1 for h in inputs.hotspots if h.singularity_near or h.sharp_corner)
-    if singular:
-        dependence.append(tr.t("assume.singular", n=singular))
+        row("force")
+    zz = inputs.error_estimate
+    if zz is not None and zz.available:
+        row("mesh_error", eta=tr.number(100 * zz.relative_error, 3))
+    else:
+        row("mesh")
     if inputs.regular_exclusion is not None:
-        dependence.append(tr.t("assume.regular",
-                               distance=tr.quantity(inputs.regular_exclusion, 2)))
-    dependence.append(tr.t("assume.digits", n=result_digits(inputs)))
-    dependence.append(tr.t("assume.surface"))
-    blocks.append(BulletList(tuple(dependence)))
+        row("regular", distance=tr.quantity(inputs.regular_exclusion, 2))
+    row("digits", n=result_digits(inputs))
+    blocks = [Table(header=(tr.t("assume.col.assumption"), tr.t("assume.col.better")),
+                    rows=tuple(rows), widths=(0.5, 0.5)),
+              Paragraph(tr.t("assume.not_assessed"))]
     if inputs.config.disclaimer_text:
         blocks.append(Paragraph(inputs.config.disclaimer_text))  # user text
     blocks.append(units)

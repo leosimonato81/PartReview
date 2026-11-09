@@ -69,9 +69,11 @@ def test_assumptions_follow_solver_settings_and_list_what_is_not_assessed():
     inputs.trace = trace()
     text = text_of(section(build_report(inputs, Translator("pt_BR", strict=True)),
                            "fem.assumptions"))
-    assert "Pequenos deslocamentos" in text and "Material Aço elástico linear" in text
+    assert "Pequenos deslocamentos" in text and "Aço: elástico linear" in text
     assert "fadiga" in text and "flambagem" in text
     assert "Apoios fixos" in text
+    # each assumption says briefly what would be better
+    assert "Carga que se repete ou bate" in text
 
 
 def test_quick_assumptions_are_one_paragraph():
