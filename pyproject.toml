@@ -3,7 +3,7 @@
 
 [project]
 name = "partreview"
-version = "1.6.0"
+version = "1.6.2"
 description = "FreeCAD workbench for professional reports of FEM results"
 license = "LGPL-2.1-or-later"
 requires-python = ">=3.11"

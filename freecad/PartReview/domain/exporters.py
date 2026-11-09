@@ -17,7 +17,8 @@ from .colors import accent_palette, to_hex
 from .i18n import Translator
 from .models import FieldKind, FemResult
 
-CSV_FIELDS = (FieldKind.VON_MISES, FieldKind.DISPLACEMENT, FieldKind.ESTIMATED_ERROR)
+CSV_FIELDS = (FieldKind.VON_MISES, FieldKind.PRINCIPAL_MAX, FieldKind.DISPLACEMENT,
+              FieldKind.ESTIMATED_ERROR)
 
 
 def nodal_csv(result: FemResult, tr: Translator, extra_fields=()) -> str:

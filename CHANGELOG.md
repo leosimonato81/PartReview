@@ -2,6 +2,44 @@
 
 All notable changes to PartReview. / Mudanças importantes do PartReview.
 
+## 1.6.2 — 2026-11-09
+
+Report for daily use, for several materials (steel, aluminium, PLA, ABS, PETG).
+(1.6.1 was an internal step and was not published.) / Relatório para o dia a
+dia, para vários materiais. (A 1.6.1 foi uma etapa interna, não publicada.)
+
+**Report / Relatório**
+- Conclusion first: one design safety factor (away from supports, loads and
+  sharp corners; the smallest among the criteria of the material) and, with
+  the new optional field "required SF", meets / does not meet. The margin is
+  given as a load multiplier (linear analysis), or how much the design stress
+  must drop. / Conclusão primeiro: um FS de projeto e, com o novo campo
+  opcional "FS exigido", atende / não atende, com a margem como multiplicador
+  de carga.
+- Polymers: Rankine uses the principal stress away from supports too (it used
+  the peak on the support). / Rankine também fora dos apoios.
+- Levels by purpose: quick = the verdict (~4 pages); standard = daily report
+  (~6 pages, compact cover, close-ups only of what decides); full =
+  documentation (contents, every close-up, error map, convergence, histogram,
+  traceability). / Níveis por finalidade.
+- "How to read this report": one line per harder concept, only those used. /
+  Glossário curto, só com os termos usados.
+- Assumptions as "assumption | what would be better", with how to choose the
+  material limit (metals: guaranteed minimum; printed parts: interlayer value,
+  the print direction is not in the model) and the required SF. / Premissas
+  com o que seria melhor e como escolher limite e FS.
+- Material card checks: density out of the physical range (wrong unit),
+  polymer without tensile strength. / Checagem do cartão do material.
+- Results computed on another mesh than the analysis' current one are flagged
+  first. / Aviso de resultados de outra malha.
+- Shorter texts; results without minimums and node ids (kept in the CSV, which
+  now also has the maximum principal stress); reactions without solver
+  round-off; figures without axes triad and scale bar. / Textos mais curtos.
+- Balloons never sit on another balloon's leader. / Balões sem sobreposição.
+- PDF pagination by look-ahead: fewer pages, no half-empty pages, no small
+  pieces, full last page; headings stay with their table; table headers
+  repeated after a page break. / Paginação melhor do PDF.
+
 ## 1.6.0 — 2026-11-08
 
 Improvement release: a report written for professionals who did not run the

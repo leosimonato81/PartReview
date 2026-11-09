@@ -163,7 +163,6 @@
   "exec.alerts_none": "none",
   "exec.singular": "The maximum stress (point {n}) lies on {label}: it may be a numerical singularity, which grows as the mesh is refined, rather than the real stress in the part.",
   "exec.equilibrium": "The reactions do not balance the applied loads (residual of {residual} %): check the model and run the solver again before using the results.",
-  "exec.error": "Estimated error of the analysis: {eta} %. The error map shows where to refine.",
   "exec.invalid": "The mesh has {n} inverted or degenerate elements: remesh before using the results.",
   "assume.short": "Linear static analysis, elastic material and ideal supports. Not assessed: fatigue, buckling, contact, plasticity, impact and temperature.",
   "assume.static": "Static: loads applied slowly and constant.",
@@ -439,7 +438,6 @@
   "conv.single": "Only one mesh was solved: there is no mesh comparison to show convergence.",
   "warn.yield_above_uts": "The limit entered ({limit}) is higher than the material card's tensile strength ({uts}): by that card, the material breaks before reaching the limit entered. Check the value; the tension safety factor uses the tensile strength.",
   "volume.none": "No part of the volume exceeds {pct} % of the material limit ({limit}): the whole part works with margin.",
-  "exec.error_quick": "Estimated error of the analysis: {eta} %.",
   "assume.short_polymer": "Plastic (PLA, ABS, PETG…): also checked against the tensile strength (Rankine). A printed part was treated as solid and the same in every direction: between layers the limit is lower.",
   "mo.choose": "Part",
   "mo.fc.title": "Targets on this computer",
@@ -512,7 +510,7 @@
   "assume.regular.better": "—",
   "assume.digits.better": "—",
   "assume.not_assessed": "Not assessed: fatigue, buckling, contact and preload, plasticity, impact and vibration, temperature, manufacturing defects, nor whether supports, loads and material represent the real case.",
-  "exec.error_split": "Estimated error: {eta} % over the whole model, concentrated at supports and loads; at the design point ({n}), {local} %.",
+  "exec.error_split": "{local} % at the design point ({n}); {eta} % over the whole model, concentrated at supports and loads",
   "warn.density": "Density of {name} out of the usual range ({value}): check the unit in the material card. It only affects analyses with self-weight or vibration.",
   "assume.limit_printed": "Limit given: {limit}, compared with von Mises.",
   "assume.limit_printed.better": "The print direction is not in the model. Without knowing how the layers sit relative to the load, use the filament datasheet's interlayer (Z axis) tensile strength: it is the safe side. Without that value, a conservative rule of thumb: ~1/3 of the in-plane value (e.g. PETG ~45 MPa in plane → ~15 MPa).",
@@ -531,5 +529,8 @@
   "assume.fs_required.better": "It must cover what this analysis does not see: uncertainty of the load, the material and the manufacturing. Repeated loads call for a fatigue analysis, not only a larger SF.",
   "assume.fs_none": "No required SF: the report does not say “meets / does not meet”.",
   "assume.fs_none.better": "Use the one of the standard or the customer. Without a standard, design textbooks (e.g. Shigley, Juvinall) recommend larger SFs the more uncertain the load, the material and the model are.",
-  "check.reduce_limit": "To stay below the limit, lower the design stress by {pct} % (or the load to {k}× the current one), e.g. with more material or larger radii in the region."
+  "check.reduce_limit": "To stay below the limit, lower the design stress by {pct} % (or the load to {k}× the current one), e.g. with more material or larger radii in the region.",
+  "assume.short_polymer_no_uts": "Plastic (PLA, ABS, PETG…) without tensile strength in the card: Rankine (tension) not assessed. A printed part was treated as solid and the same in every direction: between layers the limit is lower.",
+  "assume.printed_given": "3D-printed part (PLA, ABS, PETG…) treated as solid and the same in every direction.",
+  "assume.printed_given.better": "Infill and number of walls change stiffness and strength: use datasheet values measured with print settings similar to yours."
 }

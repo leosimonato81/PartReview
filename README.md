@@ -8,7 +8,9 @@ do começo ao fim, sem travar o seu computador:
    malha recomendada (ou a melhor para um objetivo de memória ou de tempo).
 2. **Otimizar malha pelo erro (beta)** — roda o seu cálculo, mede o erro estimado e
    refina a malha só onde ele é alto, até a meta (ex.: 5 %) ou o limite do PC.
-3. **Relatório FEM** — relatório para quem não fez a análise: vistas
+3. **Relatório FEM** — começa pela conclusão (um fator de segurança de projeto
+   e, se você informar o FS exigido, "atende / não atende" com a margem), em 3
+   níveis (rápido, dia a dia, completo); para quem não fez a análise: vistas
    automáticas que nunca escondem o ponto mais crítico, forma deformada, tensão
    fora de apoios e cantos vivos com fator de segurança próprio, erro estimado
    em cada ponto, critério certo para metais e polímeros (PLA, ABS, PETG),
@@ -23,7 +25,9 @@ to finish, without freezing your computer:
 2. **Optimise mesh by the error (beta)** — solves your analysis, measures the
    estimated error and refines the mesh only where it is high, up to the target
    (e.g. 5 %) or the computer's limit.
-3. **FEM report** — a report for readers who did not run the analysis:
+3. **FEM report** — starts with the conclusion (one design safety factor and,
+   if you give the required SF, "meets / does not meet" with the margin), in 3
+   levels (quick, daily, full); for readers who did not run the analysis:
    automatic views that never hide the most critical point, deformed shape,
    stress away from supports and sharp corners with its own safety factor,
    estimated error at each point, the right criterion for metals and polymers
@@ -194,17 +198,19 @@ the computer's limits or stagnation (singularities).
 
 1. Abra o documento com um resultado FEM já calculado (CalculiX).
 2. Ative o workbench **PartReview** e clique em **Relatório FEM**.
-3. Escolha o **tamanho do relatório** nos cartões: *Resumo rápido* (~3 páginas),
-   *Intermediário* (~8) ou *Completo* (~10).
+3. Escolha o **tamanho do relatório** nos cartões: *Resumo rápido* (~4 páginas,
+   a conclusão), *Intermediário* (~6, o relatório do dia a dia) ou *Completo*
+   (~10, documentação com sumário, mapa de erro e rastreabilidade).
 4. Preencha resultado, idioma (PT-BR ou EN), unidades (MPa/mm/N ou as do
    FreeCAD), título, autor, empresa, logo e, se quiser, o limite de escoamento
-   (ex.: `250 MPa`) para obter o fator de segurança. O logo (SVG, PNG ou JPG)
+   (ex.: `250 MPa`) para obter o fator de segurança e o **FS exigido** (ex.: `2`)
+   para a conclusão "atende / não atende". O logo (SVG, PNG ou JPG)
    aparece centralizado embaixo da capa; o diálogo mostra uma prévia e avisa se
    uma imagem pequena pode sair borrada na impressão (SVG sai sempre nítido). Na
    primeira vez o campo vem com o logo do FreeCAD (o botão **Padrão** volta a
    ele); deixe-o vazio para um relatório sem logo. Os campos do último
    relatório (empresa, autor, aparência, nível, idioma, unidades, limite de
-   escoamento, exportações) voltam enquanto o FreeCAD fica aberto; o logo
+   escoamento, FS exigido, exportações) voltam enquanto o FreeCAD fica aberto; o logo
    escolhido é lembrado também depois de fechar.
 5. Opcional: em **Aparência e textos fixos**, escolha a cor de destaque (padrão:
    preto) e os textos de abertura e de responsabilidade. Com cores claras, os
@@ -290,7 +296,7 @@ no modelo de referência do autor (FreeCAD 1.1.4, CalculiX, malha de tetraedros 
 | 5 | **Modelos dentro de `App::Part`** ou com vários corpos | Enquadramento da câmera e mapeamento da geometria podem errar com `Placement`. | A posição de apoios e cargas vem da face do CAD (`Shape` do objeto), **sem** somar o `Placement` de um `App::Part` que o contenha. Se o contêiner estiver deslocado, os marcadores de apoio/carga e o aviso de singularidade podem sair no lugar errado. As vistas de tensão e deslocamento usam só a malha e não são afetadas. | Risco conhecido |
 | 6 | **Objeto que desenha o mapa de cores** | A captura depende de qual objeto (`Pipeline_*`, malha de resultados) está presente no documento. Documentos montados de outra forma podem precisar de outro caminho. | **Resolvido para resultados mecânicos:** a ferramenta não depende do estado da tela nem do pipeline. Ela pinta a própria malha de resultados (`result.Mesh`) com a escala azul→vermelho, esconde todo o resto e restaura tudo no fim. | Resolvido |
 | 7 | **Singularidades de tensão** | Apoios fixos e cargas pontuais geram picos que não representam a tensão real e crescem com o refino da malha. Os pontos próximos a eles são sinalizados no relatório, mas a decisão é do engenheiro. | Um ponto de tensão alta é sinalizado como "possível singularidade" quando fica a menos de 1,5× o tamanho médio do elemento (ou 1% do tamanho da peça) de uma face de apoio ou de carga. Na viga de `examples/teste_app_part.FCStd`, o canto do engaste é sinalizado. Cargas em arestas ou vértices ainda não entram nessa verificação. | Sinalizado |
-| 8 | **Critério de falha** | O relatório só calcula fator de segurança se o usuário informar o limite de escoamento. Sem isso, não afirma que a peça passa ou falha. | O limite vem do diálogo (ex.: `250 MPa`, convertido para a unidade do relatório) ou, se houver, do `YieldStrength` do material. Fator de segurança < 1 gera aviso. O critério é só de escoamento por von Mises: não cobre fadiga, flambagem nem fratura. | Por projeto |
+| 8 | **Critério de falha** | O relatório só calcula fator de segurança se o usuário informar o limite de escoamento. Sem isso, não afirma que a peça passa ou falha. | O limite vem do diálogo (ex.: `250 MPa`, convertido para a unidade do relatório) ou, se houver, do `YieldStrength` do material (ou da resistência à tração, se for menor). O fator de segurança de projeto usa a tensão longe de apoios, cargas e cantos vivos; em polímeros vale o menor entre von Mises e Rankine (tração). "Atende / não atende" só com o FS exigido informado; FS < 1 gera aviso. Não cobre fadiga, flambagem nem fratura. | Por projeto |
 | 9 | **Unidades** | Devem ser lidas do documento. Conferir em modelos com unidades diferentes de mm e MPa. | O FreeCAD guarda os resultados mecânicos em mm/MPa (convenção do próprio FreeCAD). O relatório mostra em MPa/mm/N ou no sistema de unidades das preferências, conforme a escolha no diálogo. Material e cargas são convertidos pela API de unidades do FreeCAD. Verificado nos 10 sistemas de unidades do FreeCAD 1.1: quando um sistema não define unidade legível para uma grandeza, usa MPa/N/mm nela. As reações do CalculiX estão em N, o que foi confirmado com o exemplo da viga em balanço. | Verificado (Linux) |
 | 10 | **Interface gráfica** | A geração de relatório depende do FreeCAD com interface aberta. Não roda em modo sem interface. | Precisa do FreeCAD com interface, porque a captura usa a vista 3D. Funciona também com a interface **invisível** (`QT_QPA_PLATFORM=offscreen`), que é como os testes automáticos rodam. Não funciona no `freecadcmd`. | Por projeto |
 | 11 | **Desempenho** | Modelos grandes podem travar a interface. | No modelo de referência (40 mil nós), o relatório completo leva de 5 a 15 s, com barra de progresso e botão de cancelar. Ainda não foi testado com malhas muito maiores. | A verificar |

@@ -220,7 +220,10 @@ def _reactions(reactions, tr: Translator) -> Table:
     """Force each support takes (what bolts and fixtures must hold)."""
     rows = []
     for label, f in reactions:
-        rows.append((label,) + tuple(tr.quantity(Quantity(v, "N"), 3) for v in _clean(f))
+        # components below 1e-6 of the resultant are solver round-off: 0
+        noise = 1e-6 * g.length(f)
+        rows.append((label,) + tuple(tr.quantity(Quantity(0.0 if abs(v) <= noise else v, "N"), 3)
+                                     for v in f)
                     + (tr.quantity(Quantity(g.length(f), "N"), 3),))
     header = (tr.t("reactions.support"), "Fx", "Fy", "Fz", "|F|")
     return Table(header=header, rows=tuple(rows), widths=(0.32, 0.17, 0.17, 0.17, 0.17))
@@ -407,6 +410,11 @@ def _material(inputs: ReportInputs):
     return inputs.result.materials[0] if len(inputs.result.materials) == 1 else None
 
 
+def _plain(value: float, tr: Translator) -> str:
+    """A number typed by the user, shown as typed: 2 -> "2", 1.5 -> "1,5"."""
+    return ("%g" % value).replace(".", tr.decimal_sep)
+
+
 def _criterion_name(c, tr: Translator) -> str:
     return tr.t("check.crit." + c.key)
 
@@ -422,7 +430,7 @@ def _criteria_table(check: DesignCheck, tr: Translator, d: int) -> Table:
         name = _criterion_name(c, tr)
         if c is check.governing and len(check.criteria) > 1:
             name += " — " + tr.t("check.governs")
-        limit = tr.quantity(c.limit, 4)
+        limit = tr.quantity(c.limit, 3)
         if c.limit_source:
             limit += " (%s)" % tr.t("results.yield_source." + c.limit_source)
         design = tr.quantity(c.design_stress, d)
@@ -446,7 +454,7 @@ def _conclusion(ctx: FemContext, tr: Translator) -> Notice | None:
     c = check.governing
     values = dict(fs=tr.number(check.fs, d), criterion=_criterion_name(c, tr),
                   where=_where_design(c, tr),
-                  required=tr.number(check.required, 3) if check.required else "")
+                  required=_plain(check.required, tr) if check.required else "")
     level = {"meets": "ok", "fails": "warning", "exceeds": "warning", "number": "info"}
     text = tr.t("check." + check.status, **values)
     # Linear analysis: stress is proportional to the load, so the margin over the
@@ -649,7 +657,7 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
                                                   criterion=_criterion_name(c, tr),
                                                   where=_where_design(c, tr))))
         if check.required is not None:
-            rows.append((tr.t("exec.required_fs"), tr.number(check.required, 3)))
+            rows.append((tr.t("exec.required_fs"), _plain(check.required, tr)))
         if c.design_is_regular and c.fs_peak < c.fs_design and smax is not None \
                 and (smax.singularity_near or smax.sharp_corner):
             sentences.append(tr.t("exec.peak_fs", n=ctx.numbers[smax], fs=tr.number(c.fs_peak, d),
@@ -668,18 +676,17 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
             sentences.append(tr.t("exec.equilibrium", residual=tr.number(100 * eq.residual, 2)))
     zz = inputs.error_estimate
     if zz is not None and zz.available:
-        rows.append((tr.t("quality.error"), tr.number(100 * zz.relative_error, 3) + " %"))
         eta = 100 * zz.relative_error
         local = None
         if regular is not None and inputs.error_field is not None:
             local = dict(zip(inputs.error_field.node_ids,
                              inputs.error_field.values)).get(regular.peak_node)
         if local is not None and local < eta:  # the error sits at the supports
-            sentences.append(tr.t("exec.error_split", eta=tr.number(eta, 3),
-                                  n=ctx.numbers[regular], local=tr.number(local, 2)))
+            value = tr.t("exec.error_split", eta=tr.number(eta, 3), n=ctx.numbers[regular],
+                         local=tr.number(local, 2))
         else:
-            key = "exec.error" if level is not ReportLevel.QUICK else "exec.error_quick"
-            sentences.append(tr.t(key, eta=tr.number(eta, 3)))
+            value = tr.number(eta, 3) + " %"
+        rows.append((tr.t("quality.error"), value))
     q = inputs.mesh_quality
     if q is not None and q.invalid_elements:
         sentences.append(tr.t("exec.invalid", n=q.invalid_elements))
@@ -738,7 +745,8 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
         blocks = [Paragraph(tr.t("assume.short"))]
         mat = _material(inputs)
         if mat is not None and mat.family == "polymer":
-            blocks.append(Paragraph(tr.t("assume.short_polymer")))
+            blocks.append(Paragraph(tr.t("assume.short_polymer" if mat.ultimate_strength
+                                         is not None else "assume.short_polymer_no_uts")))
         if inputs.yield_source == "material_uts":
             blocks.append(Paragraph(tr.t("assume.uts_used")))
         return blocks + [units]
@@ -761,7 +769,7 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
         row("criterion_metal")
     elif mat is not None and mat.family == "polymer":
         row("criterion_polymer" if mat.ultimate_strength is not None else "no_uts")
-        row("printed")
+        row("printed" if inputs.yield_source != "user" else "printed_given")
         row("polymer_time")
     if inputs.yield_source == "material_uts":
         row("uts_used")
@@ -777,7 +785,7 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
         row("limit_card", limit=tr.quantity(inputs.yield_strength, 3))
     if ctx.check is not None:
         if ctx.check.required is not None:
-            row("fs_required", fs=tr.number(ctx.check.required, 3))
+            row("fs_required", fs=_plain(ctx.check.required, tr))
         else:
             row("fs_none")
     if any(c.kind is ConstraintKind.FIXED for c in res.constraints):

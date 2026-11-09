@@ -81,7 +81,7 @@ def test_conclusion_is_the_first_block_of_the_summary():
                  if getattr(b, "anchor", "") == "fem.executive")
     first = doc.blocks[start + 1]
     assert isinstance(first, Notice) and first.level == "ok"
-    assert first.text.startswith("ATENDE") and "2,50" in first.text and "(2,00)" in first.text
+    assert first.text.startswith("ATENDE") and "2,50" in first.text and "(2)" in first.text
     inputs.config.required_safety = "3"
     doc = build_report(inputs, Translator("en", strict=True))
     notice = next(b for b in doc.blocks if isinstance(b, Notice))
@@ -132,7 +132,7 @@ def test_assumptions_say_how_to_choose_the_limit_and_the_factor():
     assert "Sem FS exigido" in t and "Shigley" in t
     inputs.config.required_safety = "2"
     t = _texts(build_report(inputs, tr))
-    assert "FS exigido: 2,00" in t and "fadiga" in t
+    assert "FS exigido: 2 (informado)" in t and "fadiga" in t
 
 
 def test_results_from_another_mesh_are_flagged_first():
