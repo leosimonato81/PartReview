@@ -515,5 +515,21 @@
   "exec.error_split": "Estimated error: {eta} % over the whole model, concentrated at supports and loads; at the design point ({n}), {local} %.",
   "warn.density": "Density of {name} out of the usual range ({value}): check the unit in the material card. It only affects analyses with self-weight or vibration.",
   "assume.limit_printed": "Limit given: {limit}, compared with von Mises.",
-  "assume.limit_printed.better": "The print direction is not in the model (the part may be printed in another position). Without knowing how the layers sit relative to the load, use the interlayer (Z) limit: it is the safe side."
+  "assume.limit_printed.better": "The print direction is not in the model. Without knowing how the layers sit relative to the load, use the filament datasheet's interlayer (Z axis) tensile strength: it is the safe side. Without that value, a conservative rule of thumb: ~1/3 of the in-plane value (e.g. PETG ~45 MPa in plane → ~15 MPa).",
+  "warn.stale_mesh": "The results were computed with another mesh ({used} nodes); the analysis' current mesh has {now} nodes. Solve again before using this report.",
+  "check.margin": "By the linear analysis, the load may grow up to {k}× the current one keeping the required SF.",
+  "check.reduce": "To meet it, lower the design stress by {pct} % (or the load to {k}× the current one), e.g. with more material or larger radii in the region.",
+  "assume.limit_metal": "Limit given: {limit}, compared with von Mises.",
+  "assume.limit_metal.better": "Use the guaranteed minimum yield of the standard or the batch certificate, not the typical one. Catalogue references: SAE 1020 hot-rolled steel ~210 MPa, SAE 1045 ~310 MPa, aluminium 6061-T6 ~240 MPa.",
+  "assume.limit_user": "Limit given: {limit}, compared with von Mises.",
+  "assume.limit_user.better": "Use the supplier's guaranteed minimum, in the material's weakest direction.",
+  "assume.limit_card": "Limit from the material card: {limit} (generic value).",
+  "assume.limit_card.better": "Prefer your supplier's value (metal: batch certificate; filament: datasheet), in the weakest direction.",
+  "assume.limit_none": "No material limit: no safety factor and no conclusion.",
+  "assume.limit_none.better": "When generating the report, give the yield strength (metals) or the tensile strength in the weakest direction (printed part: between layers).",
+  "assume.fs_required": "Required SF: {fs} (given).",
+  "assume.fs_required.better": "It must cover what this analysis does not see: uncertainty of the load, the material and the manufacturing. Repeated loads call for a fatigue analysis, not only a larger SF.",
+  "assume.fs_none": "No required SF: the report does not say “meets / does not meet”.",
+  "assume.fs_none.better": "Use the one of the standard or the customer. Without a standard, design textbooks (e.g. Shigley, Juvinall) recommend larger SFs the more uncertain the load, the material and the model are.",
+  "check.reduce_limit": "To stay below the limit, lower the design stress by {pct} % (or the load to {k}× the current one), e.g. with more material or larger radii in the region."
 }

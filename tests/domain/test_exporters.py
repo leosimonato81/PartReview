@@ -51,7 +51,7 @@ def test_html_is_self_contained_and_escapes_user_text():
 def test_html_logo_is_centered_at_the_bottom_of_the_full_cover_only():
     from freecad.PartReview.domain.models import ReportLevel
     logo = '<img class="logo"'
-    for level, at_bottom in ((ReportLevel.FULL, True), (ReportLevel.STANDARD, True),
+    for level, at_bottom in ((ReportLevel.FULL, True), (ReportLevel.STANDARD, False),
                              (ReportLevel.QUICK, False)):
         inputs = make_inputs()
         inputs.config.level = level

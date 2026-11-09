@@ -269,7 +269,12 @@ def generate_fem_report(doc, config, progress=_no_progress):
     surface = build_surface(result.elements, result.mesh.node_positions) if tets else None
 
     progress(tr.t("progress.quality"), 0.2)
-    equilibrium = _equilibrium(analysis, result)
+    current_nodes = fem_reader.analysis_mesh_nodes(analysis)
+    stale = (current_nodes, result.mesh.node_count) \
+        if current_nodes is not None and current_nodes != result.mesh.node_count else None
+    # The equilibrium check rebuilds the loads on the CURRENT mesh: meaningless
+    # when the results come from another one.
+    equilibrium = _equilibrium(analysis, result) if stale is None else None
     max_node = stress.maximum(result.mesh).node_id if stress is not None else None
     quality = mesh_quality(result.elements, result.mesh.node_positions, max_node) if tets else None
     zz, error_field = _error_estimate(analysis, result_obj, result, tets)
@@ -341,6 +346,7 @@ def generate_fem_report(doc, config, progress=_no_progress):
             equilibrium=equilibrium, mesh_quality=quality, error_estimate=zz,
             error_field=error_field, error_view=error_view, boundary_views=boundary_views,
             reactions=_reactions(analysis, result), regular_principal=principal_regular,
+            stale_mesh=stale,
             convergence=optimizer.read_history(analysis, result.mesh.node_count),
             regular_exclusion=(Quantity(exclusion, result.mesh.length_unit)
                                if exclusion and any(s.kind is HotspotKind.STRESS_REGULAR

@@ -101,3 +101,45 @@ def test_glossary_lists_only_the_concepts_of_this_report():
     inputs.config.required_safety = "2"
     terms = glossary(build_report(inputs, tr))
     assert terms[:3] == ["FS de projeto", "Tensão de projeto", "FS exigido"]
+
+
+def _texts(doc):
+    out = []
+    for b in doc.blocks:
+        if hasattr(b, "rows"):
+            out += [c for row in b.rows for c in row]
+        elif hasattr(b, "text"):
+            out.append(b.text)
+    return "\n".join(out)
+
+
+def test_margin_over_the_required_factor_is_a_load_multiplier():
+    inputs = make_inputs(Quantity(50.0, "MPa"))  # max 10 MPa -> FS 5 (peak used)
+    inputs.config.required_safety = "2"
+    t = _texts(build_report(inputs, Translator("pt_BR", strict=True)))
+    assert "a carga pode crescer até 2,5× a atual" in t  # 5 / 2
+    inputs.config.required_safety = "8"
+    t = _texts(build_report(inputs, Translator("pt_BR", strict=True)))
+    assert "reduza a tensão de projeto em 38 %" in t  # 1 - 5/8
+
+
+def test_assumptions_say_how_to_choose_the_limit_and_the_factor():
+    tr = Translator("pt_BR", strict=True)
+    t = _texts(build_report(make_inputs(), tr))  # nothing given
+    assert "Sem limite do material" in t
+    inputs = make_inputs(Quantity(250.0, "MPa"))
+    t = _texts(build_report(inputs, tr))  # given, no required SF
+    assert "Sem FS exigido" in t and "Shigley" in t
+    inputs.config.required_safety = "2"
+    t = _texts(build_report(inputs, tr))
+    assert "FS exigido: 2,00" in t and "fadiga" in t
+
+
+def test_results_from_another_mesh_are_flagged_first():
+    inputs = make_inputs(Quantity(250.0, "MPa"))
+    inputs.stale_mesh = (63000, 57000)
+    doc = build_report(inputs, Translator("pt_BR", strict=True))
+    start = next(i for i, b in enumerate(doc.blocks)
+                 if getattr(b, "anchor", "") == "fem.executive")
+    first = doc.blocks[start + 1]
+    assert isinstance(first, Notice) and "outra malha (57 000 nós)" in first.text

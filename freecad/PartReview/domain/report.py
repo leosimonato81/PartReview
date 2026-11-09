@@ -83,6 +83,9 @@ class ReportInputs:
     # Largest principal stress away from supports, loads and sharp corners (same
     # rule as STRESS_REGULAR); None when unknown. Rankine design value of polymers.
     regular_principal: Quantity | None = None
+    # (nodes of the analysis' mesh now, nodes of the mesh the results came from)
+    # when they differ: the mesh changed after solving.
+    stale_mesh: tuple | None = None
     # Reaction force of each support from CalculiX: [(support label, Vec3 in N)].
     reactions: list = field(default_factory=list)
     # Passes of "Optimise mesh by the error" that produced this mesh (quality.ConvergencePass).
@@ -445,7 +448,17 @@ def _conclusion(ctx: FemContext, tr: Translator) -> Notice | None:
                   where=_where_design(c, tr),
                   required=tr.number(check.required, 3) if check.required else "")
     level = {"meets": "ok", "fails": "warning", "exceeds": "warning", "number": "info"}
-    return Notice(tr.t("check." + check.status, **values), level=level[check.status])
+    text = tr.t("check." + check.status, **values)
+    # Linear analysis: stress is proportional to the load, so the margin over the
+    # required factor is a load multiplier.
+    if check.status == "meets":
+        text += " " + tr.t("check.margin", k=tr.number(check.fs / check.required, 2))
+    elif check.status in ("fails", "exceeds"):
+        target = check.required or 1.0
+        key = "check.reduce" if check.required else "check.reduce_limit"
+        text += " " + tr.t(key, pct=tr.integer(round(100 * (1 - check.fs / target))),
+                           k=tr.number(check.fs / target, 2))
+    return Notice(text, level=level[check.status])
 
 
 def _note_hidden(figures, inputs: ReportInputs, numbers, tr: Translator) -> list:
@@ -598,6 +611,8 @@ def _alerts(ctx: FemContext) -> int:
     count += sum(1 for c in inputs.result.constraints if c.on_edges_or_vertices)
     if ctx.check is not None and ctx.check.status in ("fails", "exceeds"):
         count += 1
+    if inputs.stale_mesh is not None:
+        count += 1
     if inputs.equilibrium is not None and inputs.equilibrium.status is EquilibriumStatus.IMBALANCE:
         count += 1
     if inputs.mesh_quality is not None and inputs.mesh_quality.invalid_elements:
@@ -674,6 +689,10 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     conclusion = _conclusion(ctx, tr)
     if conclusion is not None:
         blocks.insert(0, conclusion)
+    if inputs.stale_mesh is not None:  # before anything else: the results may not apply
+        now, used = inputs.stale_mesh
+        blocks.insert(0, Notice(tr.t("warn.stale_mesh", now=tr.integer(now),
+                                     used=tr.integer(used))))
     if inputs.config.intro_text:
         blocks.insert(0, Paragraph(inputs.config.intro_text))  # user text, never translated
     if sentences:
@@ -746,8 +765,21 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
         row("polymer_time")
     if inputs.yield_source == "material_uts":
         row("uts_used")
-    if inputs.yield_source == "user" and mat is not None and mat.family == "polymer":
-        row("limit_printed", limit=tr.quantity(inputs.yield_strength, 3))
+    # How the limit and the required factor were chosen, and how to choose them well.
+    if inputs.yield_strength is None:
+        if res.get_field(FieldKind.VON_MISES) is not None:
+            row("limit_none")
+    elif inputs.yield_source == "user":
+        family = mat.family if mat is not None else "other"
+        key = {"polymer": "limit_printed", "metal": "limit_metal"}.get(family, "limit_user")
+        row(key, limit=tr.quantity(inputs.yield_strength, 3))
+    elif inputs.yield_source == "material":
+        row("limit_card", limit=tr.quantity(inputs.yield_strength, 3))
+    if ctx.check is not None:
+        if ctx.check.required is not None:
+            row("fs_required", fs=tr.number(ctx.check.required, 3))
+        else:
+            row("fs_none")
     if any(c.kind is ConstraintKind.FIXED for c in res.constraints):
         row("fixed")
     if any(c.kind is ConstraintKind.FORCE for c in res.constraints):
@@ -953,7 +985,7 @@ def _cover(inputs: ReportInputs, tr: Translator) -> Cover:
         info=tuple(info),
         company=config.company,
         logo_path=config.logo_path,
-        full_page=config.level is not ReportLevel.QUICK,
+        full_page=config.level is ReportLevel.FULL,  # daily reports: compact header
     )
 
 

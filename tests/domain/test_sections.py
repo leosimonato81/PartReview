@@ -62,7 +62,7 @@ def test_a_new_section_plugs_in_without_touching_the_engine():
 
 @pytest.mark.parametrize("level, has_points, has_toc, full_cover", [
     (ReportLevel.QUICK, False, False, False),
-    (ReportLevel.STANDARD, True, False, True),  # daily report: no table of contents
+    (ReportLevel.STANDARD, True, False, False),  # daily report: no contents, compact cover
     (ReportLevel.FULL, True, True, True),
 ])
 def test_fem_report_levels(level, has_points, has_toc, full_cover):

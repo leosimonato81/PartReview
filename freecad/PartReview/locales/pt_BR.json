@@ -515,5 +515,21 @@
   "exec.error_split": "Erro estimado: {eta} % no modelo todo, concentrado junto a apoios e cargas; no ponto de projeto ({n}), {local} %.",
   "warn.density": "Densidade de {name} fora do usual ({value}): confira a unidade no cartão do material. Só afeta o cálculo com peso próprio ou vibração.",
   "assume.limit_printed": "Limite informado: {limit}, comparado com von Mises.",
-  "assume.limit_printed.better": "A direção de impressão não está no modelo (a peça pode ser impressa em outra posição). Sem saber como as camadas ficam em relação à carga, use o limite entre camadas (Z): é o lado seguro."
+  "assume.limit_printed.better": "A direção de impressão não está no modelo. Sem saber como as camadas ficam em relação à carga, use a tração entre camadas (eixo Z) da ficha do filamento: é o lado seguro. Sem esse valor, regra prática conservadora: ~1/3 do valor no plano (ex.: PETG ~45 MPa no plano → ~15 MPa).",
+  "warn.stale_mesh": "Os resultados foram calculados com outra malha ({used} nós); a malha atual da análise tem {now} nós. Calcule de novo antes de usar este relatório.",
+  "check.margin": "Pela análise linear, a carga pode crescer até {k}× a atual mantendo o FS exigido.",
+  "check.reduce": "Para atender, reduza a tensão de projeto em {pct} % (ou a carga para {k}× a atual), por exemplo com mais material ou raios maiores na região.",
+  "assume.limit_metal": "Limite informado: {limit}, comparado com von Mises.",
+  "assume.limit_metal.better": "Use o escoamento mínimo garantido da norma ou do certificado do lote, não o típico. Referências de catálogo: aço SAE 1020 laminado ~210 MPa, SAE 1045 ~310 MPa, alumínio 6061-T6 ~240 MPa.",
+  "assume.limit_user": "Limite informado: {limit}, comparado com von Mises.",
+  "assume.limit_user.better": "Use o valor mínimo garantido pelo fornecedor, na direção mais fraca do material.",
+  "assume.limit_card": "Limite do cartão do material: {limit} (valor genérico).",
+  "assume.limit_card.better": "Prefira o valor do seu fornecedor (metal: certificado do lote; filamento: ficha técnica), na direção mais fraca.",
+  "assume.limit_none": "Sem limite do material: sem fator de segurança nem conclusão.",
+  "assume.limit_none.better": "Ao gerar o relatório, informe o escoamento (metais) ou a tração na direção mais fraca (peça impressa: entre camadas).",
+  "assume.fs_required": "FS exigido: {fs} (informado).",
+  "assume.fs_required.better": "Ele precisa cobrir o que esta análise não vê: incerteza da carga, do material e da fabricação. Carga que se repete pede análise de fadiga, não só um FS maior.",
+  "assume.fs_none": "Sem FS exigido: o relatório não diz “atende / não atende”.",
+  "assume.fs_none.better": "Use o da norma ou do cliente. Sem norma, os livros de projeto (ex.: Shigley, Juvinall) indicam FS maiores quanto mais incertos forem a carga, o material e o modelo.",
+  "check.reduce_limit": "Para ficar abaixo do limite, reduza a tensão de projeto em {pct} % (ou a carga para {k}× a atual), por exemplo com mais material ou raios maiores na região."
 }

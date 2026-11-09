@@ -390,6 +390,18 @@ def solver_meshes(doc, selection=()):
     return selected or [o for o in doc.Objects if usable(o)]
 
 
+def analysis_mesh_nodes(analysis):
+    """Node count of the analysis' own mesh (the one the solver would use now),
+    or None when there is not exactly one."""
+    result_meshes = [getattr(o, "Mesh", None) for o in analysis.Group if is_mechanical_result(o)]
+    meshes = [m for m in analysis.Group if m.isDerivedFrom("Fem::FemMeshObject")
+              and not getattr(m, "Suppressed", False)
+              and not any(m is r for r in result_meshes)]
+    if len(meshes) != 1 or getattr(meshes[0], "FemMesh", None) is None:
+        return None
+    return meshes[0].FemMesh.NodeCount
+
+
 def nodal_loads_and_fixed_nodes(analysis):
     """({node: Vec3 load in N}, {fixed node ids}) as FreeCAD writes them for CalculiX.
 

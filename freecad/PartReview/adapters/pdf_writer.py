@@ -91,11 +91,19 @@ class _Style:
 
 
 KEEP_TABLE_SHARE = 0.2  # tables up to 20 % of a page are never split
-# A section that fits in one page but would leave only a small tail (< 30 % of a
-# page) on the next one starts on that page instead when little is left behind
-# (< 20 %), and always when it is the last section: no near-empty last page.
-SMALL_TAIL = 0.3
-MAX_LEFT_BLANK = 0.2
+
+# Page breaks between sections are chosen by looking ahead: before each section
+# both choices (continue on this page / start a new one) are laid out to the end
+# of the document without images, and the one with the lower "badness" wins.
+# Badness (in points): every page costs a lot; blank space at the bottom of a page
+# (quadratic: a little is fine, half a page is not); a piece of a section shorter
+# than SMALL_PIECE of a page on either side of a break; a near-empty last page.
+PAGE_COST = 1000.0
+BLANK_COST = 400.0
+SMALL_PIECE = 0.15
+PIECE_COST = 250.0
+LAST_PAGE_MIN = 0.3
+LAST_PAGE_COST = 500.0
 
 
 class _Layout:
@@ -111,10 +119,22 @@ class _Layout:
         self.anchor_pages = {}  # section anchor -> page number (for the contents)
         self.cover_pages = 0  # pages without running header/footer
         self.title_on_first_page = False  # compact cover: page 1 has no running header
+        self.fills = []  # bottom of the used area of each finished page
+        self.pieces = []  # (before, after) heights of each section split by a page break
 
     def new_page(self):
+        self.fills.append(self.y)  # how far the page was used
         self.pages.append([])
         self.y = self.top
+
+    def probe(self):
+        """Empty copy at the same position (for looking ahead, no drawing)."""
+        other = _Layout(self.width, self.height)
+        other.top, other.bottom, other.y = self.top, self.bottom, self.y
+        other.pages = [[] for _ in self.pages]
+        other.fills = list(self.fills)
+        other.cover_pages = self.cover_pages
+        return other
 
     def ensure(self, needed):
         if self.y + needed > self.bottom and self.y > self.top:
@@ -312,6 +332,8 @@ def _layout_table(layout, table, x0, style):
         layout.y += h
 
     if table.header:
+        first = row_height(table.rows[0], style.body) if table.rows else 0.0
+        layout.ensure(row_height(table.header, style.bold) + first)  # header not alone
         place_row(table.header, style.bold, style.accent_light)
     for row in table.rows:
         place_row(row, style.body, None)
@@ -490,13 +512,45 @@ def layout_document(doc, image_paths, style, page_w, page_h):
         img_h = (layout.width - mm(LEGEND_MM)) * fig.image_size[1] / fig.image_size[0]
         return img_h + style.height(style.caption, figure_text(fig), layout.width) + mm(2)
 
+    def first_rows(table):
+        """What of a table must follow its heading: the whole table when it is
+        small (it is never split), else the header and the first row."""
+        widths = [w * layout.width for w in table.widths]
+        pad = mm(1.5)
+
+        def h(row):
+            return max(style.height(style.body, c, w - 2 * pad) for c, w in zip(row, widths)) \
+                + 2 * pad
+        rows = ([table.header] if table.header else []) + list(table.rows)
+        total = sum(h(r) for r in rows)
+        slack = mm(3)  # bold header and rounding: never short by a hair
+        if total <= KEEP_TABLE_SHARE * (layout.bottom - layout.top):
+            return total + slack
+        return sum(h(r) for r in rows[:2]) + slack
+
+    def keep_with_heading(blocks, i):
+        """Height that must fit under a heading: its intro paragraph(s) and the
+        beginning of the first table, or the first figure."""
+        keep = 0.0
+        while i < len(blocks):
+            block = blocks[i]
+            if isinstance(block, Paragraph):
+                keep += style.height(style.body, block.text, layout.width) + mm(GAP_MM)
+                i += 1
+                continue
+            if isinstance(block, Figure):
+                return keep + figure_height(block)
+            if isinstance(block, Table):
+                return keep + first_rows(block)
+            break
+        return max(keep, mm(25))
+
     def place(layout, blocks, a, b, dry):
         for index in range(a, b):
             block = blocks[index]
             if isinstance(block, Heading):
                 h = style.height(style.heading, block.text, layout.width)
-                following = blocks[index + 1] if index + 1 < len(blocks) else None
-                keep = figure_height(following) if isinstance(following, Figure) else mm(25)
+                keep = keep_with_heading(blocks, index + 1)
                 layout.ensure(h + mm(4) + keep)  # never leave a heading alone at a page end
                 layout.y += mm(2)
                 if block.anchor:
@@ -558,25 +612,41 @@ def layout_document(doc, image_paths, style, page_w, page_h):
         if isinstance(block, Heading) or not sections:
             sections.append([i, i])
         sections[-1][1] = i + 1
-    usable = layout.bottom - layout.top
-    for n, (a, b) in enumerate(sections):
-        need = _measure(blocks[a:b], layout, place)
-        left = layout.bottom - layout.y
-        last = n == len(sections) - 1
-        if need > left and need <= usable and need - left < SMALL_TAIL * usable \
-                and (last or left < MAX_LEFT_BLANK * usable) and layout.y > layout.top:
-            layout.new_page()
-        place(layout, blocks, a, b, dry=False)
+
+    def put(lay, n, brk, dry):
+        a, b = sections[n]
+        if brk and lay.y > lay.top:
+            lay.new_page()
+        page, y = len(lay.pages), lay.y
+        place(lay, blocks, a, b, dry)
+        if len(lay.pages) > page:  # split: remember both pieces
+            lay.pieces.append((lay.bottom - y, lay.y - lay.top))
+
+    def badness(n, brk):
+        lay = layout.probe()
+        put(lay, n, brk, True)
+        for m in range(n + 1, len(sections)):
+            put(lay, m, False, True)
+        return _badness(lay)
+
+    for n in range(len(sections)):
+        brk = layout.y > layout.top and badness(n, True) < badness(n, False)
+        put(layout, n, brk, False)
     return layout
 
 
-def _measure(blocks, layout, place):
-    """Height a run of blocks takes when laid out without page breaks."""
-    probe = _Layout(layout.width, 1e9)
-    probe.top = probe.y = 0.0
-    probe.bottom = 1e9
-    place(probe, blocks, 0, len(blocks), dry=True)
-    return probe.y
+def _badness(lay) -> float:
+    usable = lay.bottom - lay.top
+    cost = PAGE_COST * len(lay.pages)
+    for used in lay.fills[lay.cover_pages:]:
+        blank = max(0.0, (lay.bottom - used) / usable)
+        cost += BLANK_COST * blank * blank
+    cost += PIECE_COST * sum(1 for before, after in lay.pieces
+                             if min(before, after) < SMALL_PIECE * usable)
+    last = (lay.y - lay.top) / usable
+    if last < LAST_PAGE_MIN:
+        cost += LAST_PAGE_COST * (LAST_PAGE_MIN - last) / LAST_PAGE_MIN
+    return cost
 
 
 def _paint_header_footer(painter, doc, style, page_number, total, page_w, page_h,
