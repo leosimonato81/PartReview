@@ -13,7 +13,8 @@ import math
 _ANGLES = 24
 _DISTANCES = (2.6, 3.4, 4.3, 5.4, 6.8, 8.5, 10.5, 13.0, 16.0, 20.0)  # in balloon radii
 _OUTWARD_WEIGHT = 1.6  # radii added for pointing straight back towards the part
-MIN_GAP = 2.3  # balloon centers at least 2.3 radii apart
+MIN_GAP = 2.8  # balloon centers at least 2.8 radii apart (a clear gap between circles)
+LEADER_CLEARANCE = 1.3  # radii between a leader and any other balloon's center
 
 
 CLEARANCE = 1.5  # radii of empty background around the center: half a radius of margin
@@ -37,6 +38,23 @@ def segments_cross(a, b, c, d) -> bool:
     d1, d2 = orient(c, d, a), orient(c, d, b)
     d3, d4 = orient(a, b, c), orient(a, b, d)
     return d1 * d2 < 0 and d3 * d4 < 0
+
+
+def _point_segment(p, a, b) -> float:
+    ax, ay = a
+    dx, dy = b[0] - ax, b[1] - ay
+    length2 = dx * dx + dy * dy
+    t = 0.0 if length2 == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / length2))
+    return math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy)
+
+
+def _leader_hits_balloon(tip, center, placed, leaders, radius) -> bool:
+    """The new leader passes through a placed balloon, or the new balloon sits on
+    a placed leader: either way one number would hide behind a line."""
+    limit = LEADER_CLEARANCE * radius
+    if any(_point_segment(c, tip, center) < limit for c in placed):
+        return True
+    return any(_point_segment(center, t, c) < limit for t, c in leaders)
 
 
 def place_balloon(tip, radius, size, is_background, placed=(), away_from=None, leaders=()):
@@ -66,6 +84,8 @@ def place_balloon(tip, radius, size, is_background, placed=(), away_from=None, l
         if gap < MIN_GAP * radius:
             continue
         if any(segments_cross(tip, (x, y), t, c) for t, c in leaders):
+            continue
+        if _leader_hits_balloon(tip, (x, y), placed, leaders, radius):
             continue
         if _disc_is_clear(x, y, radius, is_background):
             return x, y

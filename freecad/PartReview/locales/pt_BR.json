@@ -213,11 +213,11 @@
   "ui.done_many": "Arquivos salvos:\n{paths}",
   "ui.level": "Tamanho do relatório",
   "ui.level_pages.quick": "≈ 4 páginas",
-  "ui.level_pages.standard": "≈ 9 páginas",
-  "ui.level_pages.full": "≈ 11 páginas",
-  "ui.level_desc.quick": "Resumo rápido: resumo executivo com os fatores de segurança, visão geral da tensão, forma deformada, resultados principais e um quadro de malha, equilíbrio e erro estimado. Bom para uma conferência rápida.",
-  "ui.level_desc.standard": "Intermediário: capa, sumário, visão geral e aproximações da tensão (máximo e fora de apoios), forma deformada, reações nos apoios, pontos de interesse com erro local, qualidade da malha com mapa de erro, premissas e rastreabilidade.",
-  "ui.level_desc.full": "Completo: tudo do intermediário, com até 8 vistas (todos os pontos de interesse) e o histograma da forma dos elementos. Para documentação técnica.",
+  "ui.level_pages.standard": "≈ 6 páginas",
+  "ui.level_pages.full": "≈ 10 páginas",
+  "ui.level_desc.quick": "Resumo rápido: a conclusão (atende / não atende), visão geral da tensão, forma deformada, resultados e critérios. Para conferir em um minuto.",
+  "ui.level_desc.standard": "Intermediário (dia a dia): o rápido mais a aproximação do ponto de projeto, reações nos apoios, pontos de interesse com erro local e qualidade da malha. Só o que decide.",
+  "ui.level_desc.full": "Completo (documentação): o intermediário mais sumário, aproximações de todos os pontos (inclusive apoios), mapa de erro, estudo de convergência, histograma da malha e rastreabilidade.",
   "fem.error.not_static": "Esta versão gera relatórios só de análise estática linear. O resultado escolhido é de outro tipo de análise (por exemplo, vibração, flambagem ou térmica) e não foi processado.",
   "exec.figure": "(figura {figures})",
   "ma.command": "Assistente de malha",
@@ -513,5 +513,7 @@
   "assume.digits.better": "—",
   "assume.not_assessed": "Não avaliado: fadiga, flambagem, contato e pré-carga, plasticidade, impacto e vibração, temperatura, defeitos de fabricação, e se apoios, cargas e material representam o caso real.",
   "exec.error_split": "Erro estimado: {eta} % no modelo todo, concentrado junto a apoios e cargas; no ponto de projeto ({n}), {local} %.",
-  "warn.density": "Densidade de {name} fora do usual ({value}): confira a unidade no cartão do material. Só afeta o cálculo com peso próprio ou vibração."
+  "warn.density": "Densidade de {name} fora do usual ({value}): confira a unidade no cartão do material. Só afeta o cálculo com peso próprio ou vibração.",
+  "assume.limit_printed": "Limite informado: {limit}, comparado com von Mises.",
+  "assume.limit_printed.better": "Peça impressa: o limite entre camadas (Z) fica do lado seguro; o do plano (XY) só vale se a carga não separa as camadas."
 }

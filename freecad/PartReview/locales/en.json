@@ -213,11 +213,11 @@
   "ui.done_many": "Files saved:\n{paths}",
   "ui.level": "Report size",
   "ui.level_pages.quick": "≈ 4 pages",
-  "ui.level_pages.standard": "≈ 9 pages",
-  "ui.level_pages.full": "≈ 11 pages",
-  "ui.level_desc.quick": "Quick summary: executive summary with the safety factors, stress overview, deformed shape, main results and a mesh/equilibrium/estimated-error box. Good for a quick check.",
-  "ui.level_desc.standard": "Intermediate: cover, contents, stress overview and close-ups (maximum and away from supports), deformed shape, support reactions, points of interest with local error, mesh quality with error map, assumptions and traceability.",
-  "ui.level_desc.full": "Complete: everything in intermediate, with up to 8 views (every point of interest) and the element-shape histogram. For technical documentation.",
+  "ui.level_pages.standard": "≈ 6 pages",
+  "ui.level_pages.full": "≈ 10 pages",
+  "ui.level_desc.quick": "Quick summary: the conclusion (meets / does not meet), stress overview, deformed shape, results and criteria. To check in a minute.",
+  "ui.level_desc.standard": "Standard (daily): the quick summary plus the close-up of the design point, support reactions, points of interest with local error and mesh quality. Only what decides.",
+  "ui.level_desc.full": "Full (documentation): the standard report plus table of contents, close-ups of every point (supports included), error map, convergence study, mesh histogram and traceability.",
   "fem.error.not_static": "This version only reports linear static analyses. The chosen result comes from another analysis type (for example frequency, buckling or thermal) and was not processed.",
   "exec.figure": "(figure {figures})",
   "ma.command": "Mesh assistant",
@@ -513,5 +513,7 @@
   "assume.digits.better": "—",
   "assume.not_assessed": "Not assessed: fatigue, buckling, contact and preload, plasticity, impact and vibration, temperature, manufacturing defects, nor whether supports, loads and material represent the real case.",
   "exec.error_split": "Estimated error: {eta} % over the whole model, concentrated at supports and loads; at the design point ({n}), {local} %.",
-  "warn.density": "Density of {name} out of the usual range ({value}): check the unit in the material card. It only affects analyses with self-weight or vibration."
+  "warn.density": "Density of {name} out of the usual range ({value}): check the unit in the material card. It only affects analyses with self-weight or vibration.",
+  "assume.limit_printed": "Limit given: {limit}, compared with von Mises.",
+  "assume.limit_printed.better": "Printed part: the interlayer (Z) limit is on the safe side; the in-plane (XY) one only holds if the load does not pull the layers apart."
 }

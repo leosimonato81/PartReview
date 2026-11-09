@@ -92,7 +92,7 @@ def _yield_strength(config, result, stress_unit):
     return None, ""
 
 
-def _plan(result, surface, max_views, boundary_views):
+def _plan(result, surface, max_views, boundary_views, singular_closeups=True):
     """Result hotspots (numbered order), result views, supports/loads views and
     the model radius.
 
@@ -145,7 +145,11 @@ def _plan(result, surface, max_views, boundary_views):
     for kind in (FieldKind.VON_MISES, FieldKind.DISPLACEMENT):
         if result.get_field(kind) is not None:
             views.append(cp.plan_overview(kind, results, center, radius, is_visible))
-    views += [cp.plan_target_view(s, center, radius, is_visible) for s in results]
+    # Close-ups: the full report shows every point; the others only what decides
+    # (the singular peaks stay visible, with their balloons, in the overview).
+    targets = [s for s in results
+               if singular_closeups or not (s.singularity_near or s.sharp_corner)]
+    views += [cp.plan_target_view(s, center, radius, is_visible) for s in targets]
     views = cp.drop_redundant_closeups(views)
     selected = cp.reading_order(cp.select_views(views, max_views=max_views), results)
     if surface is not None:  # close-ups: let the part fill the frame
@@ -273,13 +277,13 @@ def generate_fem_report(doc, config, progress=_no_progress):
     progress(tr.t("progress.hotspots"), 0.3)
     spots, views, boundary_views, radius, exclusion, principal_regular = _plan(
         result, surface, views_for_level(config),
-        2 if config.includes_boundary else 0)
+        2 if config.includes_boundary else 0, config.level is ReportLevel.FULL)
     progress(tr.t("progress.planning"), 0.4)
     displacement = fem_reader.read_displacement_vectors(result_obj) \
         if result.get_field(FieldKind.DISPLACEMENT) is not None else {}
     views = [_deformed(v, displacement, radius) for v in views]
     error_view = None
-    if error_field is not None and views and config.level is not ReportLevel.QUICK:
+    if error_field is not None and views and config.level is ReportLevel.FULL:
         error_view = replace(views[0], color_field=FieldKind.ESTIMATED_ERROR, targets=())
     fields = dict(result.fields)
     if error_field is not None:

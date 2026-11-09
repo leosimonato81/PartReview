@@ -58,3 +58,19 @@ def test_leaders_do_not_cross():
             assert not segments_cross(a, b, c, d)
     crossed = untangle([[(0, 0), (10, 10)], [(0, 10), (10, 0)]])
     assert not segments_cross(crossed[0][0], crossed[0][1], crossed[1][0], crossed[1][1])
+
+
+def test_no_leader_runs_through_another_balloon():
+    """Three tips a few pixels apart on the top edge of the part (owner's figure:
+    balloon 5 sat on the leader of balloon 2)."""
+    from freecad.PartReview.domain.balloons import LEADER_CLEARANCE, _point_segment
+    part = block(150, 300, 650, 550)
+    placed, leaders = [], []
+    for tip in [(380, 305), (392, 306), (404, 304)]:
+        c = place_balloon(tip, R, (W, H), part, placed, away_from=(400, 425), leaders=leaders)
+        placed.append(c)
+        leaders.append((tip, c))
+    for i, (tip, c) in enumerate(leaders):
+        for j, other in enumerate(placed):
+            if i != j:
+                assert _point_segment(other, tip, c) >= LEADER_CLEARANCE * R - 1e-9

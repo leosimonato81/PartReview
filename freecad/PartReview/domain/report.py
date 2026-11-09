@@ -746,6 +746,8 @@ def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
         row("polymer_time")
     if inputs.yield_source == "material_uts":
         row("uts_used")
+    if inputs.yield_source == "user" and mat is not None and mat.family == "polymer":
+        row("limit_printed", limit=tr.quantity(inputs.yield_strength, 3))
     if any(c.kind is ConstraintKind.FIXED for c in res.constraints):
         row("fixed")
     if any(c.kind is ConstraintKind.FORCE for c in res.constraints):
@@ -859,13 +861,14 @@ def _section_quality(ctx: FemContext, tr: Translator, level) -> list:
         blocks.append(Notice(tr.t("warn.invalid_elements", n=q.invalid_elements)))
     if q is not None and q.nodes_per_element == 4:
         blocks.append(Notice(tr.t("quality.tet4_note"), level="info"))
-    if zz is not None and zz.available and detailed:
+    full = level is ReportLevel.FULL  # explanations, error map and studies
+    if zz is not None and zz.available and full:
         blocks.append(Paragraph(tr.t("quality.zz_explain")))
         if inputs.error_view is not None and inputs.error_field is not None:
             blocks.append(_error_figure(ctx, tr))
-    if inputs.convergence and detailed:
+    if inputs.convergence and full:
         blocks += _convergence(inputs.convergence, tr)
-    if q is not None and level is ReportLevel.FULL:
+    if q is not None and full:
         labels = tuple("%s–%s" % (tr.number(i / 10, 1), tr.number((i + 1) / 10, 1))
                        for i in range(10))
         blocks.append(BarChart(title=tr.t("quality.histogram"), labels=labels,
@@ -918,6 +921,11 @@ def _error_figure(ctx: FemContext, tr: Translator) -> Figure:
 # Order chosen by the owner: images first, then the tables. Steps c) to f) of
 # phase 6a add their sections here; DFM (phase 4) and combined risks (phase 5)
 # will register theirs in their own modules.
+# What each level is for (owner, 2026-11-08): quick = the verdict; standard = the
+# daily report (what decides, nothing more); full = documentation (every view,
+# error map, convergence, histogram, traceability, table of contents).
+FULL_ONLY = frozenset({ReportLevel.FULL})
+
 FEM_SECTIONS = SectionRegistry([
     Section("fem.executive", 50, "section.executive", ALL_LEVELS, _section_executive),
     Section("fem.views", 100, "section.views", ALL_LEVELS, _section_views),
@@ -927,7 +935,7 @@ FEM_SECTIONS = SectionRegistry([
     Section("fem.quality", 450, "section.quality", ALL_LEVELS, _section_quality),
     Section("fem.glossary", 880, "section.glossary", ALL_LEVELS, _section_glossary),
     Section("fem.assumptions", 900, "section.assumptions", ALL_LEVELS, _section_assumptions),
-    Section("fem.trace", 950, "section.trace", DETAILED_LEVELS, _section_trace),
+    Section("fem.trace", 950, "section.trace", FULL_ONLY, _section_trace),
 ])
 
 
@@ -963,7 +971,7 @@ def build_report(inputs: ReportInputs, tr: Translator,
     return Document(
         cover=cover,
         blocks=tuple(blocks),
-        toc=tuple(toc) if level is not ReportLevel.QUICK else (),
+        toc=tuple(toc) if level is ReportLevel.FULL else (),
         toc_title=tr.t("report.toc"),
         header_text=cover.title,
         footer=_footer(inputs, tr),
