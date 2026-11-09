@@ -501,7 +501,7 @@
   "assume.criterion_polymer.better": "Use the tensile strength of your filament, not the generic one.",
   "assume.no_uts": "Plastic without tensile strength in the card: Rankine (tension) not assessed.",
   "assume.no_uts.better": "Fill in the tensile strength (UltimateTensileStrength) in the FreeCAD material.",
-  "assume.printed.better": "If the load pulls the layers apart, use the filament's interlayer (Z axis) strength as the limit, much lower than in plane; or orient the print so the load lies in the layer plane.",
+  "assume.printed.better": "The print direction is not in the model. If the load can pull the layers apart, use the filament's interlayer (Z axis) strength as the limit, much lower than in plane.",
   "assume.polymer_time.better": "Sustained load (creep) or heat: lower the limit. They lose stiffness near the glass transition: PLA ~60 °C, PETG ~80 °C, ABS ~105 °C.",
   "assume.uts_used.better": "Check both values in the material card.",
   "assume.fixed.better": "The stress next to them is not real; to assess the fastening, model the bolt or contact.",
@@ -515,5 +515,5 @@
   "exec.error_split": "Estimated error: {eta} % over the whole model, concentrated at supports and loads; at the design point ({n}), {local} %.",
   "warn.density": "Density of {name} out of the usual range ({value}): check the unit in the material card. It only affects analyses with self-weight or vibration.",
   "assume.limit_printed": "Limit given: {limit}, compared with von Mises.",
-  "assume.limit_printed.better": "Printed part: the interlayer (Z) limit is on the safe side; the in-plane (XY) one only holds if the load does not pull the layers apart."
+  "assume.limit_printed.better": "The print direction is not in the model (the part may be printed in another position). Without knowing how the layers sit relative to the load, use the interlayer (Z) limit: it is the safe side."
 }

@@ -501,7 +501,7 @@
   "assume.criterion_polymer.better": "Use a resistência à tração do seu filamento, não a genérica.",
   "assume.no_uts": "Plástico sem resistência à tração no cartão: Rankine (tração) não avaliado.",
   "assume.no_uts.better": "Preencha a resistência à tração (UltimateTensileStrength) no material do FreeCAD.",
-  "assume.printed.better": "Se a carga puxa as camadas, use como limite a resistência entre camadas (eixo Z) do filamento, bem menor que no plano; ou oriente a impressão para a carga ficar no plano das camadas.",
+  "assume.printed.better": "A direção de impressão não está no modelo. Se as camadas puderem ser puxadas pela carga, use como limite a resistência entre camadas (eixo Z) do filamento, bem menor que no plano.",
   "assume.polymer_time.better": "Carga contínua (fluência) ou calor: reduzir o limite. Perdem rigidez perto da transição vítrea: PLA ~60 °C, PETG ~80 °C, ABS ~105 °C.",
   "assume.uts_used.better": "Confira os dois valores no cartão do material.",
   "assume.fixed.better": "A tensão junto a eles não é real; para avaliar a fixação, modelar parafuso ou contato.",
@@ -515,5 +515,5 @@
   "exec.error_split": "Erro estimado: {eta} % no modelo todo, concentrado junto a apoios e cargas; no ponto de projeto ({n}), {local} %.",
   "warn.density": "Densidade de {name} fora do usual ({value}): confira a unidade no cartão do material. Só afeta o cálculo com peso próprio ou vibração.",
   "assume.limit_printed": "Limite informado: {limit}, comparado com von Mises.",
-  "assume.limit_printed.better": "Peça impressa: o limite entre camadas (Z) fica do lado seguro; o do plano (XY) só vale se a carga não separa as camadas."
+  "assume.limit_printed.better": "A direção de impressão não está no modelo (a peça pode ser impressa em outra posição). Sem saber como as camadas ficam em relação à carga, use o limite entre camadas (Z): é o lado seguro."
 }

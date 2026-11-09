@@ -90,6 +90,14 @@ class _Style:
         return fm.boundingRect(QRectF(0, 0, width, 1e6), int(Qt.TextWordWrap), text).height()
 
 
+KEEP_TABLE_SHARE = 0.2  # tables up to 20 % of a page are never split
+# A section that fits in one page but would leave only a small tail (< 30 % of a
+# page) on the next one starts on that page instead when little is left behind
+# (< 20 %), and always when it is the last section: no near-empty last page.
+SMALL_TAIL = 0.3
+MAX_LEFT_BLANK = 0.2
+
+
 class _Layout:
     """Places drawing operations on pages, breaking pages when needed."""
 
@@ -281,9 +289,18 @@ def _layout_table(layout, table, x0, style):
     def row_height(cells, font):
         return max(style.height(font, c, w - 2 * pad) for c, w in zip(cells, widths)) + 2 * pad
 
+    usable = layout.bottom - layout.top
+    total = sum(row_height(r, style.body) for r in table.rows) + \
+        (row_height(table.header, style.bold) if table.header else 0)
+    if total <= KEEP_TABLE_SHARE * usable:  # small table: never split
+        layout.ensure(total)
+
     def place_row(cells, font, fill):
         h = row_height(cells, font)
+        page = len(layout.pages)
         layout.ensure(h)
+        if len(layout.pages) != page and table.header and cells is not table.header:
+            place_row(table.header, style.bold, style.accent_light)  # header again
         y = layout.y
         if fill is not None:
             layout.add(_fill_op(QRectF(x0, y, width, h), fill))
@@ -473,66 +490,93 @@ def layout_document(doc, image_paths, style, page_w, page_h):
         img_h = (layout.width - mm(LEGEND_MM)) * fig.image_size[1] / fig.image_size[0]
         return img_h + style.height(style.caption, figure_text(fig), layout.width) + mm(2)
 
-    blocks = list(doc.blocks)
-    for index, block in enumerate(blocks):
-        if isinstance(block, Heading):
-            h = style.height(style.heading, block.text, layout.width)
-            following = blocks[index + 1] if index + 1 < len(blocks) else None
-            keep = figure_height(following) if isinstance(following, Figure) else mm(25)
-            layout.ensure(h + mm(4) + keep)  # never leave a heading alone at a page end
-            layout.y += mm(2)
-            if block.anchor:
-                layout.anchor_pages[block.anchor] = len(layout.pages)
-            layout.add(_text_op(style.heading, block.text,
-                                QRectF(x0, layout.y, layout.width, h), style.accent_text))
-            layout.y += h + mm(2)
-        elif isinstance(block, Paragraph):
-            h = style.height(style.body, block.text, layout.width)
-            layout.ensure(h)
-            layout.add(_text_op(style.body, block.text, QRectF(x0, layout.y, layout.width, h)))
-            layout.y += h + mm(GAP_MM)
-        elif isinstance(block, BulletList):
-            indent = mm(5)
-            for item in block.items:
-                h = style.height(style.body, item, layout.width - indent)
+    def place(layout, blocks, a, b, dry):
+        for index in range(a, b):
+            block = blocks[index]
+            if isinstance(block, Heading):
+                h = style.height(style.heading, block.text, layout.width)
+                following = blocks[index + 1] if index + 1 < len(blocks) else None
+                keep = figure_height(following) if isinstance(following, Figure) else mm(25)
+                layout.ensure(h + mm(4) + keep)  # never leave a heading alone at a page end
+                layout.y += mm(2)
+                if block.anchor:
+                    layout.anchor_pages[block.anchor] = len(layout.pages)
+                layout.add(_text_op(style.heading, block.text,
+                                    QRectF(x0, layout.y, layout.width, h), style.accent_text))
+                layout.y += h + mm(2)
+            elif isinstance(block, Paragraph):
+                h = style.height(style.body, block.text, layout.width)
                 layout.ensure(h)
-                layout.add(_text_op(style.body, "•", QRectF(x0 + mm(1), layout.y, indent, h)))
-                layout.add(_text_op(style.body, item,
-                                    QRectF(x0 + indent, layout.y, layout.width - indent, h)))
-                layout.y += h + mm(1.2)
-            layout.y += mm(GAP_MM - 1.2)
-        elif isinstance(block, Notice):
-            color = NOTICE_COLORS.get(block.level, INFO)
-            inner = layout.width - mm(5)
-            h = style.height(style.body, block.text, inner) + mm(3)
-            layout.ensure(h)
-            y = layout.y
-            layout.add(_fill_op(QRectF(x0, y, mm(1.2), h), color))
-            layout.add(_text_op(style.body, block.text,
-                                QRectF(x0 + mm(4), y + mm(1.5), inner, h)))
-            layout.y += h + mm(2)
-        elif isinstance(block, Table):
-            _layout_table(layout, block, x0, style)
-        elif isinstance(block, BarChart):
-            _layout_bar_chart(layout, block, x0, style)
-        elif isinstance(block, Figure):
-            img_w = layout.width - mm(LEGEND_MM)
-            iw, ih = block.image_size
-            img_h = img_w * ih / iw
-            cap_h = style.height(style.caption, figure_text(block), layout.width)
-            layout.ensure(img_h + cap_h + mm(2))
-            y = layout.y
-            image = draw_figure(QImage(image_paths[block.view_index]), block)
-            rect = QRectF(x0, y, img_w, img_h)
-            layout.add(lambda p, r=rect, im=image: (p.drawImage(r, im),
-                                                    p.setPen(QPen(RULE, mm(0.2))),
-                                                    p.setBrush(Qt.NoBrush), p.drawRect(r)))
-            layout.add(_legend_op(block.legend, x0 + img_w + mm(4), y + mm(4),
-                                  img_h - mm(8), style))
-            layout.add(_text_op(style.caption, figure_text(block),
-                                QRectF(x0, y + img_h + mm(1.5), layout.width, cap_h), MUTED))
-            layout.y += img_h + cap_h + mm(6)
+                layout.add(_text_op(style.body, block.text, QRectF(x0, layout.y, layout.width, h)))
+                layout.y += h + mm(GAP_MM)
+            elif isinstance(block, BulletList):
+                indent = mm(5)
+                for item in block.items:
+                    h = style.height(style.body, item, layout.width - indent)
+                    layout.ensure(h)
+                    layout.add(_text_op(style.body, "•", QRectF(x0 + mm(1), layout.y, indent, h)))
+                    layout.add(_text_op(style.body, item,
+                                        QRectF(x0 + indent, layout.y, layout.width - indent, h)))
+                    layout.y += h + mm(1.2)
+                layout.y += mm(GAP_MM - 1.2)
+            elif isinstance(block, Notice):
+                color = NOTICE_COLORS.get(block.level, INFO)
+                inner = layout.width - mm(5)
+                h = style.height(style.body, block.text, inner) + mm(3)
+                layout.ensure(h)
+                y = layout.y
+                layout.add(_fill_op(QRectF(x0, y, mm(1.2), h), color))
+                layout.add(_text_op(style.body, block.text,
+                                    QRectF(x0 + mm(4), y + mm(1.5), inner, h)))
+                layout.y += h + mm(2)
+            elif isinstance(block, Table):
+                _layout_table(layout, block, x0, style)
+            elif isinstance(block, BarChart):
+                _layout_bar_chart(layout, block, x0, style)
+            elif isinstance(block, Figure):
+                img_w = layout.width - mm(LEGEND_MM)
+                iw, ih = block.image_size
+                img_h = img_w * ih / iw
+                cap_h = style.height(style.caption, figure_text(block), layout.width)
+                layout.ensure(img_h + cap_h + mm(2))
+                y = layout.y
+                image = None if dry else draw_figure(QImage(image_paths[block.view_index]),
+                                                     block)
+                rect = QRectF(x0, y, img_w, img_h)
+                layout.add(lambda p, r=rect, im=image: (p.drawImage(r, im),
+                                                        p.setPen(QPen(RULE, mm(0.2))),
+                                                        p.setBrush(Qt.NoBrush), p.drawRect(r)))
+                layout.add(_legend_op(block.legend, x0 + img_w + mm(4), y + mm(4),
+                                      img_h - mm(8), style))
+                layout.add(_text_op(style.caption, figure_text(block),
+                                    QRectF(x0, y + img_h + mm(1.5), layout.width, cap_h), MUTED))
+                layout.y += img_h + cap_h + mm(6)
+
+    blocks = list(doc.blocks)
+    sections = []  # [start, end) of each heading's blocks
+    for i, block in enumerate(blocks):
+        if isinstance(block, Heading) or not sections:
+            sections.append([i, i])
+        sections[-1][1] = i + 1
+    usable = layout.bottom - layout.top
+    for n, (a, b) in enumerate(sections):
+        need = _measure(blocks[a:b], layout, place)
+        left = layout.bottom - layout.y
+        last = n == len(sections) - 1
+        if need > left and need <= usable and need - left < SMALL_TAIL * usable \
+                and (last or left < MAX_LEFT_BLANK * usable) and layout.y > layout.top:
+            layout.new_page()
+        place(layout, blocks, a, b, dry=False)
     return layout
+
+
+def _measure(blocks, layout, place):
+    """Height a run of blocks takes when laid out without page breaks."""
+    probe = _Layout(layout.width, 1e9)
+    probe.top = probe.y = 0.0
+    probe.bottom = 1e9
+    place(probe, blocks, 0, len(blocks), dry=True)
+    return probe.y
 
 
 def _paint_header_footer(painter, doc, style, page_number, total, page_w, page_h,
