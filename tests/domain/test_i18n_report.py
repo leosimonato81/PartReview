@@ -149,7 +149,7 @@ def test_section_order_views_first():
     titles = [b.text for b in blocks if isinstance(b, Heading)]
     assert titles == ["1. Resumo executivo", "2. Vistas", "3. Resumo da análise",
                       "4. Resultados principais", "5. Pontos de interesse",
-                      "6. Premissas e limitações"]
+                      "6. Como ler este relatório", "7. Premissas e limitações"]
 
 
 def test_section_numbers_have_no_gap_without_points():
@@ -162,7 +162,8 @@ def test_section_numbers_have_no_gap_without_points():
     titles = [b.text for b in build_report(inputs, Translator("en", strict=True)).blocks
               if isinstance(b, Heading)]
     assert titles == ["1. Executive summary", "2. Views", "3. Analysis summary",
-                      "4. Main results", "5. Assumptions and limitations"]
+                      "4. Main results", "5. How to read this report",
+                      "6. Assumptions and limitations"]
 
 
 def test_balloons_are_explained_under_each_figure_and_in_the_table():

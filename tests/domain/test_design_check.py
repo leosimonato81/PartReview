@@ -86,3 +86,18 @@ def test_conclusion_is_the_first_block_of_the_summary():
     doc = build_report(inputs, Translator("en", strict=True))
     notice = next(b for b in doc.blocks if isinstance(b, Notice))
     assert notice.text.startswith("DOES NOT MEET") and notice.level == "warning"
+
+
+def test_glossary_lists_only_the_concepts_of_this_report():
+    def glossary(doc):
+        start = next(i for i, b in enumerate(doc.blocks)
+                     if getattr(b, "anchor", "") == "fem.glossary")
+        return [row[0] for row in doc.blocks[start + 1].rows]
+
+    tr = Translator("pt_BR", strict=True)
+    plain = glossary(build_report(make_inputs(), tr))  # no material limit
+    assert "FS de projeto" not in plain and "Von Mises" in plain and "Rankine" not in plain
+    inputs = make_inputs(Quantity(25.0, "MPa"))
+    inputs.config.required_safety = "2"
+    terms = glossary(build_report(inputs, tr))
+    assert terms[:3] == ["FS de projeto", "Tensão de projeto", "FS exigido"]

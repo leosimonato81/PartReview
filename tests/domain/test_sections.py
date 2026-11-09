@@ -56,7 +56,8 @@ def test_a_new_section_plugs_in_without_touching_the_engine():
     doc = build_report(make_inputs(), TR, registry=reg)
     texts = [b.text for b in doc.blocks if isinstance(b, Paragraph)]
     assert "DFM here" in texts
-    assert [e.anchor for e in doc.toc][-2:] == ["dfm.findings", "fem.assumptions"]
+    assert [e.anchor for e in doc.toc][-3:] == ["dfm.findings", "fem.glossary",
+                                                "fem.assumptions"]
 
 
 @pytest.mark.parametrize("level, has_points, has_toc, full_cover", [

@@ -666,6 +666,34 @@ def _section_executive(ctx: FemContext, tr: Translator, level) -> list:
     return blocks
 
 
+def _section_glossary(ctx: FemContext, tr: Translator, level) -> list:
+    """One line per harder concept, only those this report uses: read once,
+    then out of the way of the daily reader."""
+    inputs, check = ctx.inputs, ctx.check
+    res = inputs.result
+    terms = []
+    if check is not None:
+        terms += ["design_fs", "design_stress"]
+        if check.required is not None:
+            terms.append("required_fs")
+    if any(h.singularity_near or h.sharp_corner for h in inputs.hotspots):
+        terms.append("singularity")
+    if res.get_field(FieldKind.VON_MISES) is not None:
+        terms.append("von_mises")
+    if check is not None and any(c.key == "rankine" for c in check.criteria):
+        terms.append("rankine")
+    if inputs.error_estimate is not None and inputs.error_estimate.available:
+        terms.append("error")
+    if inputs.equilibrium is not None:
+        terms.append("equilibrium")
+    if any(v.deformation for v in inputs.views):
+        terms.append("deformed")
+    if not terms:
+        return []
+    rows = tuple((tr.t("glossary.%s" % k), tr.t("glossary.%s.text" % k)) for k in terms)
+    return [Table(header=(), rows=rows, widths=(0.26, 0.74))]
+
+
 def _section_assumptions(ctx: FemContext, tr: Translator, level) -> list:
     """What the analysis assumes and what the report does not assess (step d)."""
     inputs = ctx.inputs
@@ -884,6 +912,7 @@ FEM_SECTIONS = SectionRegistry([
     Section("fem.results", 300, "section.results", ALL_LEVELS, _section_results),
     Section("fem.points", 400, "section.points", DETAILED_LEVELS, _section_points),
     Section("fem.quality", 450, "section.quality", ALL_LEVELS, _section_quality),
+    Section("fem.glossary", 880, "section.glossary", ALL_LEVELS, _section_glossary),
     Section("fem.assumptions", 900, "section.assumptions", ALL_LEVELS, _section_assumptions),
     Section("fem.trace", 950, "section.trace", DETAILED_LEVELS, _section_trace),
 ])
