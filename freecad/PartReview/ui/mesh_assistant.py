@@ -672,7 +672,8 @@ class MeshAssistantPanel:
             size=mt.mm(self.tr, trial.option.max_size), nodes=self.tr.integer(trial.nodes),
             seconds=(t("ma.time_unknown") if self._total_seconds(trial) is None
                      else format_duration(self._total_seconds(trial))),
-            status=t("ma.status." + statuses[level].value), why=t(key)))
+            status=t("ma.status." + statuses[level].value),
+            why=t(key) + " " + t("ma.recommend.error_note")))
 
     def _total_seconds(self, trial):
         """None while this computer's speed is unknown."""

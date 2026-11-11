@@ -48,7 +48,7 @@ class MeshLevel(Enum):
 
 _DIVISOR = {MeshLevel.VERY_COARSE: 2.0 / 3.0, MeshLevel.COARSE: 1, MeshLevel.MEDIUM: 2,
             MeshLevel.FINE: 3, MeshLevel.VERY_FINE: 4}
-DEFAULT_LEVEL = MeshLevel.MEDIUM  # ~2 elements across the wall (coarse gave 24 % error)
+DEFAULT_LEVEL = MeshLevel.MEDIUM  # ~2 elements across the wall (see mesh_plan.recommend)
 _DIAGONAL_RATIO = 10.0
 # Holes and fillets (faces with a radius): local size ~ r/5. A1 (plate with a hole,
 # r = 5 mm, Heywood): a 1 mm region (r/5) with a 2 mm global size gave the peak

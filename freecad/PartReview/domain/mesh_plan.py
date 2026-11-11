@@ -161,10 +161,13 @@ def total_seconds(model: SolverModel, nodes: int, solver_seconds: float | None =
 def recommend(statuses: dict, seconds: dict):
     """Recommended level from fit status and total time per tried level.
 
-    Quadratic tetrahedra need about 2 elements across a wall for bending stresses
-    (medium); one element (coarse) gave 24 % estimated error on the owner's part.
-    Fine is preferred when it fits and solves quickly; coarse only when medium does
-    not fit (the panel then warns that the error tends to be high).
+    Finer is preferred when it fits: fine when it also solves quickly, else medium
+    (about 2 elements across the wall), else coarse, else very coarse. What the
+    texts say comes from the validation cases (A3, 2026-11-11): one quadratic
+    element across a strip's thickness gave M c / I within 0.03 %; on the A1 plate
+    the hole peak was off by ~2-3 % in the coarse options. The 24 % once quoted for
+    the owner's part was the OVERALL ZZ error, which the supports dominate (the
+    local error at the design point was 0.55 %).
     Returns (level, reason key).
     """
     from .mesh_budget import BudgetStatus
