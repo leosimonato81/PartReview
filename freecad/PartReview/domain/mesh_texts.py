@@ -96,8 +96,9 @@ def gmsh_settings(option: MeshOption, tr) -> str:
         "ElementOrder = %s" % option.order,
         "SecondOrderLinear = %s" % option.straight_edges,
         "HighOrderOptimize = None",
-        "MeshRegion.CharacteristicLength = %s" % (mm(tr, option.local_size)
-                                                  if option.local_size else "—"),
+        "MeshRegion.CharacteristicLength = %s" % (", ".join(
+            "%s (%d)" % (mm(tr, size), len(faces)) for size, faces in option.radius_regions)
+            or "—"),
     ])
 
 

@@ -8,8 +8,14 @@ Starting points (practical FEM rules), not verdicts: each option says why.
 - medium: about 2 (h = t/2); fine: about 3 (h = t/3); very fine: about 4 (h = t/4);
 - chunky parts (t close to the part size) are capped by the bounding-box
   diagonal D: h <= D/10, D/20, D/30, so a solid block still gets a usable mesh.
-Local regions: supports/loads at h/2; holes and fillets at about r/5 (never
-finer than h/4), where stress concentrates (radius_regions).
+Local regions: holes and fillets at about r/5 (never finer than h/2), where
+stress concentrates (radius_regions); radii below t/5 (the "small radius" details
+of geometry_summary) get no region. Support and load faces are NOT refined
+(A2, 2026-11-11): FreeCAD writes a mesh region as point sizes on the face's
+VERTICES and Gmsh spreads them, so refining the end faces of a bar or plate
+refined the whole part (3.6 to 5.6 times the nodes); the stress there is singular
+and the report leaves it out of the design stress anyway; supports on holes are
+refined by the radius rule.
 Always 2nd order (straight sides only as a fallback, see with_straight_edges) and
 curvature-based sizing (FreeCAD default 12): in spike 8.0
 coarse meshes WITHOUT curvature produced inverted 2nd-order elements that
@@ -20,7 +26,7 @@ import math
 from dataclasses import dataclass, replace
 from enum import Enum
 
-from .geometry_summary import GeometrySummary
+from .geometry_summary import SMALL_RADIUS_RATIO, GeometrySummary
 
 CURVATURE = 12  # Gmsh "elements per 2*pi radians" (FreeCAD default, spike 8.0)
 TETS_PER_UNIT_VOLUME = 6.0 * math.sqrt(2.0)  # regular tetrahedron of edge h: V = h^3/(6 sqrt 2)
@@ -44,13 +50,16 @@ _DIVISOR = {MeshLevel.VERY_COARSE: 2.0 / 3.0, MeshLevel.COARSE: 1, MeshLevel.MED
             MeshLevel.FINE: 3, MeshLevel.VERY_FINE: 4}
 DEFAULT_LEVEL = MeshLevel.MEDIUM  # ~2 elements across the wall (coarse gave 24 % error)
 _DIAGONAL_RATIO = 10.0
-LOCAL_FACTOR = 0.5  # refined regions use half the global size
 # Holes and fillets (faces with a radius): local size ~ r/5. A1 (plate with a hole,
 # r = 5 mm, Heywood): a 1 mm region (r/5) with a 2 mm global size gave the peak
 # within -0.4 to -1 %; curvature sizing alone at 1.3 mm (24 per turn) missed it by
 # up to 2.6 %. Validated on that case only (A2.3 adds more).
 RADIUS_FACTOR = 0.2
-MIN_LOCAL_RATIO = 0.25  # cost guard: a region is never finer than 1/4 of the global size
+# Cost guards. FreeCAD writes a region as point sizes on the face's vertices and Gmsh
+# spreads them: on the owner's part (41 curved faces) a floor of h/4 tripled the
+# nodes (coarse: 57 k -> 191 k); h/2 and no region on radii below t/5 kept it at
+# 65 k (A2, 2026-11-11).
+MIN_LOCAL_RATIO = 0.5  # a region is never finer than half the global size
 
 
 @dataclass(frozen=True)
@@ -67,18 +76,20 @@ class MeshOption:
     # details and refinement regions on every size of the owner's part (each fold cost a
     # second Gmsh run); straight sides never fold, same node count, half the trial time.
     straight_edges: bool = True
-    local_size: float = 0.0  # mm, mesh region on supports/loads (0 = none)
+    local_size: float = 0.0  # mm, region on faces chosen by the caller (validation
+    # scripts); the assistant's options leave it 0 (see the module docstring)
     # ((size mm, ("FaceN", ...)), ...): regions on holes and fillets (radius_regions)
     radius_regions: tuple = ()
 
 
-def radius_regions(radii, max_size: float) -> tuple:
+def radius_regions(radii, max_size: float, min_radius: float = 0.0) -> tuple:
     """Mesh regions for faces with a radius (holes, fillets, bosses): size
-    max(r/5, max_size/4), only where r/5 is below the global size. Faces of the same
-    size share one region: ((size, ("FaceN", ...)), ...), finest first."""
+    max(r/5, max_size/2), only where r/5 is below the global size and r is at least
+    ``min_radius``. Faces of the same size share one region:
+    ((size, ("FaceN", ...)), ...), finest first."""
     groups = {}
     for radius, face in radii:
-        if radius <= 0 or RADIUS_FACTOR * radius >= max_size:
+        if radius <= 0 or radius < min_radius or RADIUS_FACTOR * radius >= max_size:
             continue
         size = _round_size(max(RADIUS_FACTOR * radius, MIN_LOCAL_RATIO * max_size), 3)
         groups.setdefault(size, []).append(face)
@@ -86,9 +97,8 @@ def radius_regions(radii, max_size: float) -> tuple:
 
 
 def region_groups(option: MeshOption, refine=()) -> dict:
-    """{size: [faces]} for one mesh: supports/loads (``refine``) at
-    option.local_size plus the option's radius regions; a face in both gets the
-    smaller size."""
+    """{size: [faces]} for one mesh: faces in ``refine`` at option.local_size (when
+    set) plus the option's radius regions; a face in both gets the smaller size."""
     by_face = {}
     if option.local_size > 0:
         for face in refine:
@@ -102,14 +112,19 @@ def region_groups(option: MeshOption, refine=()) -> dict:
     return groups
 
 
+def _min_radius(summary: GeometrySummary) -> float:
+    """Radii below this are 'small radius' details (geometry_summary): no region."""
+    return SMALL_RADIUS_RATIO * summary.characteristic_thickness
+
+
 def auto_option(summary: GeometrySummary, size: float, objective_key: str) -> MeshOption:
     """Option with a size computed for an objective (see mesh_plan)."""
     size = _round_size(size, 3)  # 3 digits: the search needs finer steps than the levels
     n = estimate_nodes(summary.volume, size, 1.0)
     return MeshOption(MeshLevel.AUTO, size, 0.0, CURVATURE, "2nd", objective_key,
                       int(n * TET_FACTOR_LOW), int(n * TET_FACTOR_HIGH),
-                      local_size=_round_size(LOCAL_FACTOR * size, 3),
-                      radius_regions=radius_regions(summary.radii, size))
+                      radius_regions=radius_regions(summary.radii, size,
+                                                    _min_radius(summary)))
 
 
 def with_straight_edges(option: MeshOption) -> MeshOption:
@@ -149,6 +164,5 @@ def mesh_options(summary: GeometrySummary) -> list:
             level, size, 0.0, CURVATURE, "2nd", key,
             estimate_nodes(summary.volume, size, TET_FACTOR_LOW),
             estimate_nodes(summary.volume, size, TET_FACTOR_HIGH),
-            local_size=_round_size(LOCAL_FACTOR * size),
-            radius_regions=radius_regions(summary.radii, size)))
+            radius_regions=radius_regions(summary.radii, size, _min_radius(summary))))
     return options

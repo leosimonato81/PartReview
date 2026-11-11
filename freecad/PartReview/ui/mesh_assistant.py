@@ -66,7 +66,6 @@ MAX_PROBES = 3
 # Meshed first; finer sizes are meshed only if the law measured on this part says
 # they may fit (each fine Gmsh trial costs 15-30 s on a typical part).
 CHEAP_LEVELS = (MeshLevel.VERY_COARSE, MeshLevel.COARSE, MeshLevel.MEDIUM)
-REFINE_MAX_AREA_SHARE = 0.05  # refine support/load faces only when small (<= 5 % of the area)
 AUTO_ATTEMPTS = 3  # size search for an objective (CLAUDE.md rule 6)
 GMSH_S_PER_NODE = 7e-5  # spike 8.0: 13.3 s for 198 000 nodes; replaced by measurements
 STATUS_COLORS = {BudgetStatus.FITS: QColor(46, 125, 50), BudgetStatus.TIGHT: QColor(178, 106, 0),
@@ -402,14 +401,11 @@ class MeshAssistantPanel:
                 item.setData(Qt.UserRole, subs)
                 self.issues.addItem(item)
                 issues.append(None)
-        shape = geometry_reader.solid_shape(self.solid)
-        faces = [s for _, _, subs in targets for s in subs if s.startswith("Face")
-                 and shape.getElement(s).Area <= REFINE_MAX_AREA_SHARE * self.summary.area]
-        self.refine = tuple(dict.fromkeys(faces))  # supports/loads; radii: in each option
+        self.refine = ()  # supports/loads are not refined (see domain/mesh_sizing)
         default = next(o for o in self.options if o.level is DEFAULT_LEVEL)
         curved = sum(len(f) for _, f in default.radius_regions)
-        self.refine_label.setText(t("ma.refine", count=len(self.refine), curved=curved)
-                                  if self.refine or curved else t("ma.refine_none"))
+        self.refine_label.setText(t("ma.refine", curved=curved) if curved
+                                  else t("ma.refine_none"))
         count = sum(1 for i in range(self.issues.count()))
         self.issues_box.setTitle("%s (%d)" % (t("ma.group.issues"), count))
         if not issues:

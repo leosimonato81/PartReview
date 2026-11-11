@@ -133,11 +133,13 @@ def test_total_time_includes_freecad_overhead():
     assert total_seconds(model, 57299, solver_seconds=11.4) == pytest.approx(21.1, abs=0.2)
 
 
-def test_options_carry_a_local_refinement_size():
+def test_options_do_not_refine_supports_and_loads():
+    # FreeCAD regions are point sizes on face vertices: on end faces they refined
+    # the whole part (A2, 2026-11-11). Only holes and fillets are refined.
     from test_mesh_assistant import SHROUD
     from freecad.PartReview.domain.mesh_sizing import mesh_options
     for option in mesh_options(SHROUD):
-        assert option.local_size == pytest.approx(option.max_size / 2, rel=0.1)
+        assert option.local_size == 0.0
 
 
 def test_this_computer_is_measured_not_assumed():
