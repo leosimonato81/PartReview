@@ -402,10 +402,8 @@ class MeshAssistantPanel:
                 self.issues.addItem(item)
                 issues.append(None)
         self.refine = ()  # supports/loads are not refined (see domain/mesh_sizing)
-        default = next(o for o in self.options if o.level is DEFAULT_LEVEL)
-        curved = sum(len(f) for _, f in default.radius_regions)
-        self.refine_label.setText(t("ma.refine", curved=curved) if curved
-                                  else t("ma.refine_none"))
+        self.plain_nodes = None
+        self._show_refine()
         count = sum(1 for i in range(self.issues.count()))
         self.issues_box.setTitle("%s (%d)" % (t("ma.group.issues"), count))
         if not issues:
@@ -444,7 +442,12 @@ class MeshAssistantPanel:
         self._fill_table()
         cheap = [o for o in self.options if o.level in CHEAP_LEVELS]
         self.finer_pending = [o for o in self.options if o.level not in CHEAP_LEVELS]
-        self._run([("gmsh", o) for o in cheap])
+        self.plain_nodes = None
+        tasks = [("gmsh", o) for o in cheap]
+        default = self._default_option()
+        if default.radius_regions:  # one more trial: the same mesh without local refinement
+            tasks.append(("plain", replace(default, radius_regions=())))
+        self._run(tasks)
 
     def auto_mesh(self):
         t = self.tr.t
@@ -498,6 +501,27 @@ class MeshAssistantPanel:
 
     # --- task queue -----------------------------------------------------------------
 
+    def _default_option(self):
+        return next(o for o in self.options if o.level is DEFAULT_LEVEL)
+
+    def _show_refine(self):
+        """What is refined locally and, after the trials, what it costs (A4: say what
+        really makes the mesh heavy; measured, never guessed)."""
+        t = self.tr.t
+        default = self._default_option()
+        curved = sum(len(f) for _, f in default.radius_regions)
+        if not curved:
+            self.refine_label.setText(t("ma.refine_none"))
+            return
+        text = t("ma.refine", curved=curved)
+        trial = self.trials.get(DEFAULT_LEVEL)
+        if self.plain_nodes and trial is not None:
+            text += " " + t("ma.refine_cost", level=t("ma.level." + DEFAULT_LEVEL.value).lower(),
+                            extra=self.tr.integer(trial.nodes - self.plain_nodes),
+                            plain=self.tr.integer(self.plain_nodes),
+                            nodes=self.tr.integer(trial.nodes))
+        self.refine_label.setText(text)
+
     def _run(self, tasks):
         self.tasks = list(tasks)
         self.run_started = time.monotonic()
@@ -519,6 +543,9 @@ class MeshAssistantPanel:
             if not self.tasks:
                 break
             kind, payload = self.tasks.pop(0)
+            if kind == "plain" and DEFAULT_LEVEL in self.skipped:
+                self.steps_done += 1
+                continue  # the refined one was too big for Gmsh: no comparison
             if kind == "gmsh" and self._too_big_for_gmsh(payload):
                 self.skipped.add(payload.level)
                 self.steps_done += 1
@@ -536,7 +563,7 @@ class MeshAssistantPanel:
 
     def _make_job(self, kind, payload):
         gmsh_limit = GMSH_MEMORY_SHARE * self.machine.available_mb
-        if kind in ("gmsh", "auto"):
+        if kind in ("gmsh", "auto", "plain"):
             return self.trial_doc.job(payload, GMSH_TIME_LIMIT_S, gmsh_limit, self.refine)
         if kind == "probe_gmsh":
             return self.trial_doc.job(payload[1], GMSH_TIME_LIMIT_S, gmsh_limit, ())
@@ -564,6 +591,9 @@ class MeshAssistantPanel:
                 self.tasks.insert(0, ("probe", job))  # now solve it with CalculiX
             else:
                 self.tasks = [task for task in self.tasks if task[0] != "probe_gmsh"]
+        elif kind == "plain":  # a failed comparison is not a failed test: no message
+            self.plain_nodes = job.run.nodes if state == job.DONE else None
+            self._show_refine()
         elif state != job.DONE:
             self._failed(kind, payload, job, state)
             return
@@ -918,7 +948,7 @@ class MeshAssistantPanel:
                     if known else GMSH_S_PER_NODE)
         pending_gmsh, pending_probes = [], []
         for kind, payload in self.tasks:
-            if kind in ("gmsh", "auto"):
+            if kind in ("gmsh", "auto", "plain"):
                 pending_gmsh.append(self._predicted_nodes(payload))
             elif kind == "probe_gmsh":
                 pending_probes.append(payload[0])

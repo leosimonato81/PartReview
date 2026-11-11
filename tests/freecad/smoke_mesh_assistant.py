@@ -83,6 +83,7 @@ def main():
     finished = wait(panel)
     say("test options: %s in %.0f s -> %s" % ("done" if finished else "TIMEOUT",
                                             time.time() - started, panel.status_label.text()))
+    say("refine after the test:", panel.refine_label.text())
     say("recommend:", panel.recommend_label.text().replace("\n", " "))
     table(panel)
 
