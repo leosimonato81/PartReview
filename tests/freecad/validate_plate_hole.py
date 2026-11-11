@@ -424,15 +424,17 @@ def main():
         report_fit("region", [m for _, m in sequence])
 
     if "2" in STUDIES:
-        say("\n2. Mesh options of the assistant (unchanged rules; refinement on supports/loads)")
+        say("\n2. Mesh options of the assistant (its own rules; h_hole = size on the hole wall)")
         say(HEADER)
         targets = mesh_runner.constraint_targets(doc, part)
         refine = tuple(s for _, _, subs in targets for s in subs if s.startswith("Face")
                        and part.Shape.getElement(s).Area <= 0.05 * summary.area)
         say("refined faces (supports/loads):", refine)
         for option in options:
+            hole = next((size for size, faces in option.radius_regions if wall in faces),
+                        option.max_size)  # size on the hole wall (A2.2), else the global one
             run_case(option.level.value, doc, part, analysis, wall, option, refine,
-                     option.local_size, full_frame(L))
+                     hole, full_frame(L))
     App.closeDocument(doc.Name)
 
     if "3" in STUDIES and sequence:
