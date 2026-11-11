@@ -9,7 +9,7 @@ from freecad.PartReview.domain.geometry_summary import (
     WallSample,
     find_issues,
 )
-from freecad.PartReview.domain.gmsh_log import parse_gmsh_log
+from freecad.PartReview.domain.gmsh_log import parse_gmsh_log, single_thread
 from freecad.PartReview.domain.mesh_sizing import MeshLevel, mesh_options, with_straight_edges
 
 # Owner's part (spike 8.0, "Shroud 001"): real numbers from the geometry inventory.
@@ -147,3 +147,18 @@ def test_panel_texts_in_both_languages():
     pt = Translator("pt_BR", strict=True)
     assert mt.issue_text(find_issues(SHROUD)[0], SHROUD, pt).startswith(
         "Parede de 0,300 mm entre Face5, Face71: 10× mais fina")
+
+
+def test_single_thread_replaces_freecad_thread_count():
+    geo = "Mesh.ElementOrder = 2;\nGeneral.NumThreads = 8;\nMesh.Algorithm = 2;\n"
+    out = single_thread(geo)
+    assert "General.NumThreads = 1;" in out
+    assert "= 8" not in out
+    assert out.count("NumThreads") == 1
+    assert "Mesh.Algorithm = 2;" in out
+
+
+def test_single_thread_added_when_missing():
+    out = single_thread("Mesh.ElementOrder = 2;\n")
+    assert out.startswith("General.NumThreads = 1;")
+

@@ -337,6 +337,7 @@
   "ma.src.estimated_band": "fits with margin from ~{low} to ~{high} nodes depending on the part's shape (try to find out)",
   "ma.updated": "Mesh updated: {label}, {nodes} nodes. {status}.",
   "ma.results_stale": "The results already in the document were computed with the previous mesh: solve again before generating the report.",
+  "ma.degenerate": "Warning: {n} element(s) of this mesh are degenerate (flat or folded); CalculiX will refuse it. Choose another fineness and create the mesh again.",
   "mo.command": "Optimise mesh by the error (beta)",
   "mo.command_tip": "Beta version. Solves your analysis, measures the estimated error and refines the mesh only where it is high, repeating until the target or the computer's limit.",
   "mo.title": "Optimise mesh by the error (beta)",

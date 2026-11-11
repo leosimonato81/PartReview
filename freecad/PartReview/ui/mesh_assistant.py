@@ -704,10 +704,12 @@ class MeshAssistantPanel:
                             status=t("ma.status." + status.value)), where)
         if mesh_runner.has_results(self.doc):
             text += " " + t("ma.results_stale")
+        if job.degenerate:  # CalculiX would refuse this mesh: never only a status-bar note
+            text += " " + t("ma.degenerate", n=self.tr.integer(len(job.degenerate)))
         App.Console.PrintMessage("PartReview: %s\n" % text)
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(mesh)  # the new mesh is selected in the tree
-        if inside and not mesh_runner.has_results(self.doc):  # all set: status bar note
+        if inside and not mesh_runner.has_results(self.doc) and not job.degenerate:
             Gui.getMainWindow().statusBar().showMessage(text, 20000)
         else:  # something to do (mesh outside the analysis): say it clearly
             QMessageBox.information(Gui.getMainWindow(), t("ma.title"), text)

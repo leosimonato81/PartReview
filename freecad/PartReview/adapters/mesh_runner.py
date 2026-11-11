@@ -13,7 +13,7 @@ import time
 
 import FreeCAD as App  # type: ignore
 
-from ..domain.gmsh_log import GmshRun, parse_gmsh_log
+from ..domain.gmsh_log import GmshRun, parse_gmsh_log, single_thread
 
 MARKER = "PartReviewAssistant"  # property on every object the assistant creates
 
@@ -191,6 +191,10 @@ class GmshJob:
         self.mesh_obj = mesh_obj
         self.tools = GmshTools(mesh_obj)
         self.tools.prepare()  # writes .brep + .geo in a temporary folder
+        with open(self.tools.temp_file_geo) as fh:
+            geo = fh.read()
+        with open(self.tools.temp_file_geo, "w") as fh:
+            fh.write(single_thread(geo))  # same mesh on every run (see single_thread)
         self.log_path = os.path.join(os.path.dirname(self.tools.temp_file_geo), "gmsh.log")
         self.time_limit = time_limit_s
         self.memory_limit = memory_limit_mb
@@ -200,6 +204,7 @@ class GmshJob:
         self.started = 0.0
         self.elapsed = 0.0
         self.run = GmshRun()
+        self.degenerate = ()  # ids of degenerate elements of a loaded mesh (CalculiX refuses)
         self._process = None
         self._log = None
 
@@ -227,14 +232,30 @@ class GmshJob:
         self.run = parse_gmsh_log(self._read_log())
         if self._process.returncode == 0 and self.run.finished:
             if self.load:  # undoable, like every write to the user's document (rule 9)
-                doc = self.mesh_obj.Document
-                doc.openTransaction("PartReview: generate mesh")
-                self.tools.update_properties()  # mesh_obj.FemMesh = Fem.read(...)
-                doc.commitTransaction()
+                self._load()
             self.state = self.DONE
         else:
             self.state = self.FAILED
         return self.state
+
+    def _load(self):
+        """Read the mesh Gmsh wrote, check it, then put it in the mesh object
+        (what FreeCAD's GmshTools.update_properties does, plus the check)."""
+        import Fem  # type: ignore
+        from .mesh_check import degenerate_elements
+        fem_mesh = Fem.read(self.tools.temp_file_mesh)
+        self.degenerate = tuple(degenerate_elements(fem_mesh))
+        if self.degenerate:
+            App.Console.PrintWarning(
+                "PartReview: mesh %s has %d degenerate element(s) (zero or negative "
+                "Jacobian determinant; CalculiX will refuse it): %s\n"
+                % (self.mesh_obj.Label, len(self.degenerate),
+                   ", ".join(str(e) for e in self.degenerate[:10])))
+        doc = self.mesh_obj.Document
+        doc.openTransaction("PartReview: generate mesh")
+        self.mesh_obj.FemMesh = fem_mesh
+        self.tools.rename_groups()
+        doc.commitTransaction()
 
     def cancel(self):
         if self.state == self.RUNNING:

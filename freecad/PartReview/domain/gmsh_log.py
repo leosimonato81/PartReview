@@ -32,3 +32,21 @@ def parse_gmsh_log(text: str) -> GmshRun:
     stages = tuple((name, float(seconds)) for name, seconds in _STAGE.findall(text))
     errors = tuple(e.strip() for e in _ERROR.findall(text))
     return GmshRun(nodes, elements, inverted, stages, errors)
+
+
+_THREADS = re.compile(r"^\s*General\.NumThreads\s*=.*$", re.MULTILINE)
+
+
+def single_thread(geo: str) -> str:
+    """Gmsh input (.geo) set to mesh with ONE thread.
+
+    FreeCAD writes General.NumThreads from its preference (default: every core).
+    With several threads Gmsh gave a different mesh on each run of the same input
+    and, now and then, a flat tetrahedron that CalculiX refused (A1b, 2026-11-11);
+    with one thread the same input gave the same mesh every time, in the same
+    time. So a mesh the assistant tested is the mesh it creates."""
+    line = "General.NumThreads = 1;"
+    if _THREADS.search(geo):
+        return _THREADS.sub(line, geo)
+    return line + "\n" + geo
+

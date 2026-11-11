@@ -337,6 +337,7 @@
   "ma.src.estimated_band": "cabe com folga de ~{low} a ~{high} nós, conforme a forma da peça (teste para saber)",
   "ma.updated": "Malha atualizada: {label}, {nodes} nós. {status}.",
   "ma.results_stale": "Os resultados que já estão no documento foram calculados com a malha anterior: calcule de novo antes de gerar o relatório.",
+  "ma.degenerate": "Atenção: {n} elemento(s) desta malha estão degenerados (achatados ou dobrados); o CalculiX vai recusá-la. Escolha outra finura e crie a malha de novo.",
   "mo.command": "Otimizar malha pelo erro (beta)",
   "mo.command_tip": "Versão beta. Calcula a sua análise, mede o erro estimado e refina a malha só onde ele é alto, repetindo até a meta ou o limite do computador.",
   "mo.title": "Otimizar malha pelo erro (beta)",
