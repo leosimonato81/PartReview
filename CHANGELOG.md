@@ -2,6 +2,50 @@
 
 All notable changes to PartReview. / Mudanças importantes do PartReview.
 
+## 1.6.3 — 2026-11-11 — "Malha confiável em um clique / Reliable mesh in one click"
+
+Stability release: a mesh assistant you can trust with one button, checked
+against known solutions, and report fixes. / Versão de estabilidade: assistente
+de malha confiável com um botão, conferido contra soluções conhecidas, e
+correções no relatório.
+
+**Mesh assistant / Assistente de malha**
+- One button, "Create the recommended mesh": tests the options on this
+  computer, picks the recommended one and creates it (one undo step). It creates
+  nothing when no option fits with margin: it says so and opens "Other options"
+  (cards, test, objective, create the chosen one). / Um botão testa, escolhe e
+  cria; se nada cabe com folga, não cria e abre "Outras opções".
+- Validated where it matters: plate with a hole (Heywood, Kt) and strip in
+  bending (M·c/I, exact to 0.03 % with one element through the thickness). The
+  recommendation texts say what these cases showed: coarse options can miss a
+  hole peak by about 2–3 % in thin parts (the report's local error estimate
+  shows it). / Validado na placa com furo e na tira em flexão; textos honestos.
+- Holes and fillets refined at about r/5, with a cost guard; supports and loads
+  are no longer refined (FreeCAD's mesh regions spread the size over the whole
+  bar or plate: 3.6–5.6 × the nodes). / Refino em furos e raios; apoios e
+  cargas não são mais refinados.
+- Gmsh with one thread: the same mesh every time (several threads gave
+  different meshes and, at random, flat elements that CalculiX refuses).
+  Degenerate elements are checked before the mesh is loaded. / Gmsh com 1
+  thread; elementos degenerados detectados antes de carregar.
+- Says what really makes the mesh heavy, measured on the part (the extra nodes
+  of the local refinement), never guessed. / Diz o que pesa na malha, medido.
+- Material warnings read from the analysis: Poisson ratio ≥ 0.45 (rubber, TPU:
+  linear analysis only for small strains) and a plastic that may be printed
+  (solid isotropic model: infill and layers not included, strength between
+  layers not checked). / Avisos de material lidos da análise.
+
+**Report / Relatório**
+- Fix: "'NoneType' object has no attribute 'triangles'" while capturing the
+  deformed shape when the result mesh has no tetrahedra (seen on Windows,
+  FreeCAD 1.1.3). The tetrahedra are taken from the analysis mesh when it has
+  the same nodes; otherwise the report is written without the part outline and
+  the console says what the result mesh had. / Correção do erro ao capturar a
+  forma deformada.
+- Reports are saved to the Downloads folder; a folder you choose becomes the
+  default, also after FreeCAD restarts. / Relatórios na pasta Downloads; a pasta
+  escolhida passa a ser a padrão.
+
 ## 1.6.2 — 2026-11-09
 
 Report for daily use, for several materials (steel, aluminium, PLA, ABS, PETG).

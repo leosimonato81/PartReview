@@ -127,16 +127,23 @@ Use it **before** solving, usually on a model that has no mesh yet.
    só uma, ela já vem escolhida, e a selecionada na tela também). O painel mostra
    dimensões, volume e a *espessura característica*
    (t = 2·volume/área; todas as sugestões partem dela, por isso servem para
-   peças de qualquer tamanho). **Avisos de geometria:** paredes muito mais finas
-   que a peça (provável sobra de modelagem), furos e raios pequenos, e apoios ou
-   cargas em arestas ou vértices (tensão teoricamente infinita ali). Clique duas
-   vezes num aviso para selecionar a face na tela.
+   peças de qualquer tamanho). **Avisos da peça e da análise:** paredes muito
+   mais finas que a peça (provável sobra de modelagem), furos e raios pequenos,
+   apoios ou cargas em arestas ou vértices (tensão teoricamente infinita ali) e o
+   que o cálculo não representa no material da análise: coeficiente de Poisson
+   ≥ 0,45 (borracha, TPU: análise linear só para deformações pequenas) e plástico
+   que pode ser impresso (o cálculo trata a peça como maciça; camadas e
+   preenchimento não entram). Clique duas vezes num aviso para selecionar a face
+   na tela.
 3. **2 · Seu computador:** separa o que foi **lido do sistema** (memória total e
    livre, núcleos), o que foi **medido neste computador** (ensaios do CalculiX) e
    o que é **estimado** a partir dos dois.
 4. **3 · Escolha da malha:** se a peça já tem malha, o cartão **Malha atual**
-   diz se ela deve caber na memória. Clique em **Testar as opções** (cerca de
-   meio minuto a um minuto): o assistente gera as malhas baratas num documento
+   diz se ela deve caber na memória. O caminho normal é um botão só: **Criar a
+   malha recomendada** testa as opções, escolhe a recomendada e a cria — só se
+   ela couber com folga neste computador; senão para, avisa e abre **Outras
+   opções**. Em **Outras opções**, **Testar as opções** (cerca de
+   meio minuto a dois minutos): o assistente gera as malhas baratas num documento
    oculto — o seu arquivo não muda —, roda o CalculiX em malhas de ensaio
    pequenas **da sua peça, no seu computador** para medir memória e tempo, e só
    gera as malhas finas que têm chance de caber (as outras aparecem como
@@ -145,9 +152,10 @@ Use it **before** solving, usually on a model that has no mesh yet.
    recomendada leva ★ (normalmente a média: cerca de 2 elementos na espessura).
    Ou escolha um **objetivo** (a malha mais fina que cabe na memória, ou cálculo
    em até ~1, 5 ou 10 minutos) e clique em **Gerar malha automática**.
-5. **4 · Criar a malha:** cria um objeto de malha Gmsh **novo** (nada do que já
-   existe é alterado; Ctrl+Z desfaz), com refino local nas faces pequenas de
-   apoio e carga, gera a malha, seleciona-a na árvore e fecha o painel. Rodar o
+5. **Criar a malha escolhida** (em Outras opções) ou o botão único criam um
+   objeto de malha Gmsh **novo** (nada do que já existe é alterado; Ctrl+Z
+   desfaz), com refino local em furos e arredondamentos (cerca de r/5, com trava
+   de custo), gera a malha, seleciona-a na árvore e fecha o painel. Rodar o
    assistente de novo **atualiza** essa mesma malha (não cria outra); malhas
    feitas por você nunca são alteradas.
 6. Gere a malha (se ainda não estiver gerada) e calcule pelo Workbench FEM.
@@ -211,7 +219,10 @@ the computer's limits or stagnation (singularities).
    ele); deixe-o vazio para um relatório sem logo. Os campos do último
    relatório (empresa, autor, aparência, nível, idioma, unidades, limite de
    escoamento, FS exigido, exportações) voltam enquanto o FreeCAD fica aberto; o logo
-   escolhido é lembrado também depois de fechar.
+   escolhido é lembrado também depois de fechar. O PDF é salvo na pasta
+   **Downloads**; se você escolher outra pasta, ela passa a ser a padrão (também
+   depois de fechar). / The PDF goes to your **Downloads** folder; a folder you
+   choose instead becomes the default.
 5. Opcional: em **Aparência e textos fixos**, escolha a cor de destaque (padrão:
    preto) e os textos de abertura e de responsabilidade. Com cores claras, os
    títulos usam automaticamente um tom mais escuro da mesma cor, para manter o
