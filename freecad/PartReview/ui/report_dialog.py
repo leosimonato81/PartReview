@@ -406,9 +406,10 @@ class ReportDialog(QDialog):
         self._show_color()
 
     def _default_output(self):
-        base = os.path.splitext(self.doc.FileName)[0] if self.doc.FileName else \
-            os.path.join(os.path.expanduser("~"), self.doc.Label)
-        return base + "_PartReview.pdf"
+        """<Downloads or the folder last chosen>/<document>_PartReview.pdf."""
+        name = os.path.splitext(os.path.basename(self.doc.FileName))[0] if self.doc.FileName \
+            else self.doc.Label
+        return os.path.join(preferences.output_dir(), name + "_PartReview.pdf")
 
     def _browse(self):
         path, _ = QFileDialog.getSaveFileName(self, self.tr_ui.t("ui.output"),
