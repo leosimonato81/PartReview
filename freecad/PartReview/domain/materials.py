@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 Leonardo Simonato
-"""Material logic of PartReview (one place, CLAUDE.md architecture rule 4).
+"""Material logic of PartReview, kept in one place.
 
 For now: warnings about what the linear static analysis cannot represent for the
 materials of the analysis, read before the calculation (mesh assistant).
@@ -8,7 +8,7 @@ materials of the analysis, read before the calculation (mesh assistant).
 - Poisson ratio >= 0.45 (rubber, TPU, other elastomers): nearly incompressible
   material. The analysis is linear elastic, valid only for small strains;
   elastomers usually work at large strains, which need a hyperelastic model that
-  PartReview does not cover (out of scope, PLANO.md).
+  PartReview does not cover (out of scope).
 - Young's modulus in the polymer range (models.material_family, Ashby charts):
   the part may be 3D printed. The mesh is a solid part with the same properties
   in every direction: infill, perimeters and layers are not represented and the
