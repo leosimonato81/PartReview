@@ -166,6 +166,7 @@ class MeshAssistantPanel:
         self.refine = ()  # faces refined locally: supports, loads, small radii
         self.recommended = None  # (MeshLevel, reason key) after a test
         self.test_run = False
+        self.create_after_test = False  # one-click "create the recommended mesh" (A5)
 
         self.form = QWidget()
         self.form.setWindowTitle(t("ma.title"))
@@ -225,7 +226,10 @@ class MeshAssistantPanel:
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.itemSelectionChanged.connect(self._show_selected)
         self.test_button = _button(t("ma.test"), QStyle.SP_MediaPlay, self.test_options,
-                                   primary=True, tip=t("ma.test_tip"))
+                                   tip=t("ma.test_tip"))
+        self.one_button = _button(t("ma.create_recommended"), QStyle.SP_DialogApplyButton,
+                                  self.create_recommended, primary=True,
+                                  tip=t("ma.create_recommended_tip"))
         self.objective_box = QComboBox()
         for objective in mp.Objective:
             self.objective_box.addItem(t("ma.objective." + objective.value), objective)
@@ -259,22 +263,31 @@ class MeshAssistantPanel:
         progress_row = QHBoxLayout()
         progress_row.addWidget(self.progress, 1)
         progress_row.addWidget(self.cancel_button)
+        self.create_button = _button(t("ma.create"), QStyle.SP_DialogApplyButton,
+                                     self.create_mesh, tip=t("ma.create_tip"))
+        # A5: one button does it all; choosing another mesh stays one click away.
         options_layout.addWidget(self.recommend_label)
         options_layout.addWidget(self.current_label)
-        options_layout.addWidget(self.cards_widget)
-        options_layout.addWidget(self.test_button)
+        options_layout.addWidget(self.one_button)
         options_layout.addWidget(self.status_label)
         options_layout.addLayout(progress_row)
-        options_layout.addWidget(auto_box)
         layout.addWidget(self.options_box)
 
-        self.create_title = QLabel("<b>%s</b>" % t("ma.group.create"))
-        layout.addWidget(self.create_title)
-        actions = QHBoxLayout()
-        self.create_button = _button(t("ma.create"), QStyle.SP_DialogApplyButton,
-                                     self.create_mesh, primary=True, tip=t("ma.create_tip"))
-        actions.addWidget(self.create_button)
-        layout.addLayout(actions)
+        self.more_box = QGroupBox(t("ma.group.more"))
+        self.more_box.setCheckable(True)
+        self.more_box.setChecked(False)
+        self.more_box.setFlat(True)
+        more_inner = QWidget()  # option cards, test, objective, create the chosen one
+        more = QVBoxLayout(more_inner)
+        more.setContentsMargins(0, 0, 0, 0)
+        more.addWidget(self.cards_widget)
+        more.addWidget(self.test_button)
+        more.addWidget(auto_box)
+        more.addWidget(self.create_button)
+        more_inner.setVisible(False)
+        self.more_box.toggled.connect(more_inner.setVisible)
+        QVBoxLayout(self.more_box).addWidget(more_inner)
+        layout.addWidget(self.more_box)
 
         self.details_box = QGroupBox(t("ma.group.details"))
         self.details_box.setCheckable(True)
@@ -479,6 +492,28 @@ class MeshAssistantPanel:
         self.auto_attempt = 1
         self._run([("auto", auto_option(self.summary, size, "mesh.reason.objective"))])
 
+    def create_recommended(self):
+        """One click: test the options on this computer (unless already tested), then
+        create the recommended mesh, only when it fits with margin (A5)."""
+        if self.summary is None or self.job is not None:
+            return
+        if self.recommended is None:
+            self.create_after_test = True
+            self.test_options()
+            return
+        self._create_if_it_fits()
+
+    def _create_if_it_fits(self):
+        t = self.tr.t
+        level = self.recommended[0]
+        trial = self.trials.get(level)
+        if trial is None or self._status(trial) is not BudgetStatus.FITS:
+            self.status_label.setText(t("ma.one_click_stopped"))
+            self.more_box.setChecked(True)  # the choice is the user's: show the options
+            return
+        self._select_level(level)
+        self.create_mesh()
+
     def create_mesh(self):
         t = self.tr.t
         option = self._selected_option()
@@ -667,6 +702,7 @@ class MeshAssistantPanel:
         option = payload[0] if kind == "create" else payload
         level = t("ma.level." + option.level.value).lower()
         self.tasks = []
+        self.create_after_test = False
         self._set_busy(False)
         self.timer.stop()
         self.details.setPlainText("%s\n\n%s" % (mt.gmsh_settings(option, self.tr), job.log_tail()))
@@ -683,6 +719,10 @@ class MeshAssistantPanel:
             self.status_label.setText(t("ma.tested", elapsed=format_duration(
                 time.monotonic() - self.run_started)))
             self._recommend()
+            if self.create_after_test:
+                self.create_after_test = False
+                if self.recommended is not None:
+                    self._create_if_it_fits()
 
     def _recommend(self):
         t = self.tr.t
@@ -979,14 +1019,14 @@ class MeshAssistantPanel:
         self.progress.setVisible(busy)
         self.cancel_button.setVisible(busy)
         analysed = self.summary is not None
-        for widget in (self.test_button, self.auto_button, self.create_button,
-                       self.objective_box):
+        for widget in (self.one_button, self.test_button, self.auto_button,
+                       self.create_button, self.objective_box):
             widget.setEnabled(not busy and analysed)
         self.analyze_button.setEnabled(not busy)
         self.part_combo.setEnabled(not busy)
 
     def _enable(self, analysed):
-        for widget in (self.issues_box, self.options_box, self.details_box, self.create_title):
+        for widget in (self.issues_box, self.options_box, self.details_box, self.more_box):
             widget.setVisible(analysed)
         self._set_busy(False)
 

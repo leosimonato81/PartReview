@@ -4,6 +4,8 @@
 # Smoke test of the mesh assistant on a COPY of a document, invisible GUI:
 # analyse the part, test the options (Gmsh + CalculiX probes), ask for an
 # objective, create the recommended mesh, and print what the panel shows.
+# PARTREVIEW_ONE_CLICK=1: only the single button "Create the recommended mesh" (A5).
+# PARTREVIEW_FREE_MB=<n>: pretend only n MB are free (to see the button stop).
 #
 #   flatpak run --env=QT_QPA_PLATFORM=offscreen --env=PARTREVIEW_DOC=<file.FCStd> \
 #       --env=PARTREVIEW_PART=<object name> --env=PARTREVIEW_OUT=<report.txt> \
@@ -57,6 +59,11 @@ def main():
     machine_calibration._file = lambda: calibration
     from freecad.PartReview.ui import mesh_assistant as ma
     ma.QMessageBox.information = lambda *a: say("  message:", a[2][:200])
+    if os.environ.get("PARTREVIEW_FREE_MB"):  # simulate a busy computer (stop path of A5)
+        from dataclasses import replace as _replace
+        real = ma.machine_profile
+        free = float(os.environ["PARTREVIEW_FREE_MB"])
+        ma.machine_profile = lambda: _replace(real(), available_mb=free)
 
     source = os.environ["PARTREVIEW_DOC"]
     copy = os.path.join(tempfile.mkdtemp(prefix="pr_smoke_"), os.path.basename(source))
@@ -77,6 +84,26 @@ def main():
     say("refine:", panel.refine_label.text())
     for i in range(panel.issues.count()):
         say("  issue:", panel.issues.item(i).text()[:160])
+
+    if os.environ.get("PARTREVIEW_ONE_CLICK"):  # A5: the single button, then stop
+        started = time.time()
+        panel.create_recommended()
+        while (time.time() - started < 900 and Gui.Control.activeDialog()
+               and (panel.job is not None or panel.tasks)):
+            QApplication.processEvents()
+            time.sleep(0.05)
+        QApplication.processEvents()
+        closed = not bool(Gui.Control.activeDialog())  # closed = mesh created
+        say("one click: %.0f s; panel closed: %s" % (time.time() - started, closed))
+        if not closed:  # stopped: read what the panel says
+            say("status:", panel.status_label.text())
+            say("recommend:", panel.recommend_label.text().replace("\n", " ")[:300])
+            say("other options open:", panel.more_box.isChecked())
+        meshes = [o for o in doc.Objects if o.isDerivedFrom("Fem::FemMeshObject")
+                  and hasattr(o, "PartReviewAssistant")]
+        say("created:", [(m.Label, m.FemMesh.NodeCount) for m in meshes])
+        say("undo:", doc.UndoNames[:3])
+        return
 
     started = time.time()
     panel.test_options()

@@ -124,6 +124,8 @@ def test_recommendation_prefers_two_elements_across_the_wall():
     assert recommend(all_fit, {L.FINE: 600.0})[0] is L.MEDIUM  # too slow for the default
     tight = {L.VERY_COARSE: B.FITS, L.COARSE: B.FITS, L.MEDIUM: B.TIGHT}
     assert recommend(tight, {}) == (L.COARSE, "ma.recommend.coarse")
+    nothing = {L.VERY_COARSE: B.TIGHT, L.COARSE: B.TOO_BIG}
+    assert recommend(nothing, {}) == (L.VERY_COARSE, "ma.recommend.none_fits")
 
 
 def test_total_time_includes_freecad_overhead():

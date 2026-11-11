@@ -179,4 +179,6 @@ def recommend(statuses: dict, seconds: dict):
         return MeshLevel.MEDIUM, "ma.recommend.medium"
     if MeshLevel.COARSE in fits:
         return MeshLevel.COARSE, "ma.recommend.coarse"
-    return MeshLevel.VERY_COARSE, "ma.recommend.very_coarse"
+    if MeshLevel.VERY_COARSE in fits:
+        return MeshLevel.VERY_COARSE, "ma.recommend.very_coarse"
+    return MeshLevel.VERY_COARSE, "ma.recommend.none_fits"  # the lightest; nothing fits
