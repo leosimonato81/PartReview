@@ -253,13 +253,17 @@ def eighth_frame(half_length):
 def measure(result, part, wall, frame, hole_size):
     """Reference quantities from one result (all stresses in MPa)."""
     fem = result.Mesh.FemMesh
-    nodes = set(fem.getNodesByFace(part.Shape.getElement(wall)))
     index = {n: i for i, n in enumerate(result.NodeNumbers)}
     sxx, vm = result.NodeStressXX, result.vonMises
     if not sxx:
         raise RuntimeError("the result has no NodeStressXX")
     pos = fem.Nodes
     cx, cy, z_mid, z_faces, x_far = frame
+    # Hole-wall nodes chosen geometrically (radius d/2), not by
+    # FemMesh.getNodesByFace: on a 0.5 mm region mesh that call returned 487 of
+    # the 824 wall nodes (A1b, 2026-11-11) and the peak looked like 12 MPa at 60 deg.
+    nodes = {n for n, p in pos.items()
+             if abs(math.hypot(p.x - cx, p.y - cy) - D / 2) < 1e-3 and n in index}
 
     def angle(n):  # degrees from the load axis (x), 0..180
         p = pos[n]
