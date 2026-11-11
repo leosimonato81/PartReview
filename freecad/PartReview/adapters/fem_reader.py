@@ -353,6 +353,57 @@ def read_volume_elements(mesh_obj):
     return tuple(tuple(fem_mesh.getElementNodes(eid)) for eid in fem_mesh.Volumes)
 
 
+def _all_tetrahedra(elements):
+    return bool(elements) and all(len(e) in (4, 10) for e in elements)
+
+
+def _same_nodes(result_mesh, other_mesh, samples=200):
+    """True when ``other_mesh`` has the result mesh's node ids at the same places."""
+    mine, theirs = result_mesh.Nodes, other_mesh.Nodes
+    if len(mine) != len(theirs):
+        return False
+    ids = sorted(mine)
+    tolerance = 1e-6 * max(1.0, result_mesh.BoundBox.DiagonalLength)
+    for n in ids[::max(1, len(ids) // samples)]:
+        if n not in theirs or (mine[n] - theirs[n]).Length > tolerance:
+            return False
+    return True
+
+
+def result_volume_elements(mesh_obj, analysis):
+    """Tetrahedra of a result: from the result mesh, or else from the analysis'
+    own mesh when it has the same nodes (same ids, same positions).
+
+    A report without tetrahedra loses its surface (balloons, hidden points,
+    outlines); the console line says what the result mesh had, so that a case
+    seen on another computer can be understood."""
+    elements = read_volume_elements(mesh_obj)
+    if _all_tetrahedra(elements):
+        return elements
+    fem_mesh = mesh_obj.FemMesh
+    sizes = sorted({len(e) for e in elements})
+    App.Console.PrintWarning(
+        "PartReview: result mesh %s has %d nodes, %d volume elements (nodes per element: "
+        "%s), %d faces, %d edges; no tetrahedra to build the part surface.\n"
+        % (mesh_obj.Label, fem_mesh.NodeCount, len(elements), sizes or "-",
+           fem_mesh.FaceCount, fem_mesh.EdgeCount))
+    result_meshes = [getattr(o, "Mesh", None) for o in analysis.Group
+                     if is_mechanical_result(o)]
+    for other in analysis.Group:
+        if not other.isDerivedFrom("Fem::FemMeshObject") or other is mesh_obj \
+                or any(other is r for r in result_meshes):
+            continue
+        fem = getattr(other, "FemMesh", None)
+        if fem is None or not _same_nodes(fem_mesh, fem):
+            continue
+        candidate = read_volume_elements(other)
+        if _all_tetrahedra(candidate):
+            App.Console.PrintWarning("PartReview: using the tetrahedra of %s (same nodes).\n"
+                                     % other.Label)
+            return candidate
+    return elements
+
+
 def convert(quantity, unit):
     """Domain Quantity -> same physical value expressed in ``unit``."""
     q = App.Units.Quantity(quantity.value, quantity.unit)
@@ -518,5 +569,5 @@ def read_fem_result(doc, result_name, unit_system=UnitSystem.MPA_MM):
         fields=read_fields(result_obj, unit_system),
         materials=read_materials(analysis, unit_system),
         constraints=read_constraints(analysis, unit_system),
-        elements=read_volume_elements(mesh_obj),
+        elements=result_volume_elements(mesh_obj, analysis),
     )

@@ -317,7 +317,8 @@ def generate_fem_report(doc, config, progress=_no_progress):
                 if view.deformation:
                     vs.displace(mesh_obj, list(displacement), list(displacement.values()),
                                 view.deformation)
-                    vs.add_overlay(boundary_scene.outline(result, surface))  # unloaded part
+                    if surface is not None:  # no tetrahedra: no outline (see fem_reader)
+                        vs.add_overlay(boundary_scene.outline(result, surface))  # unloaded part
                 vs.save_image(image_paths[len(boundary_views) + i], *IMAGE_SIZE)
                 if view.deformation:
                     vs.undisplace(mesh_obj)
