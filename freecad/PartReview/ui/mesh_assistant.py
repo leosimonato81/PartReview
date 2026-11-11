@@ -52,6 +52,8 @@ from ..domain import mesh_plan as mp
 from ..domain import mesh_texts as mt
 from ..domain.geometry_summary import find_issues
 from ..domain.i18n import Translator
+from ..domain.materials import material_notes
+from ..domain.models import UnitSystem
 from ..domain.mesh_budget import FITS_FRACTION, TIGHT_FRACTION, BudgetStatus
 from ..domain.mesh_sizing import (DEFAULT_LEVEL, MeshLevel, auto_option, estimate_nodes,
                                   mesh_options, with_straight_edges)
@@ -414,6 +416,10 @@ class MeshAssistantPanel:
                 item.setData(Qt.UserRole, subs)
                 self.issues.addItem(item)
                 issues.append(None)
+        for note in material_notes(fem_reader.materials_of_part(
+                self.doc, self.solid, UnitSystem.FREECAD_SCHEMA)):
+            self.issues.addItem(QListWidgetItem("⚠ " + mt.material_note_text(note, self.tr)))
+            issues.append(None)
         self.refine = ()  # supports/loads are not refined (see domain/mesh_sizing)
         self.plain_nodes = None
         self._show_refine()

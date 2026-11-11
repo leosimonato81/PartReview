@@ -37,6 +37,14 @@ def issue_text(issue: GeometryIssue, summary: GeometrySummary, tr) -> str:
                 + (" …" if len(issue.elements) > 4 else ""))
 
 
+def material_note_text(note, tr) -> str:
+    """Text of a materials.MaterialNote (issue list of the mesh assistant)."""
+    mat = note.material
+    return tr.t("ma.material." + note.kind, name=mat.name,
+                nu=tr.number(mat.poisson_ratio, 2) if mat.poisson_ratio is not None else "—",
+                E=tr.quantity(mat.youngs_modulus))
+
+
 def machine_rows(machine: MachineProfile, model, probes, history, history_date, tr) -> list:
     """Step 2, one row per SOURCE of information, so the user sees what was read from
     the system, what was measured on this computer and what is only estimated.

@@ -209,6 +209,32 @@ def read_materials(analysis, unit_system):
     return tuple(materials)
 
 
+def materials_of_part(doc, solid, unit_system):
+    """Materials (domain Material) that apply to ``solid``, read only.
+
+    Analyses taken: those holding a support/load on ``solid`` or a mesh of it. A
+    material with References applies only to the parts it references; without
+    References, to the whole analysis. Same name read twice is kept once."""
+    found, names = [], set()
+    for analysis in (o for o in doc.Objects if o.TypeId == "Fem::FemAnalysis"):
+        group = analysis.Group
+        uses = any(getattr(o, "Shape", None) is solid for o in group
+                   if o.isDerivedFrom("Fem::FemMeshObject")) or any(
+            target is solid for o in group if o.TypeId.startswith("Fem::Constraint")
+            for target, _ in (getattr(o, "References", None) or []))
+        if not uses:
+            continue
+        for mat, obj in zip(read_materials(analysis, unit_system),
+                            [o for o in group if o.isDerivedFrom("App::MaterialObjectPython")]):
+            refs = getattr(obj, "References", None) or []
+            if refs and not any(target is solid for target, _ in refs):
+                continue
+            if mat.name not in names:
+                names.add(mat.name)
+                found.append(mat)
+    return found
+
+
 def _references(obj):
     refs = []
     for target, subs in getattr(obj, "References", []) or []:
