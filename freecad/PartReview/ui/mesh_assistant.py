@@ -402,13 +402,14 @@ class MeshAssistantPanel:
                 item.setData(Qt.UserRole, subs)
                 self.issues.addItem(item)
                 issues.append(None)
-        small = []  # small radii: curvature-based sizing already refines them
         shape = geometry_reader.solid_shape(self.solid)
         faces = [s for _, _, subs in targets for s in subs if s.startswith("Face")
                  and shape.getElement(s).Area <= REFINE_MAX_AREA_SHARE * self.summary.area]
-        self.refine = tuple(dict.fromkeys(faces + small))
-        self.refine_label.setText(t("ma.refine", count=len(self.refine)) if self.refine
-                                  else t("ma.refine_none"))
+        self.refine = tuple(dict.fromkeys(faces))  # supports/loads; radii: in each option
+        default = next(o for o in self.options if o.level is DEFAULT_LEVEL)
+        curved = sum(len(f) for _, f in default.radius_regions)
+        self.refine_label.setText(t("ma.refine", count=len(self.refine), curved=curved)
+                                  if self.refine or curved else t("ma.refine_none"))
         count = sum(1 for i in range(self.issues.count()))
         self.issues_box.setTitle("%s (%d)" % (t("ma.group.issues"), count))
         if not issues:
@@ -594,7 +595,8 @@ class MeshAssistantPanel:
         for target in mp.PROBE_TARGETS[:MAX_PROBES]:
             size = mp.probe_size(self.summary.volume, target)
             option = replace(auto_option(self.summary, size, "mesh.reason.objective"),
-                             curvature=0, local_size=0.0, straight_edges=True)
+                             curvature=0, local_size=0.0, radius_regions=(),
+                             straight_edges=True)
             self.tasks.append(("probe_gmsh", (target, option)))
 
     def _probe_done(self, gmsh_job, job):

@@ -10,7 +10,13 @@ from freecad.PartReview.domain.geometry_summary import (
     find_issues,
 )
 from freecad.PartReview.domain.gmsh_log import parse_gmsh_log, single_thread
-from freecad.PartReview.domain.mesh_sizing import MeshLevel, mesh_options, with_straight_edges
+from freecad.PartReview.domain.mesh_sizing import (
+    MeshLevel,
+    mesh_options,
+    radius_regions,
+    region_groups,
+    with_straight_edges,
+)
 
 # Owner's part (spike 8.0, "Shroud 001"): real numbers from the geometry inventory.
 SHROUD = GeometrySummary(
@@ -161,4 +167,36 @@ def test_single_thread_replaces_freecad_thread_count():
 def test_single_thread_added_when_missing():
     out = single_thread("Mesh.ElementOrder = 2;\n")
     assert out.startswith("General.NumThreads = 1;")
+
+
+def test_radius_regions_plate_with_hole():
+    # A1 plate: hole r = 5 mm, global 2 mm -> one region of r/5 = 1 mm on the hole.
+    assert radius_regions(((5.0, "Face7"),), 2.0) == ((1.0, ("Face7",)),)
+
+
+def test_radius_regions_floor_and_skip():
+    radii = ((0.4, "Face1"), (0.4, "Face2"), (5.0, "Face3"), (50.0, "Face4"))
+    groups = radius_regions(radii, 2.0)
+    # 0.4/5 = 0.08 is below h/4 = 0.5 -> 0.5 (cost guard); 50/5 = 10 >= h -> no region
+    assert groups == ((0.5, ("Face1", "Face2")), (1.0, ("Face3",)))
+
+
+def test_region_groups_supports_and_radii_merge_to_smaller_size():
+    option = mesh_options(box(200, 100, 10))[2]
+    option = option.__class__(**{**option.__dict__, "radius_regions": (
+        (0.5, ("Face9",)), (1.0, ("Face2",)))})
+    groups = region_groups(option, refine=("Face1", "Face2"))
+    assert groups[option.local_size] == ["Face1"]
+    assert "Face2" in groups[min(1.0, option.local_size)]
+    assert groups[0.5] == ["Face9"]
+    assert sum(len(f) for f in groups.values()) == 3  # each face once
+
+
+def test_options_carry_radius_regions_of_the_part():
+    for option in mesh_options(SHROUD):
+        for size, faces in option.radius_regions:
+            assert 0.99 * option.max_size / 4 <= size < option.max_size  # 3-digit rounding
+            assert faces
+    medium = mesh_options(SHROUD)[2]
+    assert any("Face30" in faces for _, faces in medium.radius_regions)  # r = 5 mm hole
 

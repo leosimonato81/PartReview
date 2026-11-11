@@ -14,6 +14,7 @@ import time
 import FreeCAD as App  # type: ignore
 
 from ..domain.gmsh_log import GmshRun, parse_gmsh_log, single_thread
+from ..domain.mesh_sizing import region_groups
 
 MARKER = "PartReviewAssistant"  # property on every object the assistant creates
 
@@ -30,27 +31,6 @@ def constraint_targets(doc, solid):
             found.append((obj.Label, obj.TypeId.replace("Fem::Constraint", "").lower(),
                           tuple(subs)))
     return found
-
-
-def _set_region(doc, mesh, target, elements, size):
-    """One assistant mesh region (finer size) on ``elements`` of ``target``."""
-    import ObjectsFem  # type: ignore
-    regions = [r for r in mesh.MeshRegionList if MARKER in r.PropertiesList]
-    # Extra assistant regions (e.g. left by 'Optimise mesh by the error') would make the
-    # created mesh differ from the one tested and predicted: only one region is kept.
-    for region in regions[1:] if (elements and size > 0) else regions:
-        doc.removeObject(region.Name)
-    if not elements or size <= 0:
-        return None
-    region = regions[0] if regions else ObjectsFem.makeMeshRegion(doc, mesh, size,
-                                                                  "PartReview_Refine")
-    if not regions:
-        region.addProperty("App::PropertyString", MARKER, "PartReview",
-                           "Created by the PartReview mesh assistant")
-        setattr(region, MARKER, "refinement")
-    region.CharacteristicLength = size
-    region.References = [(target, tuple(elements))]
-    return region
 
 
 def set_regions(doc, mesh, target, groups):
@@ -292,7 +272,8 @@ class TrialDocument:
 
     def job(self, option, time_limit_s, memory_limit_mb, refine=()):
         _apply_option(self.mesh, option)
-        _set_region(self.doc, self.mesh, self.doc.getObject("Solid"), refine, option.local_size)
+        set_regions(self.doc, self.mesh, self.doc.getObject("Solid"),
+                    region_groups(option, refine))
         self.doc.recompute()
         return GmshJob(self.mesh, time_limit_s, memory_limit_mb, load_into_object=False)
 
@@ -340,7 +321,7 @@ def create_mesh_object(doc, solid_obj, option, version, refine=()):
         mesh.addProperty("App::PropertyString", MARKER, "PartReview",
                          "Created by the PartReview mesh assistant")
         setattr(mesh, MARKER, "%s %s" % (version, option.level.value))
-        _set_region(doc, mesh, solid_obj, refine, option.local_size)
+        set_regions(doc, mesh, solid_obj, region_groups(option, refine))
         found = analyses(doc)
         # Into the analysis only when it is the only one and has no mesh yet: FreeCAD's
         # CalculiX refuses an analysis with two meshes, and the user's mesh is never touched.
@@ -375,7 +356,7 @@ def create_or_update_mesh(doc, solid_obj, option, version, refine=()):
         mesh.Label = mesh_label(solid_obj)
         _apply_option(mesh, option)
         setattr(mesh, MARKER, "%s %s" % (version, option.level.value))
-        _set_region(doc, mesh, solid_obj, refine, option.local_size)
+        set_regions(doc, mesh, solid_obj, region_groups(option, refine))
         if getattr(mesh, "PartReviewConvergence", ""):  # the old study no longer applies
             mesh.PartReviewConvergence = ""  # ReadOnly only blocks the property editor
         doc.recompute()
